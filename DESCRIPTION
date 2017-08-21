@@ -1,0 +1,15 @@
+Package: writexl
+Type: Package
+Title: Export R Data Frames to xlsx Format
+Version: 0.1
+Authors@R: c(
+    person("Jeroen", "Ooms", ,"jeroen@berkeley.edu", role = c("aut", "cre")),
+    person("John McNamara", role = "cph", comment = "Author of libxlsxwriter"))
+Description: Light weight data frame to xlsx exporter based on libxlsxwriter. 
+    No Java or Excel required.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+URL: https://libxlsxwriter.github.io (upstream)
+RoxygenNote: 6.0.1
+Suggests: readxl

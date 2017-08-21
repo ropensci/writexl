@@ -1,0 +1,24 @@
+LIBXLSXWRITER	= \
+  libxlsxwriter/app.o libxlsxwriter/format.o libxlsxwriter/theme.o \
+  libxlsxwriter/chart.o libxlsxwriter/hash_table.o libxlsxwriter/utility.o \
+  libxlsxwriter/content_types.o libxlsxwriter/packager.o libxlsxwriter/workbook.o \
+  libxlsxwriter/core.o libxlsxwriter/relationships.o libxlsxwriter/worksheet.o \
+  libxlsxwriter/custom.o libxlsxwriter/shared_strings.o libxlsxwriter/xmlwriter.o \
+  libxlsxwriter/drawing.o libxlsxwriter/styles.o tmpfileplus/tmpfileplus.o \
+  minizip/ioapi.o minizip/mztools.o minizip/zip.o minizip/unzip.o
+
+STATICLIB=libxlsxwriter/libstatxlsxwriter.a
+
+PKG_CFLAGS=$(C_VISIBILITY)
+PKG_CPPFLAGS=-Iinclude
+PKG_LIBS=-Llibxlsxwriter -lstatxlsxwriter -lz
+
+all: clean
+
+$(SHLIB): $(STATICLIB)
+
+$(STATICLIB): $(LIBXLSXWRITER)
+	$(AR) rcs $(STATICLIB) $(LIBXLSXWRITER)
+
+clean:
+	rm -f $(SHLIB) $(STATICLIB) $(OBJECTS) $(LIBXLSXWRITER)
