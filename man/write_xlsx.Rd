@@ -6,7 +6,7 @@
 \title{Export to xlsx}
 \usage{
 write_xlsx(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
-  date_format = "yyyy-mm-dd HH:mm:ss")
+  date_format = "yyyy-mm-dd HH:mm:ss UTC")
 }
 \arguments{
 \item{x}{data frame to write to disk}

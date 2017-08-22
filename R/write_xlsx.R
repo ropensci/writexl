@@ -11,7 +11,7 @@
 #' @param date_format how timestamps are displayed in excel
 #' @examples tmp <- write_xlsx(iris)
 #' readxl::read_xlsx(tmp)
-write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE, date_format = "yyyy-mm-dd HH:mm:ss"){
+write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE, date_format = "yyyy-mm-dd HH:mm:ss UTC"){
   stopifnot(is.data.frame(x))
   stopifnot(is.character(path) && length(path))
   stopifnot(is.character(date_format) && length(date_format))
