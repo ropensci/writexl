@@ -120,7 +120,11 @@ attribute_visible SEXP C_write_data_frame(SEXP df, SEXP file, SEXP headers){
       }; continue;
       case COL_REAL:{
         double val = REAL(col)[i];
-        if(R_FINITE(val)) // TODO: distingish NA, NaN, Inf
+        if(val == R_PosInf)
+          assert_lxw(worksheet_write_string(sheet, cursor, j, "Inf", NULL));
+        else if(val == R_NegInf)
+          assert_lxw(worksheet_write_string(sheet, cursor, j, "-Inf", NULL));
+        else if(R_FINITE(val)) // skips NA and NAN
           assert_lxw(worksheet_write_number(sheet, cursor, j, val, NULL));
       }; continue;
       case COL_INTEGER:{
