@@ -3,7 +3,7 @@
 #' Writes a data frame to an xlsx file.
 #'
 #' \if{html}{\Sexpr[results=rd, stage=build, echo=FALSE]{
-#'   writexl:::img_gif('src/clippy.gif', Rd = TRUE )
+#'   readLines('src/clippy.b64')
 #'}}
 #'
 #' @export
