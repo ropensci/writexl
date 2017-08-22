@@ -5,7 +5,19 @@
 #include <R_ext/Visibility.h>
 #include <xlsxwriter.h>
 
+typedef enum {
+  COL_LOGCIAL,
+  COL_REAL,
+  COL_INTEGER,
+  COL_STRING,
+  COL_POSIXCT,
+  COL_BLANK,
+  COL_UNKNOWN
+} R_COL_TYPE;
+
 #define assert_that(a, b) bail_if(!a, b)
+
+#define max(a,b) (a > b) ? a : b
 
 void bail_if(int check, const char * error){
   if(check)
@@ -15,6 +27,23 @@ void bail_if(int check, const char * error){
 void assert_lxw(lxw_error err){
   if(err != LXW_NO_ERROR)
     Rf_errorcall(R_NilValue, "Error in libxlsxwriter: '%s'", lxw_strerror(err));
+}
+
+R_COL_TYPE get_type(SEXP col){
+  if(Rf_inherits(col, "POSIXct"))
+    return COL_POSIXCT;
+  switch(TYPEOF(col)){
+  case STRSXP:
+    return COL_STRING;
+  case INTSXP:
+    return COL_INTEGER;
+  case REALSXP:
+    return COL_REAL;
+  case LGLSXP:
+    return COL_LOGCIAL;
+  default:
+    return COL_UNKNOWN;
+  };
 }
 
 attribute_visible SEXP C_write_data_frame(SEXP df, SEXP file, SEXP headers){
@@ -48,36 +77,38 @@ attribute_visible SEXP C_write_data_frame(SEXP df, SEXP file, SEXP headers){
 
   // number of records
   size_t cols = Rf_length(df);
-  size_t rows = cols ? Rf_length(VECTOR_ELT(df, 0)) : 0;
-  if(rows == 0 || cols == 0)
-    goto done;
+  size_t rows = 0;
 
-  // Need to iterate by row first
+  // determinte how to format each column
+  R_COL_TYPE coltypes[cols];
+  for(size_t i = 0; i < cols; i++){
+    SEXP COL = VECTOR_ELT(df, i);
+    coltypes[i] = get_type(COL);
+    if(!Rf_isMatrix(COL) && !Rf_inherits(COL, "data.frame"))
+      rows = max(rows, Rf_length(COL));
+  }
+
+  // Need to iterate by row first for performance
   for (size_t i = 0; i < rows; i++) {
     for(size_t j = 0; j < cols; j++){
       SEXP col = VECTOR_ELT(df, j);
-
-      // unclassed types
-      switch(TYPEOF(col)){
-      case STRSXP:
+      switch(coltypes[j]){
+      case COL_POSIXCT:
+        assert_lxw(worksheet_write_number(sheet, cursor, j, 25569 + REAL(col)[i] / (24*60*60) , date));
+        continue;
+      case COL_STRING:
         assert_lxw(worksheet_write_string(sheet, cursor, j, CHAR(STRING_ELT(col, i)), NULL));
         continue;
-      case INTSXP:
+      case COL_REAL:
+        assert_lxw(worksheet_write_number(sheet, cursor, j, REAL(col)[i], NULL));
+        continue;
+      case COL_INTEGER:
         assert_lxw(worksheet_write_number(sheet, cursor, j, INTEGER(col)[i], NULL));
         continue;
-      case REALSXP:
-        if(Rf_inherits(col, "POSIXct")){
-          double val = REAL(col)[i];
-          assert_lxw(worksheet_write_number(sheet, cursor, j, 25569 + val / (24*60*60) , date));
-        } else {
-          assert_lxw(worksheet_write_number(sheet, cursor, j, REAL(col)[i], NULL));
-        }
-        continue;
-      case LGLSXP:
+      case COL_LOGCIAL:
         assert_lxw(worksheet_write_boolean(sheet, cursor, j, LOGICAL(col)[i], NULL));
         continue;
       default:
-        assert_lxw(worksheet_write_blank(sheet, cursor, j, NULL));
         continue;
       };
     }
@@ -85,7 +116,6 @@ attribute_visible SEXP C_write_data_frame(SEXP df, SEXP file, SEXP headers){
   }
 
   //this both writes the xlsx file and frees the memory
-  done:
   workbook_close(workbook);
   return file;
 }
