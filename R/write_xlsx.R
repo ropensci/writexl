@@ -13,6 +13,7 @@
 write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE){
   stopifnot(is.data.frame(x))
   stopifnot(is.character(path))
+  path <- normalizePath(path, mustWork = FALSE)
   df <- normalize_df(x)
   headers <- if(isTRUE(col_names))
     colnames(x)
