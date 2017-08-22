@@ -51,7 +51,7 @@ library(nycflights13)
 out <- readxl::read_xlsx(writexl::write_xlsx(flights))
 ```
 ```
-TRUE
+## TRUE
 ```
 
 Performance is a bit better than `openxlsx` implementation:
@@ -66,10 +66,10 @@ microbenchmark(
 )
 ```
 ```
-Unit: seconds
-     expr      min       lq     mean   median       uq      max neval
-  writexl 10.94430 11.01603 11.45755 11.41462 11.50409 12.40871     5
- openxlsx 18.20038 19.67410 19.53756 19.74198 19.75242 20.31890     5
+## Unit: seconds
+##      expr      min       lq     mean   median       uq      max neval
+##   writexl 10.94430 11.01603 11.45755 11.41462 11.50409 12.40871     5
+##  openxlsx 18.20038 19.67410 19.53756 19.74198 19.75242 20.31890     5
 ```
 
 Also the output xlsx files are smaller:
@@ -79,12 +79,12 @@ writexl::write_xlsx(flights, tmp1 <- tempfile())
 file.info(tmp1)$size
 ```
 ```
-28229493
+## 28229493
 ```
 ```r
 openxlsx::write.xlsx(flights, tmp2 <- tempfile())
 file.info(tmp2)$size
 ```
 ```
-35962067
+## 35962067
 ```
