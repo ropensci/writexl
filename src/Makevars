@@ -9,7 +9,7 @@ LIBXLSXWRITER	= \
 
 STATICLIB=libxlsxwriter/libstatxlsxwriter.a
 
-PKG_CFLAGS=$(C_VISIBILITY)
+PKG_CFLAGS=$(C_VISIBILITY) -DNOCRYPT
 PKG_CPPFLAGS=-Iinclude
 PKG_LIBS=-Llibxlsxwriter -lstatxlsxwriter -lz
 
