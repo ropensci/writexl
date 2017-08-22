@@ -93,21 +93,31 @@ attribute_visible SEXP C_write_data_frame(SEXP df, SEXP file, SEXP headers){
     for(size_t j = 0; j < cols; j++){
       SEXP col = VECTOR_ELT(df, j);
       switch(coltypes[j]){
-      case COL_POSIXCT:
-        assert_lxw(worksheet_write_number(sheet, cursor, j, 25569 + REAL(col)[i] / (24*60*60) , date));
-        continue;
-      case COL_STRING:
-        assert_lxw(worksheet_write_string(sheet, cursor, j, CHAR(STRING_ELT(col, i)), NULL));
-        continue;
-      case COL_REAL:
-        assert_lxw(worksheet_write_number(sheet, cursor, j, REAL(col)[i], NULL));
-        continue;
-      case COL_INTEGER:
-        assert_lxw(worksheet_write_number(sheet, cursor, j, INTEGER(col)[i], NULL));
-        continue;
-      case COL_LOGCIAL:
-        assert_lxw(worksheet_write_boolean(sheet, cursor, j, LOGICAL(col)[i], NULL));
-        continue;
+      case COL_POSIXCT: {
+        double val = REAL(col)[i];
+        if(val != NA_REAL)
+          assert_lxw(worksheet_write_number(sheet, cursor, j, 25569 + val / (24*60*60) , date));
+      }; continue;
+      case COL_STRING:{
+        SEXP val = STRING_ELT(col, i);
+        if(val != NA_STRING)
+          assert_lxw(worksheet_write_string(sheet, cursor, j, CHAR(val), NULL));
+      }; continue;
+      case COL_REAL:{
+        double val = REAL(col)[i];
+        if(val != NA_REAL)
+          assert_lxw(worksheet_write_number(sheet, cursor, j, val, NULL));
+      }; continue;
+      case COL_INTEGER:{
+        int val = INTEGER(col)[i];
+        if(val != NA_INTEGER)
+          assert_lxw(worksheet_write_number(sheet, cursor, j, val, NULL));
+      }; continue;
+      case COL_LOGCIAL:{
+        int val = LOGICAL(col)[i];
+        if(val != NA_LOGICAL)
+          assert_lxw(worksheet_write_boolean(sheet, cursor, j, val, NULL));
+        }; continue;
       default:
         continue;
       };
