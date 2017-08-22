@@ -71,11 +71,6 @@ attribute_visible SEXP C_write_data_frame(SEXP df, SEXP file, SEXP headers){
   lxw_worksheet *sheet = workbook_add_worksheet(workbook, NULL);
   assert_that(sheet, "failed to create workbook");
 
-  //for headers
-  lxw_format * title = workbook_add_format(workbook);
-  format_set_bold(title);
-  format_set_align(title, LXW_ALIGN_CENTER);
-
   //for dates
   lxw_format * date = workbook_add_format(workbook);
   format_set_num_format(date, "yyyy-mm-dd HH:mm:ss UTC");
@@ -84,7 +79,12 @@ attribute_visible SEXP C_write_data_frame(SEXP df, SEXP file, SEXP headers){
   size_t cursor = 0;
   if(Rf_isString(headers) && Rf_length(headers)){
     for(size_t i = 0; i < Rf_length(headers); i++)
-      worksheet_write_string(sheet, cursor, i, CHAR(STRING_ELT(headers, i)), title);
+      worksheet_write_string(sheet, cursor, i, CHAR(STRING_ELT(headers, i)), NULL);
+    //format headers bold and centered
+    lxw_format * title = workbook_add_format(workbook);
+    format_set_bold(title);
+    format_set_align(title, LXW_ALIGN_CENTER);
+    worksheet_set_row(sheet, cursor, 15, title);
     cursor++;
   }
 
@@ -100,7 +100,7 @@ attribute_visible SEXP C_write_data_frame(SEXP df, SEXP file, SEXP headers){
     if(!Rf_isMatrix(COL) && !Rf_inherits(COL, "data.frame"))
       rows = max(rows, Rf_length(COL));
     if(coltypes[i] == COL_POSIXCT)
-      worksheet_set_column(sheet, i, i, 30, date);
+      worksheet_set_column(sheet, i, i, 20, date);
   }
 
   // Need to iterate by row first for performance
