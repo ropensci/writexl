@@ -46,7 +46,7 @@ R_COL_TYPE get_type(SEXP col){
   };
 }
 
-attribute_visible SEXP C_write_data_frame(SEXP df, SEXP file, SEXP headers){
+attribute_visible SEXP C_write_data_frame(SEXP df, SEXP file, SEXP headers, SEXP date_format){
   assert_that(Rf_inherits(df, "data.frame"), "Object is not a data frame");
   assert_that(Rf_isString(file) && Rf_length(file), "Invalid file path");
   assert_that(Rf_isString(headers), "Headers must be character vector");
@@ -65,7 +65,7 @@ attribute_visible SEXP C_write_data_frame(SEXP df, SEXP file, SEXP headers){
 
   //for dates
   lxw_format * date = workbook_add_format(workbook);
-  format_set_num_format(date, "yyyy-mm-d HH:MM AM/PM");
+  format_set_num_format(date, CHAR(STRING_ELT(date_format, 0)));
 
   //create header row
   size_t cursor = 0;
