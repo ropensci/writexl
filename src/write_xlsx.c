@@ -95,7 +95,7 @@ attribute_visible SEXP C_write_data_frame(SEXP df, SEXP file, SEXP headers, SEXP
       switch(coltypes[j]){
       case COL_POSIXCT: {
         double val = REAL(col)[i];
-        if(val != NA_REAL)
+        if(R_FINITE(val))
           assert_lxw(worksheet_write_number(sheet, cursor, j, 25569 + val / (24*60*60) , date));
       }; continue;
       case COL_STRING:{
