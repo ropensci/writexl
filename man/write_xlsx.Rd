@@ -17,6 +17,11 @@ write_xlsx(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE)
 \description{
 Writes a data frame to an xlsx file.
 }
+\details{
+\if{html}{\Sexpr[results=rd, stage=build, echo=FALSE]{
+  writexl:::img_gif('src/clippy.gif', Rd = TRUE )
+}}
+}
 \examples{
 tmp <- write_xlsx(iris)
 readxl::read_xlsx(tmp)
