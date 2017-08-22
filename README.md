@@ -17,13 +17,74 @@ in Microsoft Excel 'xslx' format.
 devtools::install_github("ropensci/writexl")
 ```
 
-## Hello World
+## Getting started
 
-Currently the package only has `write_xlsx()` to export a data frame to xlsx:
+Currently the package only has `write_xlsx()` to export a data frame to xlsx. 
 
 ```r
 library(writexl)
 library(readxl)
 tmp <- writexl::write_xlsx(iris)
 readxl::read_xlsx(tmp)
+```
+```
+# A tibble: 150 x 5
+   Sepal.Length Sepal.Width Petal.Length Petal.Width Species
+          <dbl>       <dbl>        <dbl>       <dbl>   <chr>
+ 1          5.1         3.5          1.4         0.2  setosa
+ 2          4.9         3.0          1.4         0.2  setosa
+ 3          4.7         3.2          1.3         0.2  setosa
+ 4          4.6         3.1          1.5         0.2  setosa
+ 5          5.0         3.6          1.4         0.2  setosa
+ 6          5.4         3.9          1.7         0.4  setosa
+ 7          4.6         3.4          1.4         0.3  setosa
+ 8          5.0         3.4          1.5         0.2  setosa
+ 9          4.4         2.9          1.4         0.2  setosa
+10          4.9         3.1          1.5         0.1  setosa
+# ... with 140 more rows
+```
+
+Most data types should roundtrip with `readxl`:
+
+```r
+library(nycflights13)
+out <- readxl::read_xlsx(writexl::write_xlsx(flights))
+```
+```
+TRUE
+```
+
+Performance is a bit better than `openxlsx` implementation:
+
+```r
+library(microbenchmark)
+library(nycflights13)
+microbenchmark(
+  writexl = writexl::write_xlsx(flights, tempfile()),
+  openxlsx = openxlsx::write.xlsx(flights, tempfile()),
+  times = 5
+)
+```
+```
+Unit: seconds
+     expr      min       lq     mean   median       uq      max neval
+  writexl 10.94430 11.01603 11.45755 11.41462 11.50409 12.40871     5
+ openxlsx 18.20038 19.67410 19.53756 19.74198 19.75242 20.31890     5
+```
+
+Also the output xlsx files are smaller:
+
+```r
+writexl::write_xlsx(flights, tmp1 <- tempfile())
+file.info(tmp1)$size
+```
+```
+28229493
+```
+```r
+openxlsx::write.xlsx(flights, tmp2 <- tempfile())
+file.info(tmp2)$size
+```
+```
+35962067
 ```
