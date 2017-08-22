@@ -60,8 +60,9 @@ attribute_visible SEXP C_write_data_frame(SEXP df, SEXP file, SEXP headers, SEXP
   assert_that(sheet, "failed to create workbook");
 
   //for headers
-  lxw_format * bold = workbook_add_format(workbook);
-  format_set_bold(bold);
+  lxw_format * title = workbook_add_format(workbook);
+  format_set_bold(title);
+  format_set_align(title, LXW_ALIGN_CENTER);
 
   //for dates
   lxw_format * date = workbook_add_format(workbook);
@@ -71,7 +72,7 @@ attribute_visible SEXP C_write_data_frame(SEXP df, SEXP file, SEXP headers, SEXP
   size_t cursor = 0;
   if(Rf_isString(headers) && Rf_length(headers)){
     for(size_t i = 0; i < Rf_length(headers); i++)
-      worksheet_write_string(sheet, cursor, i, CHAR(STRING_ELT(headers, i)), bold);
+      worksheet_write_string(sheet, cursor, i, CHAR(STRING_ELT(headers, i)), title);
     cursor++;
   }
 
