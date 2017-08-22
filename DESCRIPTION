@@ -10,6 +10,9 @@ Description: Light weight data frame to xlsx exporter based on libxlsxwriter.
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
-URL: https://libxlsxwriter.github.io (upstream)
+URL: https://github.com/ropensci/writexl (devel), https://libxlsxwriter.github.io (upstream)
+BugReports: https://github.com/ropensci/writexl/issues
 RoxygenNote: 6.0.1
-Suggests: readxl
+Suggests: readxl,
+    nycflights13,
+    testthat
