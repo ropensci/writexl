@@ -9,3 +9,8 @@ lxw_version <- function(){
   version <- .Call(C_lxw_version)
   as.numeric_version(version)
 }
+
+#' @useDynLib writexl C_set_tempdir
+.onLoad <- function(lib, pkg){
+  .Call(C_set_tempdir, tempdir())
+}

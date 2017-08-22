@@ -8,18 +8,16 @@
 #' @param x data frame to write to disk
 #' @param path a file name to write to
 #' @param col_names write column names at the top of the file?
-#' @param date_format how timestamps are displayed in excel
 #' @examples tmp <- write_xlsx(iris)
 #' readxl::read_xlsx(tmp)
-write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE, date_format = "yyyy-mm-dd HH:mm:ss UTC"){
+write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE){
   stopifnot(is.data.frame(x))
   stopifnot(is.character(path) && length(path))
-  stopifnot(is.character(date_format) && length(date_format))
   path <- normalizePath(path, mustWork = FALSE)
   df <- normalize_df(x)
   headers <- if(isTRUE(col_names))
     colnames(x)
-  .Call(C_write_data_frame, df, path, headers, date_format)
+  .Call(C_write_data_frame, df, path, headers)
 }
 
 normalize_df <- function(df){

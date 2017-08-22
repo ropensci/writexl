@@ -5,8 +5,7 @@
 \alias{writexl}
 \title{Export to xlsx}
 \usage{
-write_xlsx(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
-  date_format = "yyyy-mm-dd HH:mm:ss UTC")
+write_xlsx(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE)
 }
 \arguments{
 \item{x}{data frame to write to disk}
@@ -14,8 +13,6 @@ write_xlsx(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
 \item{path}{a file name to write to}
 
 \item{col_names}{write column names at the top of the file?}
-
-\item{date_format}{how timestamps are displayed in excel}
 }
 \description{
 Writes a data frame to an xlsx file.

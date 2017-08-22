@@ -1,5 +1,6 @@
 #define R_NO_REMAP
 #define STRICT_R_HEADERS
+#include <string.h>
 #include <Rinternals.h>
 #include <R_ext/Rdynload.h>
 #include <R_ext/Visibility.h>
@@ -46,13 +47,24 @@ R_COL_TYPE get_type(SEXP col){
   };
 }
 
-attribute_visible SEXP C_write_data_frame(SEXP df, SEXP file, SEXP headers, SEXP date_format){
+char TEMPDIR[2048];
+
+attribute_visible SEXP C_set_tempdir(SEXP dir){
+  strcpy(TEMPDIR, Rf_translateChar(STRING_ELT(dir, 0)));
+  return Rf_mkString(TEMPDIR);
+}
+
+attribute_visible SEXP C_write_data_frame(SEXP df, SEXP file, SEXP headers){
   assert_that(Rf_inherits(df, "data.frame"), "Object is not a data frame");
   assert_that(Rf_isString(file) && Rf_length(file), "Invalid file path");
-  assert_that(Rf_isString(headers), "Headers must be character vector");
+  assert_that(Rf_isString(headers), "headers must be character vector");
+
+  lxw_workbook_options options;
+  options.constant_memory = 1; //use less memory
+  options.tmpdir = TEMPDIR;
 
   //create workbook
-  lxw_workbook *workbook = workbook_new(Rf_translateChar(STRING_ELT(file, 0)));
+  lxw_workbook *workbook = workbook_new_opt(Rf_translateChar(STRING_ELT(file, 0)), &options);
   assert_that(workbook, "failed to create workbook");
 
   //create sheet
@@ -66,7 +78,7 @@ attribute_visible SEXP C_write_data_frame(SEXP df, SEXP file, SEXP headers, SEXP
 
   //for dates
   lxw_format * date = workbook_add_format(workbook);
-  format_set_num_format(date, CHAR(STRING_ELT(date_format, 0)));
+  format_set_num_format(date, "yyyy-mm-dd HH:mm:ss UTC");
 
   //create header row
   size_t cursor = 0;
