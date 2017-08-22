@@ -1,0 +1,33 @@
+language: r
+cache: packages
+latex: false
+
+matrix:
+  include:
+    - os: linux
+      dist: precise
+    - os: linux
+      dist: trusty
+    - os: osx
+      osx_image: xcode8.3
+    - os: osx
+      osx_image: xcode7.3
+      disable_homebrew: true
+
+r_github_packages:
+  - jimhester/covr
+
+warnings_are_errors: true
+#r_check_revdep: true
+
+notifications:
+  email:
+    on_success: change
+    on_failure: change
+
+after_success:
+  - if [[ "${R_CODECOV}" ]]; then R -e 'covr::codecov(type = "all")'; fi
+
+# Prevents Travis timeout for building magick
+before_install:
+  - (while true; do echo 'Ping? Pong!'; sleep 500; done) &
