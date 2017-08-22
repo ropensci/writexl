@@ -9,6 +9,7 @@ test_that("Types roundtrip properly",{
   num <- c(NA_real_, pi, 1.2345e80)
   int <- c(NA_integer_, 0L, -100L)
   str <- c(NA_character_, "foo", kremlin) #note emptry string's dont work yet
-  df <- data.frame(num = num, int = int, str = str, stringsAsFactors = FALSE)
+  time <- Sys.time() + 1:3
+  df <- data.frame(num = num, int = int, str = str, time = time, stringsAsFactors = FALSE)
   expect_equal(df, as.data.frame(roundtrip(df)))
 })

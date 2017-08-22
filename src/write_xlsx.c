@@ -99,6 +99,8 @@ attribute_visible SEXP C_write_data_frame(SEXP df, SEXP file, SEXP headers){
     coltypes[i] = get_type(COL);
     if(!Rf_isMatrix(COL) && !Rf_inherits(COL, "data.frame"))
       rows = max(rows, Rf_length(COL));
+    if(coltypes[i] == COL_POSIXCT)
+      worksheet_set_column(sheet, i, i, 30, date);
   }
 
   // Need to iterate by row first for performance
@@ -109,7 +111,7 @@ attribute_visible SEXP C_write_data_frame(SEXP df, SEXP file, SEXP headers){
       case COL_POSIXCT: {
         double val = REAL(col)[i];
         if(R_FINITE(val))
-          assert_lxw(worksheet_write_number(sheet, cursor, j, 25569 + val / (24*60*60) , date));
+          assert_lxw(worksheet_write_number(sheet, cursor, j, 25569 + val / (24*60*60) , NULL));
       }; continue;
       case COL_STRING:{
         SEXP val = STRING_ELT(col, i);
