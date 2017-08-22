@@ -107,7 +107,7 @@ attribute_visible SEXP C_write_data_frame(SEXP df, SEXP file, SEXP headers, SEXP
       }; continue;
       case COL_REAL:{
         double val = REAL(col)[i];
-        if(val != NA_REAL)
+        if(R_FINITE(val)) // TODO: distingish NA, NaN, Inf
           assert_lxw(worksheet_write_number(sheet, cursor, j, val, NULL));
       }; continue;
       case COL_INTEGER:{
