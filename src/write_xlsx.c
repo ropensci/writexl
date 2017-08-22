@@ -100,8 +100,8 @@ attribute_visible SEXP C_write_data_frame(SEXP df, SEXP file, SEXP headers){
       }; continue;
       case COL_STRING:{
         SEXP val = STRING_ELT(col, i);
-        if(val != NA_STRING)
-          assert_lxw(worksheet_write_string(sheet, cursor, j, CHAR(val), NULL));
+        if(val != NA_STRING && Rf_length(val)) // xlsx does string not supported it seems?
+           assert_lxw(worksheet_write_string(sheet, cursor, j, CHAR(val), NULL));
       }; continue;
       case COL_REAL:{
         double val = REAL(col)[i];
