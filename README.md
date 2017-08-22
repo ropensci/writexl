@@ -49,8 +49,6 @@ Most data types should roundtrip with `readxl`:
 ```r
 library(nycflights13)
 out <- readxl::read_xlsx(writexl::write_xlsx(flights))
-```
-```
 ## TRUE
 ```
 
@@ -64,8 +62,6 @@ microbenchmark(
   openxlsx = openxlsx::write.xlsx(flights, tempfile()),
   times = 5
 )
-```
-```
 ## Unit: seconds
 ##      expr      min       lq     mean   median       uq      max neval
 ##   writexl 10.94430 11.01603 11.45755 11.41462 11.50409 12.40871     5
@@ -77,14 +73,11 @@ Also the output xlsx files are smaller:
 ```r
 writexl::write_xlsx(flights, tmp1 <- tempfile())
 file.info(tmp1)$size
-```
-```
 ## 28229493
 ```
+
 ```r
 openxlsx::write.xlsx(flights, tmp2 <- tempfile())
 file.info(tmp2)$size
-```
-```
 ## 35962067
 ```
