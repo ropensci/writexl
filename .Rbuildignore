@@ -4,3 +4,4 @@
 ^src/.*\.o$
 ^appveyor\.yml$
 ^.travis.yml$
+^README.md$
