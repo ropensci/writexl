@@ -1,0 +1,4 @@
+Licenses of bundled C code not written by Jeroen:
+ - libxlsxwriter: FreeBSD License: https://libxlsxwriter.github.io/license.html
+ - minizip: "Same as Zlib": https://en.wikipedia.org/wiki/Zlib_License
+ - tmpfileplus: Mozilla Public License http://mozilla.org/MPL/2.0/
