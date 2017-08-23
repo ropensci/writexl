@@ -2,9 +2,11 @@
 #'
 #' Writes a data frame to an xlsx file.
 #'
-#' \if{html}{\Sexpr[results=rd, stage=build, echo=FALSE]{
-#'   readLines('src/clippy.html')
-#'}}
+#' \if{html}{
+#' \out{
+#' <link rel="stylesheet" type="text/css" href="https://jeroen.github.io/clippy/clippy.min.css" media="all">
+#' <script src="https://jeroen.github.io/clippy/bundle.js"></script>
+#' }}
 #'
 #' @export
 #' @aliases writexl
