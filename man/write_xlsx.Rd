@@ -18,12 +18,17 @@ write_xlsx(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE)
 Writes a data frame to an xlsx file.
 }
 \details{
-\if{html}{\out{
+Currently supports strings, numbers, booleans and dates. Formatting options
+may be added in future versions.
+
+\if{html}{
+\out{
 <link rel="stylesheet" type="text/css" href="https://jeroen.github.io/clippy/clippy.min.css" media="all">
 <script src="https://jeroen.github.io/clippy/bundle.js"></script>
 }}
 }
 \examples{
+# Roundtrip example
 tmp <- write_xlsx(iris)
 readxl::read_xlsx(tmp)
 }

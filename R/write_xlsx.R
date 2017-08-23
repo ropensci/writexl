@@ -2,6 +2,9 @@
 #'
 #' Writes a data frame to an xlsx file.
 #'
+#' Currently supports strings, numbers, booleans and dates. Formatting options
+#' may be added in future versions.
+#'
 #' \if{html}{
 #' \out{
 #' <link rel="stylesheet" type="text/css" href="https://jeroen.github.io/clippy/clippy.min.css" media="all">
@@ -14,7 +17,8 @@
 #' @param x data frame to write to disk
 #' @param path a file name to write to
 #' @param col_names write column names at the top of the file?
-#' @examples tmp <- write_xlsx(iris)
+#' @examples # Roundtrip example
+#' tmp <- write_xlsx(iris)
 #' readxl::read_xlsx(tmp)
 write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE){
   stopifnot(is.data.frame(x))
