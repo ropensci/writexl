@@ -1,0 +1,22 @@
+\out{
+<!-- Add the stylesheet to the head -->
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/clippy.js/1.0/clippy.min.css" media="all">
+
+<!-- Add these scripts to  the bottom of the page -->
+<!-- jQuery 1.7+ -->
+<script src="https://cdn.jsdelivr.net/jquery/3.2.1/jquery.min.js"></script>
+
+<!-- Clippy.js -->
+<script src="https://cdn.jsdelivr.net/clippy.js/1.0/clippy.min.js"></script>
+
+<!-- Init script -->
+<script type="text/javascript">
+clippy.load('Clippy', function(agent){
+  // do anything with the loaded agent
+  agent.show();
+  agent.moveTo(200,80);
+  agent.speak('Hi! It looks like you are trying to write an excel file! My name is Clippy.');
+  agent.animate();
+});
+</script>
+}

@@ -19,7 +19,7 @@ Writes a data frame to an xlsx file.
 }
 \details{
 \if{html}{\Sexpr[results=rd, stage=build, echo=FALSE]{
-  readLines('src/clippy.b64')
+  readLines('src/clippy.html')
 }}
 }
 \examples{
