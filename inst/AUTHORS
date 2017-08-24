@@ -2,3 +2,4 @@ Authors of bundled C code:
  - libxlsxwriter: John McNamara
  - minizip: Gilles Vollant, Mathias Svensson
  - tmpfileplus: David Ireland, Mozilla Inc
+ - tree.h: Niels Provos
