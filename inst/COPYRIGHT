@@ -1,6 +1,10 @@
 The bundled 'libxlsxwriter' library was released by John McNamara under
 FreeBSD license: https://libxlsxwriter.github.io/license.html
+
 Original licenses of 'libxlsxwriter' 3rd party code:
  - minizip: "Same as Zlib": https://en.wikipedia.org/wiki/Zlib_License
  - tmpfileplus: Mozilla Public License http://mozilla.org/MPL/2.0/
  - queue.h The Regents of the University of California, FreeBSD
+
+Full license text for libxlsxwriter including third party components:
+https://github.com/jmcnamara/libxlsxwriter/blob/master/LICENSE.txt
