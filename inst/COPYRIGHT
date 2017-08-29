@@ -1,6 +1,6 @@
-Below all licenses and copyrightholders of code included with 'libxlsxwriter'.
-This text is copied from upstream at:
- - https://raw.githubusercontent.com/jmcnamara/libxlsxwriter/master/LICENSE.txt
+Licenses and copyrightholders of code included with 'libxlsxwriter' are available from
+  https://raw.githubusercontent.com/jmcnamara/libxlsxwriter/master/docs/src/license.dox
+Below a copy of the text from this file.
 
 ------------------------------------------------------------------------------
 
@@ -36,8 +36,8 @@ Libxlsxwriter is released under a FreeBSD license:
     official policies, either expressed or implied, of the FreeBSD Project.
 
 
-Libxlsxwriter includes `queue.h` from FreeBSD and the `minizip` component of
-`zlib` which have the following licenses:
+Libxlsxwriter includes `queue.h` and `tree.h` from FreeBSD, the `minizip`
+component of `zlib` and `tmpfileplus` which have the following licenses:
 
 
 Queue.h from FreeBSD:
@@ -70,7 +70,7 @@ Queue.h from FreeBSD:
     SUCH DAMAGE.
 
 
-tree.h from FreeBSD:
+Tree.h from FreeBSD:
 
     Copyright 2002 Niels Provos <provos@citi.umich.edu>
     All rights reserved.
@@ -96,7 +96,7 @@ tree.h from FreeBSD:
     THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-Zlib has the following License/Copyright:
+[Zlib](http://www.zlib.net) has the following License/Copyright:
 
     (C) 1995-2013 Jean-loup Gailly and Mark Adler
 
@@ -120,19 +120,21 @@ Zlib has the following License/Copyright:
     jloup@gzip.org          madler@alumni.caltech.edu
 
 
-Sources of minizip have the following License/Copyright:
+[MiniZip](http://www.winimage.com/zLibDll/minizip.html) (part of Zlib)
 
-   Part of the MiniZip project - ( http://www.winimage.com/zLibDll/minizip.html )
-   Copyright (C) 1998-2010 Gilles Vollant (minizip) ( http://www.winimage.com/zLibDll/minizip.html )
-   Modifications for Zip64 support
+   Copyright (C) 1998-2010 Gilles Vollant
    Copyright (C) 2009-2010 Mathias Svensson ( http://result42.com )
-   Condition of use and distribution are the same than zlib.
+   Condition of use and distribution are the same than Zlib (above).
 
-tmpfileplus.c has the following License/Copyright:
+[Tmpfileplus](http://www.di-mgt.com.au/c_function_to_create_temp_file.html)
+has the following license:
 
-   This Source Code Form is subject to the terms of the Mozilla Public
-   License, v. 2.0. If a copy of the MPL was not distributed with this
-   file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-   Copyright (c) 2012-16 David Ireland, DI Management Services Pty Ltd
-   <http://www.di-mgt.com.au/contact/>.
+     This Source Code Form is subject to the terms of the Mozilla Public
+     License, v. 2.0. If a copy of the MPL was not distributed with this
+     file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+     Copyright (c) 2012-16 David Ireland, DI Management Services Pty Ltd
+     <http://www.di-mgt.com.au/contact/>.
+
+See the [Mozilla Public License, v. 2.0](http://mozilla.org/MPL/2.0/).
