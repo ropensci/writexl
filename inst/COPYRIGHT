@@ -1,5 +1,6 @@
-Below all licenses and copyrightholders from libxlsxwriter. This file is copied
-from: https://raw.githubusercontent.com/jmcnamara/libxlsxwriter/master/LICENSE.txt
+Below all licenses and copyrightholders of code included with 'libxlsxwriter'.
+This text is copied from upstream at:
+ - https://raw.githubusercontent.com/jmcnamara/libxlsxwriter/master/LICENSE.txt
 
 ------------------------------------------------------------------------------
 
@@ -118,6 +119,14 @@ Zlib has the following License/Copyright:
     Jean-loup Gailly        Mark Adler
     jloup@gzip.org          madler@alumni.caltech.edu
 
+
+Sources of minizip have the following License/Copyright:
+
+   Part of the MiniZip project - ( http://www.winimage.com/zLibDll/minizip.html )
+   Copyright (C) 1998-2010 Gilles Vollant (minizip) ( http://www.winimage.com/zLibDll/minizip.html )
+   Modifications for Zip64 support
+   Copyright (C) 2009-2010 Mathias Svensson ( http://result42.com )
+   Condition of use and distribution are the same than zlib.
 
 tmpfileplus.c has the following License/Copyright:
 
