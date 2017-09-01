@@ -1,0 +1,5 @@
+0.2
+  - Add support for lists in write_xlsx() to create xlsx with multiple sheets
+
+0.1
+  - Initial CRAN release with clippy

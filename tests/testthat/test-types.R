@@ -13,3 +13,4 @@ test_that("Types roundtrip properly",{
   df <- data.frame(num = num, int = int, str = str, time = time, stringsAsFactors = FALSE)
   expect_equal(df, as.data.frame(roundtrip(df)))
 })
+

@@ -13,21 +13,22 @@
 #'
 #' @export
 #' @aliases writexl
-#' @useDynLib writexl C_write_data_frame
-#' @param x data frame to write to disk
+#' @useDynLib writexl C_write_data_frame_list
+#' @param x data frame or named list of data frames that will be sheets in the xlsx
 #' @param path a file name to write to
 #' @param col_names write column names at the top of the file?
 #' @examples # Roundtrip example
 #' tmp <- write_xlsx(iris)
 #' readxl::read_xlsx(tmp)
 write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE){
-  stopifnot(is.data.frame(x))
+  if(is.data.frame(x))
+    x <- list(x)
+  if(!is.list(x) || !all(vapply(x, is.data.frame, logical(1))))
+    stop("Argument x must be a data frame or list of data frames")
+  x <- lapply(x, normalize_df)
   stopifnot(is.character(path) && length(path))
   path <- normalizePath(path, mustWork = FALSE)
-  df <- normalize_df(x)
-  headers <- if(isTRUE(col_names))
-    colnames(x)
-  .Call(C_write_data_frame, df, path, headers)
+  .Call(C_write_data_frame_list, x, path, col_names)
 }
 
 normalize_df <- function(df){
