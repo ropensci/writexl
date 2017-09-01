@@ -49,6 +49,7 @@ Most data types should roundtrip with `readxl`:
 ```r
 library(nycflights13)
 out <- readxl::read_xlsx(writexl::write_xlsx(flights))
+all.equal(out, flights)
 ## TRUE
 ```
 
@@ -63,9 +64,9 @@ microbenchmark(
   times = 5
 )
 ## Unit: seconds
-##      expr      min       lq     mean   median       uq      max neval
-##   writexl 10.94430 11.01603 11.45755 11.41462 11.50409 12.40871     5
-##  openxlsx 18.20038 19.67410 19.53756 19.74198 19.75242 20.31890     5
+##      expr       min        lq      mean    median        uq       max neval
+##   writexl  8.884712  8.904431  9.103419  8.965643  9.041565  9.720743     5
+##  openxlsx 17.166818 18.072527 19.171003 18.669805 18.756661 23.189206     5
 ```
 
 Also the output xlsx files are smaller:
@@ -73,7 +74,7 @@ Also the output xlsx files are smaller:
 ```r
 writexl::write_xlsx(flights, tmp1 <- tempfile())
 file.info(tmp1)$size
-## 28229493
+## 29157282
 ```
 
 ```r
