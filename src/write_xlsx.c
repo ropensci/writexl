@@ -20,17 +20,17 @@ typedef enum {
 
 #define max(a,b) (a > b) ? a : b
 
-void bail_if(int check, const char * error){
+static void bail_if(int check, const char * error){
   if(check)
     Rf_error("Error %s", error);
 }
 
-void assert_lxw(lxw_error err){
+static void assert_lxw(lxw_error err){
   if(err != LXW_NO_ERROR)
     Rf_errorcall(R_NilValue, "Error in libxlsxwriter: '%s'", lxw_strerror(err));
 }
 
-R_COL_TYPE get_type(SEXP col){
+static R_COL_TYPE get_type(SEXP col){
   if(Rf_inherits(col, "POSIXct"))
     return COL_POSIXCT;
   switch(TYPEOF(col)){
@@ -48,8 +48,8 @@ R_COL_TYPE get_type(SEXP col){
 }
 
 //global options
-char TEMPDIR[2048] = {0};
-lxw_workbook_options options = {.constant_memory = 1, .tmpdir = TEMPDIR};
+static char TEMPDIR[2048] = {0};
+static lxw_workbook_options options = {.constant_memory = 1, .tmpdir = TEMPDIR};
 
 //set to R tempdir when pkg is loaded
 attribute_visible SEXP C_set_tempdir(SEXP dir){
