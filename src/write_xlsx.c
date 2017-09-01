@@ -47,21 +47,20 @@ R_COL_TYPE get_type(SEXP col){
   };
 }
 
-char TEMPDIR[2048];
+//global options
+char TEMPDIR[2048] = {0};
+lxw_workbook_options options = {.constant_memory = 1, .tmpdir = TEMPDIR};
 
+//set to R tempdir when pkg is loaded
 attribute_visible SEXP C_set_tempdir(SEXP dir){
   strcpy(TEMPDIR, Rf_translateChar(STRING_ELT(dir, 0)));
-  return Rf_mkString(TEMPDIR);
+  return Rf_mkString(options.tmpdir);
 }
 
 attribute_visible SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names){
   assert_that(Rf_isVectorList(df_list), "Object is not a list");
   assert_that(Rf_isString(file) && Rf_length(file), "Invalid file path");
   assert_that(Rf_isLogical(col_names), "col_names must be logical");
-
-  lxw_workbook_options options;
-  options.constant_memory = 1; //use less memory
-  options.tmpdir = TEMPDIR;
 
   //create workbook
   lxw_workbook *workbook = workbook_new_opt(Rf_translateChar(STRING_ELT(file, 0)), &options);
@@ -95,7 +94,7 @@ attribute_visible SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col
       SEXP names = PROTECT(Rf_getAttrib(df, R_NamesSymbol));
       for(size_t i = 0; i < Rf_length(names); i++)
         worksheet_write_string(sheet, cursor, i, Rf_translateCharUTF8(STRING_ELT(names, i)), NULL);
-      worksheet_set_row(sheet, cursor, 15, title);
+      assert_lxw(worksheet_set_row(sheet, cursor, 15, title));
       UNPROTECT(1);
       cursor++;
     }
@@ -112,7 +111,7 @@ attribute_visible SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col
       if(!Rf_isMatrix(COL) && !Rf_inherits(COL, "data.frame"))
         rows = max(rows, Rf_length(COL));
       if(coltypes[i] == COL_POSIXCT)
-        worksheet_set_column(sheet, i, i, 20, date);
+        assert_lxw(worksheet_set_column(sheet, i, i, 20, date));
     }
 
     // Need to iterate by row first for performance
@@ -160,8 +159,8 @@ attribute_visible SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col
   }
 
   //this both writes the xlsx file and frees the memory
-  UNPROTECT(1);
   workbook_close(workbook);
+  UNPROTECT(1);
   return file;
 }
 
