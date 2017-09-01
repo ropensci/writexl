@@ -1,5 +1,6 @@
 0.2
   - Add support for lists in write_xlsx() to create xlsx with multiple sheets
+  - Automatically coerce columns of type 'Date' and 'hms' to strings
 
 0.1
   - Initial CRAN release with clippy
