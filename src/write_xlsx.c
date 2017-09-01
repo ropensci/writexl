@@ -77,7 +77,7 @@ attribute_visible SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col
   format_set_align(title, LXW_ALIGN_CENTER);
 
   //iterate over sheets
-  SEXP df_names = Rf_getAttrib(df_list, R_NamesSymbol);
+  SEXP df_names = PROTECT(Rf_getAttrib(df_list, R_NamesSymbol));
   for(size_t s = 0; s < Rf_length(df_list); s++){
 
     //create sheet
@@ -92,10 +92,11 @@ attribute_visible SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col
 
     //create header row
     if(Rf_asLogical(col_names)){
-      SEXP names = Rf_getAttrib(df, R_NamesSymbol);
+      SEXP names = PROTECT(Rf_getAttrib(df, R_NamesSymbol));
       for(size_t i = 0; i < Rf_length(names); i++)
-        worksheet_write_string(sheet, cursor, i, CHAR(STRING_ELT(names, i)), NULL);
+        worksheet_write_string(sheet, cursor, i, Rf_translateCharUTF8(STRING_ELT(names, i)), NULL);
       worksheet_set_row(sheet, cursor, 15, title);
+      UNPROTECT(1);
       cursor++;
     }
 
@@ -159,6 +160,7 @@ attribute_visible SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col
   }
 
   //this both writes the xlsx file and frees the memory
+  UNPROTECT(1);
   workbook_close(workbook);
   return file;
 }
