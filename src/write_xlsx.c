@@ -80,7 +80,8 @@ attribute_visible SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col
   for(size_t s = 0; s < Rf_length(df_list); s++){
 
     //create sheet
-    const char * sheet_name = Rf_length(df_names) > s ? Rf_translateCharUTF8(STRING_ELT(df_names, s)) : NULL;
+    const char * sheet_name = Rf_length(df_names) > s && Rf_length(STRING_ELT(df_names, s)) ? \
+      Rf_translateCharUTF8(STRING_ELT(df_names, s)) : NULL;
     lxw_worksheet *sheet = workbook_add_worksheet(workbook, sheet_name);
     assert_that(sheet, "failed to create workbook");
 

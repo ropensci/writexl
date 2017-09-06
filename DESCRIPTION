@@ -1,7 +1,7 @@
 Package: writexl
 Type: Package
 Title: Export Data Frames to 'xlsx' Format
-Version: 0.1.9000
+Version: 0.2
 Authors@R: c(
     person("Jeroen", "Ooms", ,"jeroen@berkeley.edu", role = c("aut", "cre")),
     person("John McNamara", role = "cph",
