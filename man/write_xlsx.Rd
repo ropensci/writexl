@@ -8,7 +8,7 @@
 write_xlsx(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE)
 }
 \arguments{
-\item{x}{data frame to write to disk}
+\item{x}{data frame or named list of data frames that will be sheets in the xlsx}
 
 \item{path}{a file name to write to}
 
