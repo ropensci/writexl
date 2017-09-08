@@ -9,7 +9,7 @@
 > Portable, light-weight data frame to xlsx exporter based on libxlsxwriter.  No Java or Excel required.
 
 Wraps the [libxlsxwriter](https://github.com/jmcnamara/libxlsxwriter) library to create files
-in Microsoft Excel 'xslx' format.
+in Microsoft Excel 'xlsx' format.
 
 ## Installation
 
