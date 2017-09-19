@@ -12,6 +12,7 @@ typedef enum {
   COL_INTEGER,
   COL_STRING,
   COL_POSIXCT,
+  COL_FORMULA,
   COL_BLANK,
   COL_UNKNOWN
 } R_COL_TYPE;
@@ -22,7 +23,7 @@ typedef enum {
 
 static void bail_if(int check, const char * error){
   if(check)
-    Rf_error("Error %s", error);
+    Rf_errorcall(R_NilValue, "Error in writexl: %s", error);
 }
 
 static void assert_lxw(lxw_error err){
@@ -33,6 +34,8 @@ static void assert_lxw(lxw_error err){
 static R_COL_TYPE get_type(SEXP col){
   if(Rf_inherits(col, "POSIXct"))
     return COL_POSIXCT;
+  if(Rf_isString(col) && Rf_inherits(col, "xl_formula"))
+    return COL_FORMULA;
   switch(TYPEOF(col)){
   case STRSXP:
     return COL_STRING;
@@ -131,6 +134,13 @@ attribute_visible SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col
             assert_lxw(worksheet_write_string(sheet, cursor, j, Rf_translateCharUTF8(val), NULL));
           else  // xlsx does string not supported it seems?
             assert_lxw(worksheet_write_string(sheet, cursor, j, " ", NULL));
+        }; continue;
+        case COL_FORMULA:{
+          SEXP val = STRING_ELT(col, i);
+          if(val != NA_STRING && Rf_length(val))
+            assert_lxw(worksheet_write_formula(sheet, cursor, j, Rf_translateCharUTF8(val), NULL));
+          else
+            assert_lxw(worksheet_write_formula(sheet, cursor, j, " ", NULL));
         }; continue;
         case COL_REAL:{
           double val = REAL(col)[i];

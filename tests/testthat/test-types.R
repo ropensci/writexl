@@ -14,3 +14,14 @@ test_that("Types roundtrip properly",{
   expect_equal(df, as.data.frame(roundtrip(df)))
 })
 
+test_that("Writing formulas", {
+  df <- data.frame(
+    name = c("UCLA", "Berkeley"),
+    website = xl_formula(c(
+      '=HYPERLINK("http://www.ucla.edu", "website")',
+      '=HYPERLINK("http://www.berkeley.edu", "website")'
+    )),
+    stringsAsFactors = FALSE
+  )
+  as.data.frame(roundtrip(df))
+})
