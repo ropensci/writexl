@@ -17,11 +17,16 @@ test_that("Types roundtrip properly",{
 test_that("Writing formulas", {
   df <- data.frame(
     name = c("UCLA", "Berkeley"),
+    founded = c(1919, 1868),
     website = xl_formula(c(
       '=HYPERLINK("http://www.ucla.edu", "website")',
       '=HYPERLINK("http://www.berkeley.edu", "website")'
     ))
   )
+
+  # repeats a formula for entire column
+  df$age <- xl_formula('=(YEAR(TODAY()) - INDIRECT("B" & ROW()))')
+
   # currently readxl does not support formulas so inspect manually
   expect_true(file.exists(write_xlsx(df)))
 })
