@@ -23,5 +23,5 @@ test_that("Writing formulas", {
     ))
   )
   # currently readxl does not support formulas so inspect manually
-  write_xlsx(df)
+  expect_true(file.exists(write_xlsx(df)))
 })
