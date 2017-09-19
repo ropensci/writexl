@@ -20,8 +20,8 @@ test_that("Writing formulas", {
     website = xl_formula(c(
       '=HYPERLINK("http://www.ucla.edu", "website")',
       '=HYPERLINK("http://www.berkeley.edu", "website")'
-    )),
-    stringsAsFactors = FALSE
+    ))
   )
-  as.data.frame(roundtrip(df))
+  # currently readxl does not support formulas so inspect manually
+  write_xlsx(df)
 })
