@@ -7,7 +7,7 @@
 #include <xlsxwriter.h>
 
 typedef enum {
-  COL_LOGCIAL,
+  COL_LOGICAL,
   COL_REAL,
   COL_INTEGER,
   COL_STRING,
@@ -41,7 +41,7 @@ static R_COL_TYPE get_type(SEXP col){
   case REALSXP:
     return COL_REAL;
   case LGLSXP:
-    return COL_LOGCIAL;
+    return COL_LOGICAL;
   default:
     return COL_UNKNOWN;
   };
@@ -146,7 +146,7 @@ attribute_visible SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col
           if(val != NA_INTEGER)
             assert_lxw(worksheet_write_number(sheet, cursor, j, val, NULL));
         }; continue;
-        case COL_LOGCIAL:{
+        case COL_LOGICAL:{
           int val = LOGICAL(col)[i];
           if(val != NA_LOGICAL)
             assert_lxw(worksheet_write_boolean(sheet, cursor, j, val, NULL));
