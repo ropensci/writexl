@@ -2,12 +2,19 @@
 % Please edit documentation in R/excel_types.R
 \name{xl_formula}
 \alias{xl_formula}
+\alias{xl_hyperlink}
 \title{Excel Types}
 \usage{
 xl_formula(x)
+
+xl_hyperlink(url, name = NULL)
 }
 \arguments{
 \item{x}{character vector to be interpreted as formula}
+
+\item{url}{character vector of URLs}
+
+\item{name}{character vector of friendly names}
 }
 \description{
 Create special column types to write to a spreadsheet

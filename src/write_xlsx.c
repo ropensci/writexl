@@ -12,6 +12,7 @@ typedef enum {
   COL_INTEGER,
   COL_STRING,
   COL_POSIXCT,
+  COL_HYPERLINK,
   COL_FORMULA,
   COL_BLANK,
   COL_UNKNOWN
@@ -34,6 +35,8 @@ static void assert_lxw(lxw_error err){
 static R_COL_TYPE get_type(SEXP col){
   if(Rf_inherits(col, "POSIXct"))
     return COL_POSIXCT;
+  if(Rf_inherits(col, "xl_hyperlink"))
+    return COL_HYPERLINK;
   if(Rf_isString(col) && Rf_inherits(col, "xl_formula"))
     return COL_FORMULA;
   switch(TYPEOF(col)){
@@ -77,6 +80,11 @@ attribute_visible SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col
   lxw_format * title = workbook_add_format(workbook);
   format_set_bold(title);
   format_set_align(title, LXW_ALIGN_CENTER);
+
+  //how to format hyperlinks (underline + blue)
+  lxw_format * hyperlink = workbook_add_format(workbook);
+  format_set_underline(hyperlink, LXW_UNDERLINE_SINGLE);
+  format_set_font_color(hyperlink, LXW_COLOR_BLUE);
 
   //iterate over sheets
   SEXP df_names = PROTECT(Rf_getAttrib(df_list, R_NamesSymbol));
@@ -139,6 +147,13 @@ attribute_visible SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col
           SEXP val = STRING_ELT(col, i);
           if(val != NA_STRING && Rf_length(val))
             assert_lxw(worksheet_write_formula(sheet, cursor, j, Rf_translateCharUTF8(val), NULL));
+          else
+            assert_lxw(worksheet_write_formula(sheet, cursor, j, " ", NULL));
+        }; continue;
+        case COL_HYPERLINK:{
+          SEXP val = STRING_ELT(col, i);
+          if(val != NA_STRING && Rf_length(val))
+            assert_lxw(worksheet_write_formula(sheet, cursor, j, Rf_translateCharUTF8(val), hyperlink));
           else
             assert_lxw(worksheet_write_formula(sheet, cursor, j, " ", NULL));
         }; continue;

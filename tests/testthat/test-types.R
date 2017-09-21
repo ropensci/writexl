@@ -18,10 +18,7 @@ test_that("Writing formulas", {
   df <- data.frame(
     name = c("UCLA", "Berkeley"),
     founded = c(1919, 1868),
-    website = xl_formula(c(
-      '=HYPERLINK("http://www.ucla.edu", "website")',
-      '=HYPERLINK("http://www.berkeley.edu", "website")'
-    ))
+    website = xl_hyperlink(c("http://www.ucla.edu", "http://www.berkeley.edu"), "website")
   )
 
   # repeats a formula for entire column
