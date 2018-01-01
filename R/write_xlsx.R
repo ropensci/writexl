@@ -28,7 +28,8 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE){
   x <- lapply(x, normalize_df)
   stopifnot(is.character(path) && length(path))
   path <- normalizePath(path, mustWork = FALSE)
-  .Call(C_write_data_frame_list, x, path, col_names)
+  ret <- .Call(C_write_data_frame_list, x, path, col_names)
+  invisible(ret)
 }
 
 normalize_df <- function(df){
