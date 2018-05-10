@@ -15,7 +15,8 @@ write_xlsx(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE)
 \item{col_names}{write column names at the top of the file?}
 }
 \description{
-Writes a data frame to an xlsx file.
+Writes a data frame to an xlsx file. To create an xlsx with (multiple) named
+sheets, simply set \code{x} to a named list of data frames.
 }
 \details{
 Currently supports strings, numbers, booleans and dates. Formatting options

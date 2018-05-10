@@ -1,6 +1,7 @@
 #' Export to xlsx
 #'
-#' Writes a data frame to an xlsx file.
+#' Writes a data frame to an xlsx file. To create an xlsx with (multiple) named
+#' sheets, simply set \code{x} to a named list of data frames.
 #'
 #' Currently supports strings, numbers, booleans and dates. Formatting options
 #' may be added in future versions.
