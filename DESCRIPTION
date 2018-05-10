@@ -1,9 +1,10 @@
 Package: writexl
 Type: Package
 Title: Export Data Frames to 'xlsx' Format
-Version: 0.2.9000
+Version: 0.2.9100
 Authors@R: c(
-    person("Jeroen", "Ooms", ,"jeroen@berkeley.edu", role = c("aut", "cre")),
+    person("Jeroen", "Ooms", ,"jeroen@berkeley.edu", role = c("aut", "cre"),
+      comment = c(ORCID = "0000-0002-4035-0289")),
     person("John McNamara", role = "cph",
       comment = "Author of libxlsxwriter (see AUTHORS and COPYRIGHT files for details)"))
 Description: Portable, light-weight data frame to 'xlsx' exporter based on 'libxlsxwriter'. 
