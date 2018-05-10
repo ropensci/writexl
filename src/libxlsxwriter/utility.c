@@ -3,7 +3,7 @@
  *
  * Used in conjunction with the libxlsxwriter library.
  *
- * Copyright 2014-2017, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2018, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  *
  */
 
@@ -28,6 +28,7 @@ char *error_strings[LXW_MAX_ERRNO + 1] = {
     "Worksheet name exceeds Excel's limit of 31 characters.",
     "Worksheet name contains invalid Excel character: '[]:*?/\\'",
     "Worksheet name is already in use.",
+    "Parameter exceeds Excel's limit of 32 characters.",
     "Parameter exceeds Excel's limit of 128 characters.",
     "Parameter exceeds Excel's limit of 255 characters.",
     "String exceeds Excel's limit of 32,767 characters.",
@@ -419,6 +420,19 @@ lxw_strdup(const char *str)
     return copy;
 }
 
+/* Simple function to strdup() a formula string without the leading "=". */
+char *
+lxw_strdup_formula(const char *formula)
+{
+    if (!formula)
+        return NULL;
+
+    if (formula[0] == '=')
+        return lxw_strdup(formula + 1);
+    else
+        return lxw_strdup(formula);
+}
+
 /* Simple strlen that counts UTF-8 characters. Assumes well formed UTF-8. */
 size_t
 lxw_utf8_strlen(const char *str)
@@ -513,3 +527,29 @@ lxw_tmpfile(char *tmpdir)
     return tmpfile();
 #endif
 }
+
+/*
+ * Sample function to handle sprintf of doubles for locale portable code. This
+ * is usually handled by a lxw_sprintf_dbl() macro but it can be replaced with
+ * a function of the same name.
+ *
+ * The code below is a simplified example that changes numbers like 123,45 to
+ * 123.45. End-users can replace this with something more rigorous if
+ * required.
+ */
+#ifdef USE_DOUBLE_FUNCTION
+int
+lxw_sprintf_dbl(char *data, double number)
+{
+    char *tmp;
+
+    lxw_snprintf(data, LXW_ATTR_32, "%.16g", number);
+
+    /* Replace comma with decimal point. */
+    tmp = strchr(data, ',');
+    if (tmp)
+        *tmp = '.';
+
+    return 0;
+}
+#endif

@@ -3,7 +3,7 @@
  *
  * Used in conjunction with the libxlsxwriter library.
  *
- * Copyright 2014-2017, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2018, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  *
  */
 
@@ -311,9 +311,17 @@ _chart_convert_font_args(lxw_chart_font *user_font)
     font = calloc(1, sizeof(struct lxw_chart_font));
     RETURN_ON_MEM_ERROR(font, NULL);
 
-    memcpy(font, user_font, sizeof(lxw_chart_font));
-
+    /* Copy the user supplied properties. */
     font->name = lxw_strdup(user_font->name);
+    font->size = user_font->size;
+    font->bold = user_font->bold;
+    font->italic = user_font->italic;
+    font->underline = user_font->underline;
+    font->rotation = user_font->rotation;
+    font->color = user_font->color;
+    font->pitch_family = user_font->pitch_family;
+    font->charset = user_font->charset;
+    font->baseline = user_font->baseline;
 
     /* Convert font size units. */
     if (font->size > 0.0)
@@ -345,7 +353,12 @@ _chart_convert_line_args(lxw_chart_line *user_line)
     line = calloc(1, sizeof(struct lxw_chart_line));
     RETURN_ON_MEM_ERROR(line, NULL);
 
-    memcpy(line, user_line, sizeof(lxw_chart_line));
+    /* Copy the user supplied properties. */
+    line->color = user_line->color;
+    line->none = user_line->none;
+    line->width = user_line->width;
+    line->dash_type = user_line->dash_type;
+    line->transparency = user_line->transparency;
 
     if (line->color) {
         line->color = lxw_format_check_color(line->color);
@@ -372,7 +385,10 @@ _chart_convert_fill_args(lxw_chart_fill *user_fill)
     fill = calloc(1, sizeof(struct lxw_chart_fill));
     RETURN_ON_MEM_ERROR(fill, NULL);
 
-    memcpy(fill, user_fill, sizeof(lxw_chart_fill));
+    /* Copy the user supplied properties. */
+    fill->color = user_fill->color;
+    fill->none = user_fill->none;
+    fill->transparency = user_fill->transparency;
 
     if (fill->color) {
         fill->color = lxw_format_check_color(fill->color);
@@ -409,7 +425,10 @@ _chart_convert_pattern_args(lxw_chart_pattern *user_pattern)
     pattern = calloc(1, sizeof(struct lxw_chart_pattern));
     RETURN_ON_MEM_ERROR(pattern, NULL);
 
-    memcpy(pattern, user_pattern, sizeof(lxw_chart_pattern));
+    /* Copy the user supplied properties. */
+    pattern->fg_color = user_pattern->fg_color;
+    pattern->bg_color = user_pattern->bg_color;
+    pattern->type = user_pattern->type;
 
     pattern->fg_color = lxw_format_check_color(pattern->fg_color);
     pattern->has_fg_color = LXW_TRUE;
@@ -423,8 +442,6 @@ _chart_convert_pattern_args(lxw_chart_pattern *user_pattern)
         pattern->bg_color = LXW_COLOR_WHITE;
         pattern->has_bg_color = LXW_TRUE;
     }
-
-    pattern->type = user_pattern->type;
 
     return pattern;
 }
@@ -1137,7 +1154,7 @@ _chart_write_v_num(lxw_chart *self, double number)
 {
     char data[LXW_ATTR_32];
 
-    lxw_snprintf(data, LXW_ATTR_32, "%.16g", number);
+    lxw_sprintf_dbl(data, number);
 
     lxw_xml_data_element(self->file, "c:v", data, NULL);
 }
@@ -4565,6 +4582,10 @@ _chart_write_pie_plot_area(lxw_chart *self)
     /* Write subclass chart type elements for primary and secondary axes. */
     self->write_chart_type(self);
 
+    /* Write the c:spPr element for the plotarea formatting. */
+    _chart_write_sp_pr(self, self->plotarea_line, self->plotarea_fill,
+                       self->plotarea_pattern);
+
     lxw_xml_end_tag(self->file, "c:plotArea");
 }
 
@@ -5560,6 +5581,24 @@ chart_series_set_trendline_line(lxw_chart_series *series,
 }
 
 /*
+ * Set the X or Y error bars from a chart series.
+ */
+lxw_series_error_bars *
+chart_series_get_error_bars(lxw_chart_series *series,
+                            lxw_chart_error_bar_axis axis_type)
+{
+    if (!series)
+        return NULL;
+
+    if (axis_type == LXW_CHART_ERROR_BAR_AXIS_X)
+        return series->x_error_bars;
+    else if (axis_type == LXW_CHART_ERROR_BAR_AXIS_Y)
+        return series->y_error_bars;
+    else
+        return NULL;
+}
+
+/*
  * Set the error bars and type for a chart series.
  */
 void
@@ -5624,6 +5663,23 @@ chart_series_set_error_bars_line(lxw_series_error_bars *error_bars,
 }
 
 /*
+ * Get an axis pointer from a chart.
+ */
+lxw_chart_axis *
+chart_axis_get(lxw_chart *self, lxw_chart_axis_type axis_type)
+{
+    if (!self)
+        return NULL;
+
+    if (axis_type == LXW_CHART_AXIS_TYPE_X)
+        return self->x_axis;
+    else if (axis_type == LXW_CHART_AXIS_TYPE_Y)
+        return self->y_axis;
+    else
+        return NULL;
+}
+
+/*
  * Set an axis caption.
  */
 void
@@ -5639,7 +5695,7 @@ chart_axis_set_name(lxw_chart_axis *axis, const char *name)
 }
 
 /*
- * Set an axis caption, with a range instead or a formula..
+ * Set an axis caption, with a range instead or a formula.
  */
 void
 chart_axis_set_name_range(lxw_chart_axis *axis, const char *sheetname,

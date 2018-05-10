@@ -1,3 +1,6 @@
+0.3
+  - Update vendored libxlswriter to 0.7.6
+
 0.2
   - Add support for lists in write_xlsx() to create xlsx with multiple sheets
   - Automatically coerce columns of type 'Date' and 'hms' to strings

@@ -3,7 +3,7 @@
  *
  * Used in conjunction with the libxlsxwriter library.
  *
- * Copyright 2014-2017, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2018, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  *
  */
 
@@ -349,7 +349,7 @@ lxw_new_attribute_dbl(const char *key, double value)
     struct xml_attribute *attribute = malloc(sizeof(struct xml_attribute));
 
     LXW_ATTRIBUTE_COPY(attribute->key, key);
-    lxw_snprintf(attribute->value, LXW_MAX_ATTRIBUTE_LENGTH, "%.16g", value);
+    lxw_sprintf_dbl(attribute->value, value);
 
     return attribute;
 }

@@ -1,7 +1,7 @@
 /*
  * libxlsxwriter
  *
- * Copyright 2014-2017, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2018, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  */
 
 /**
@@ -9,7 +9,7 @@
  *
  * @brief Utility functions for libxlsxwriter.
  *
- * <!-- Copyright 2014-2017, John McNamara, jmcnamara@cpan.org -->
+ * <!-- Copyright 2014-2018, John McNamara, jmcnamara@cpan.org -->
  *
  */
 
@@ -18,6 +18,7 @@
 
 #include <stdint.h>
 #include "common.h"
+#include "xmlwriter.h"
 
 /**
  * @brief Convert an Excel `A1` cell string into a `(row, col)` pair.
@@ -145,6 +146,7 @@ uint16_t lxw_name_to_col_2(const char *col_str);
 double lxw_datetime_to_excel_date(lxw_datetime *datetime, uint8_t date_1904);
 
 char *lxw_strdup(const char *str);
+char *lxw_strdup_formula(const char *formula);
 
 size_t lxw_utf8_strlen(const char *str);
 
@@ -152,9 +154,13 @@ void lxw_str_tolower(char *str);
 
 FILE *lxw_tmpfile(char *tmpdir);
 
-/* Declarations required for unit testing. */
-#ifdef TESTING
-
+/* Use a user defined function to format doubles in sprintf or else a simple
+ * macro (the default). */
+#ifdef USE_DOUBLE_FUNCTION
+int lxw_sprintf_dbl(char *data, double number);
+#else
+#define lxw_sprintf_dbl(data, number) \
+        lxw_snprintf(data, LXW_ATTR_32, "%.16g", number)
 #endif
 
 /* *INDENT-OFF* */

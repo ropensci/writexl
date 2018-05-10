@@ -1,7 +1,7 @@
 /*
  * libxlsxwriter
  *
- * Copyright 2014-2017, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2018, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  *
  * xmlwriter - A libxlsxwriter library for creating Excel XLSX
  *             XML files.
@@ -22,7 +22,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include "common.h"
+#include "utility.h"
 
 #define LXW_MAX_ATTRIBUTE_LENGTH 256
 #define LXW_ATTR_32              32
