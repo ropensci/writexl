@@ -11,6 +11,7 @@ typedef enum {
   COL_REAL,
   COL_INTEGER,
   COL_STRING,
+  COL_DATE,
   COL_POSIXCT,
   COL_HYPERLINK,
   COL_FORMULA,
@@ -33,6 +34,8 @@ static void assert_lxw(lxw_error err){
 }
 
 static R_COL_TYPE get_type(SEXP col){
+  if(Rf_inherits(col, "Date"))
+    return COL_DATE;
   if(Rf_inherits(col, "POSIXct"))
     return COL_POSIXCT;
   if(Rf_inherits(col, "xl_hyperlink"))
@@ -74,7 +77,11 @@ attribute_visible SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col
 
   //how to format dates
   lxw_format * date = workbook_add_format(workbook);
-  format_set_num_format(date, "yyyy-mm-dd HH:mm:ss UTC");
+  format_set_num_format(date, "yyyy-mm-dd");
+
+  //how to format timetamps
+  lxw_format * datetime = workbook_add_format(workbook);
+  format_set_num_format(datetime, "yyyy-mm-dd HH:mm:ss UTC");
 
   //how to format headers (bold + center)
   lxw_format * title = workbook_add_format(workbook);
@@ -122,8 +129,10 @@ attribute_visible SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col
       coltypes[i] = get_type(COL);
       if(!Rf_isMatrix(COL) && !Rf_inherits(COL, "data.frame"))
         rows = max(rows, Rf_length(COL));
-      if(coltypes[i] == COL_POSIXCT)
+      if(coltypes[i] == COL_DATE)
         assert_lxw(worksheet_set_column(sheet, i, i, 20, date));
+      if(coltypes[i] == COL_POSIXCT)
+        assert_lxw(worksheet_set_column(sheet, i, i, 20, datetime));
     }
 
     // Need to iterate by row first for performance
@@ -131,6 +140,11 @@ attribute_visible SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col
       for(size_t j = 0; j < cols; j++){
         SEXP col = VECTOR_ELT(df, j);
         switch(coltypes[j]){
+        case COL_DATE:{
+          double val = Rf_isReal(col) ? REAL(col)[i] : INTEGER(col)[i];
+          if(Rf_isReal(col) ? R_FINITE(val) : val != NA_INTEGER)
+            assert_lxw(worksheet_write_number(sheet, cursor, j, 25569 + val, NULL));
+        }; continue;
         case COL_POSIXCT: {
           double val = REAL(col)[i];
           if(R_FINITE(val))

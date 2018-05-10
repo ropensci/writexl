@@ -34,7 +34,7 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE){
 
 normalize_df <- function(df){
   # Types to coerce to strings
-  for(i in which(vapply(df, inherits, logical(1), c("Date", "factor", "hms")))){
+  for(i in which(vapply(df, inherits, logical(1), c("factor", "hms")))){
     df[[i]] <- as.character(df[[i]])
   }
   for(i in which(vapply(df, inherits, logical(1), "POSIXlt"))){
