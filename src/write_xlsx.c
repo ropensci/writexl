@@ -152,24 +152,19 @@ attribute_visible SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col
         }; continue;
         case COL_STRING:{
           SEXP val = STRING_ELT(col, i);
+          // NB: xlsx does distinguish between empty string and NA
           if(val != NA_STRING && Rf_length(val))
             assert_lxw(worksheet_write_string(sheet, cursor, j, Rf_translateCharUTF8(val), NULL));
-          else  // xlsx does string not supported it seems?
-            assert_lxw(worksheet_write_string(sheet, cursor, j, " ", NULL));
         }; continue;
         case COL_FORMULA:{
           SEXP val = STRING_ELT(col, i);
           if(val != NA_STRING && Rf_length(val))
             assert_lxw(worksheet_write_formula(sheet, cursor, j, Rf_translateCharUTF8(val), NULL));
-          else
-            assert_lxw(worksheet_write_formula(sheet, cursor, j, " ", NULL));
         }; continue;
         case COL_HYPERLINK:{
           SEXP val = STRING_ELT(col, i);
           if(val != NA_STRING && Rf_length(val))
             assert_lxw(worksheet_write_formula(sheet, cursor, j, Rf_translateCharUTF8(val), hyperlink));
-          else
-            assert_lxw(worksheet_write_formula(sheet, cursor, j, " ", NULL));
         }; continue;
         case COL_REAL:{
           double val = REAL(col)[i];

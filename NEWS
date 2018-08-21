@@ -1,3 +1,6 @@
+1.1
+  - Do not write blank xlsx strings for NA and "" character values
+
 1.0
   - Save R 'Date' types as proper datetime strings
   - Update vendored libxlswriter to 0.7.6
