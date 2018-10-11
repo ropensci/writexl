@@ -1,5 +1,6 @@
 1.1
   - Do not write blank xlsx strings for NA and "" character values
+  - Coerce bit64 vectors to double with warning (xlsx does not have int64)
 
 1.0
   - Save R 'Date' types as proper datetime strings

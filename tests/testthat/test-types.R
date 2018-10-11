@@ -8,10 +8,13 @@ test_that("Types roundtrip properly",{
   kremlin <- "http://\u043F\u0440\u0435\u0437\u0438\u0434\u0435\u043D\u0442.\u0440\u0444"
   num <- c(NA_real_, pi, 1.2345e80)
   int <- c(NA_integer_, 0L, -100L)
-  str <- c(NA_character_, "foo", kremlin) #note emptry string's dont work yet
+  str <- c(NA_character_, "foo", kremlin) #note empty strings don't work yet
   time <- Sys.time() + 1:3
-  df <- data.frame(num = num, int = int, str = str, time = time, stringsAsFactors = FALSE)
-  expect_equal(df, as.data.frame(roundtrip(df)))
+  bigint <- bit64::as.integer64(.Machine$integer.max) ^ c(0,1,1.5)
+  input <- data.frame(num = num, int = int, bigint = bigint, str = str, time = time, stringsAsFactors = FALSE)
+  expect_warning(output <- roundtrip(input), "int64")
+  output$bigint <- bit64::as.integer64(output$bigint)
+  expect_equal(input, as.data.frame(output))
 })
 
 test_that("Writing formulas", {
