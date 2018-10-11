@@ -14,7 +14,7 @@ Encoding: UTF-8
 LazyData: true
 URL: https://github.com/ropensci/writexl (devel), https://libxlsxwriter.github.io (upstream)
 BugReports: https://github.com/ropensci/writexl/issues
-RoxygenNote: 6.0.1
+RoxygenNote: 6.1.0
 Suggests:
     spelling,
     readxl,

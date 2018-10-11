@@ -18,8 +18,8 @@
 #' @param x data frame or named list of data frames that will be sheets in the xlsx
 #' @param path a file name to write to
 #' @param col_names write column names at the top of the file?
-#' @examples # Roundtrip example
-#' tmp <- write_xlsx(iris)
+#' @examples # Roundtrip example with single excel sheet named 'mysheet'
+#' tmp <- write_xlsx(list(mysheet = iris))
 #' readxl::read_xlsx(tmp)
 write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE){
   if(is.data.frame(x))

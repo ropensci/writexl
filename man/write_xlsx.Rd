@@ -29,7 +29,7 @@ may be added in future versions.
 }}
 }
 \examples{
-# Roundtrip example
-tmp <- write_xlsx(iris)
+# Roundtrip example with single excel sheet named 'mysheet'
+tmp <- write_xlsx(list(mysheet = iris))
 readxl::read_xlsx(tmp)
 }

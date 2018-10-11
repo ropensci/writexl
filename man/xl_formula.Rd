@@ -19,3 +19,4 @@ xl_hyperlink(url, name = NULL)
 \description{
 Create special column types to write to a spreadsheet
 }
+\concept{writexl}
