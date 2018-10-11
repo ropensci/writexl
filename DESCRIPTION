@@ -7,7 +7,7 @@ Authors@R: c(
       comment = c(ORCID = "0000-0002-4035-0289")),
     person("John McNamara", role = "cph",
       comment = "Author of libxlsxwriter (see AUTHORS and COPYRIGHT files for details)"))
-Description: Zero-dependency and data frame to xlsx exporter based on 'libxlsxwriter'. 
+Description: Zero-dependency data frame to xlsx exporter based on 'libxlsxwriter'. 
     Fast and no Java or Excel required.
 License: BSD_2_clause + file LICENSE
 Encoding: UTF-8
