@@ -61,12 +61,12 @@ static char TEMPDIR[2048] = {0};
 static lxw_workbook_options options = {.constant_memory = 1, .tmpdir = TEMPDIR};
 
 //set to R tempdir when pkg is loaded
-attribute_visible SEXP C_set_tempdir(SEXP dir){
+SEXP C_set_tempdir(SEXP dir){
   strcpy(TEMPDIR, Rf_translateChar(STRING_ELT(dir, 0)));
   return Rf_mkString(options.tmpdir);
 }
 
-attribute_visible SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names){
+SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names){
   assert_that(Rf_isVectorList(df_list), "Object is not a list");
   assert_that(Rf_isString(file) && Rf_length(file), "Invalid file path");
   assert_that(Rf_isLogical(col_names), "col_names must be logical");
@@ -199,11 +199,19 @@ attribute_visible SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col
   return file;
 }
 
-attribute_visible SEXP C_lxw_version(){
+SEXP C_lxw_version(){
   return Rf_mkString(LXW_VERSION);
 }
 
-attribute_visible void R_init_writexl(DllInfo* info) {
-  R_registerRoutines(info, NULL, NULL, NULL, NULL);
-  R_useDynamicSymbols(info, TRUE);
+static const R_CallMethodDef CallEntries[] = {
+  {"C_lxw_version",           (DL_FUNC) &C_lxw_version,           0},
+  {"C_set_tempdir",           (DL_FUNC) &C_set_tempdir,           1},
+  {"C_write_data_frame_list", (DL_FUNC) &C_write_data_frame_list, 3},
+  {NULL, NULL, 0}
+};
+
+attribute_visible void R_init_writexl(DllInfo *dll) {
+  R_registerRoutines(dll, NULL, CallEntries, NULL, NULL);
+  R_useDynamicSymbols(dll, FALSE);
+  R_forceSymbols(dll, TRUE);
 }
