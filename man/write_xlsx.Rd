@@ -5,7 +5,8 @@
 \alias{writexl}
 \title{Export to xlsx}
 \usage{
-write_xlsx(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE)
+write_xlsx(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
+  format_headers = TRUE)
 }
 \arguments{
 \item{x}{data frame or named list of data frames that will be sheets in the xlsx}
@@ -13,6 +14,8 @@ write_xlsx(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE)
 \item{path}{a file name to write to}
 
 \item{col_names}{write column names at the top of the file?}
+
+\item{format_headers}{make the \code{col_names} in the xlsx centered and bold}
 }
 \description{
 Writes a data frame to an xlsx file. To create an xlsx with (multiple) named

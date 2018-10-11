@@ -18,10 +18,12 @@
 #' @param x data frame or named list of data frames that will be sheets in the xlsx
 #' @param path a file name to write to
 #' @param col_names write column names at the top of the file?
+#' @param format_headers make the \code{col_names} in the xlsx centered and bold
 #' @examples # Roundtrip example with single excel sheet named 'mysheet'
 #' tmp <- write_xlsx(list(mysheet = iris))
 #' readxl::read_xlsx(tmp)
-write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE){
+write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
+                       format_headers = TRUE){
   if(is.data.frame(x))
     x <- list(x)
   if(!is.list(x) || !all(vapply(x, is.data.frame, logical(1))))
@@ -29,7 +31,7 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE){
   x <- lapply(x, normalize_df)
   stopifnot(is.character(path) && length(path))
   path <- normalizePath(path, mustWork = FALSE)
-  ret <- .Call(C_write_data_frame_list, x, path, col_names)
+  ret <- .Call(C_write_data_frame_list, x, path, col_names, format_headers)
   invisible(ret)
 }
 
