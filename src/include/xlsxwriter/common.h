@@ -65,6 +65,9 @@ typedef enum lxw_error {
     /** Error encountered when creating a tmpfile during file assembly. */
     LXW_ERROR_CREATING_TMPFILE,
 
+    /** Error reading a tmpfile. */
+    LXW_ERROR_READING_TMPFILE,
+
     /** Zlib error with a file operation while creating xlsx file. */
     LXW_ERROR_ZIP_FILE_OPERATION,
 
@@ -176,6 +179,9 @@ enum lxw_custom_property_types {
 #define LXW_UINT32_T_LENGTH       sizeof("4294967296")
 #define LXW_FILENAME_LENGTH       128
 #define LXW_IGNORE                1
+
+#define LXW_PORTRAIT              1
+#define LXW_LANDSCAPE             0
 
 #define LXW_SCHEMA_MS        "http://schemas.microsoft.com/office/2006/relationships"
 #define LXW_SCHEMA_ROOT      "http://schemas.openxmlformats.org"

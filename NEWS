@@ -1,4 +1,5 @@
 1.1
+  - Update bundled libxlswriter 0.8.4
   - Do not write blank xlsx strings for NA and "" character values
   - Coerce bit64 vectors to double with warning (xlsx does not have int64)
 

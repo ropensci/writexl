@@ -87,6 +87,20 @@ extern "C" {
 /* *INDENT-ON* */
 
 /**
+ * @brief Retrieve the library version.
+ *
+ * @return The "X.Y.Z" version string.
+ *
+ * Get the library version as a "X.Y.Z" version string
+ *
+ *  @code
+ *      printf("Libxlsxwriter version = %s\n", lxw_version());
+ *  @endcode
+ *
+ */
+const char *lxw_version(void);
+
+/**
  * @brief Converts a libxlsxwriter error number to a string.
  *
  * The `%lxw_strerror` function converts a libxlsxwriter error number defined
@@ -162,6 +176,8 @@ int lxw_sprintf_dbl(char *data, double number);
 #define lxw_sprintf_dbl(data, number) \
         lxw_snprintf(data, LXW_ATTR_32, "%.16g", number)
 #endif
+
+uint16_t lxw_hash_password(const char *password);
 
 /* *INDENT-OFF* */
 #ifdef __cplusplus

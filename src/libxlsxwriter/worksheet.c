@@ -17,8 +17,6 @@
 
 #define LXW_STR_MAX                      32767
 #define LXW_BUFFER_SIZE                  4096
-#define LXW_PORTRAIT                     1
-#define LXW_LANDSCAPE                    0
 #define LXW_PRINT_ACROSS                 1
 #define LXW_VALIDATION_MAX_TITLE_LENGTH  32
 #define LXW_VALIDATION_MAX_STRING_LENGTH 255
@@ -271,10 +269,11 @@ _free_image_options(lxw_image_options *image)
         return;
 
     free(image->filename);
-    free(image->short_name);
+    free(image->description);
     free(image->extension);
     free(image->url);
     free(image->tip);
+    free(image->image_buffer);
     free(image);
 }
 
@@ -532,6 +531,26 @@ _new_inline_string_cell(lxw_row_t row_num,
     cell->row_num = row_num;
     cell->col_num = col_num;
     cell->type = INLINE_STRING_CELL;
+    cell->format = format;
+    cell->u.string = string;
+
+    return cell;
+}
+
+/*
+ * Create a new worksheet inline_string cell object for rich strings.
+ */
+STATIC lxw_cell *
+_new_inline_rich_string_cell(lxw_row_t row_num,
+                             lxw_col_t col_num, char *string,
+                             lxw_format *format)
+{
+    lxw_cell *cell = calloc(1, sizeof(lxw_cell));
+    RETURN_ON_MEM_ERROR(cell, cell);
+
+    cell->row_num = row_num;
+    cell->col_num = col_num;
+    cell->type = INLINE_RICH_STRING_CELL;
     cell->format = format;
     cell->u.string = string;
 
@@ -839,38 +858,6 @@ _cell_cmp(lxw_cell *cell1, lxw_cell *cell2)
     if (cell1->col_num < cell2->col_num)
         return -1;
     return 0;
-}
-
-/*
- * Hash a worksheet password. Based on the algorithm provided by Daniel Rentz
- * of OpenOffice.
- */
-STATIC uint16_t
-_hash_password(const char *password)
-{
-    size_t count;
-    uint8_t i;
-    uint16_t hash = 0x0000;
-
-    count = strlen(password);
-
-    for (i = 0; i < count; i++) {
-        uint32_t low_15;
-        uint32_t high_15;
-        uint32_t letter = password[i] << (i + 1);
-
-        low_15 = letter & 0x7fff;
-        high_15 = letter & (0x7fff << 15);
-        high_15 = high_15 >> 15;
-        letter = low_15 | high_15;
-
-        hash ^= letter;
-    }
-
-    hash ^= count;
-    hash ^= 0xCE4B;
-
-    return hash;
 }
 
 /*
@@ -2027,7 +2014,7 @@ lxw_worksheet_prepare_image(lxw_worksheet *self,
 
     drawing_object->anchor_type = LXW_ANCHOR_TYPE_IMAGE;
     drawing_object->edit_as = LXW_ANCHOR_EDIT_AS_ONE_CELL;
-    drawing_object->description = lxw_strdup(image_data->short_name);
+    drawing_object->description = lxw_strdup(image_data->description);
 
     /* Scale to user scale. */
     width = image_data->width * image_data->x_scale;
@@ -2079,8 +2066,10 @@ mem_error:
  */
 void
 lxw_worksheet_prepare_chart(lxw_worksheet *self,
-                            uint16_t chart_ref_id, uint16_t drawing_id,
-                            lxw_image_options *image_data)
+                            uint16_t chart_ref_id,
+                            uint16_t drawing_id,
+                            lxw_image_options *image_data,
+                            uint8_t is_chartsheet)
 {
     lxw_drawing_object *drawing_object;
     lxw_rel_tuple *relationship;
@@ -2090,8 +2079,15 @@ lxw_worksheet_prepare_chart(lxw_worksheet *self,
 
     if (!self->drawing) {
         self->drawing = lxw_drawing_new();
-        self->drawing->embedded = LXW_TRUE;
         RETURN_VOID_ON_MEM_ERROR(self->drawing);
+
+        if (is_chartsheet) {
+            self->drawing->embedded = LXW_FALSE;
+            self->drawing->orientation = self->orientation;
+        }
+        else {
+            self->drawing->embedded = LXW_TRUE;
+        }
 
         relationship = calloc(1, sizeof(lxw_rel_tuple));
         GOTO_LABEL_ON_MEM_ERROR(relationship, mem_error);
@@ -2259,8 +2255,7 @@ _process_png(lxw_image_options *image_options)
 
 file_error:
     LXW_WARN_FORMAT1("worksheet_insert_image()/_opt(): "
-                     "no size data found in file: %s.",
-                     image_options->filename);
+                     "no size data found in: %s.", image_options->filename);
 
     return LXW_ERROR_IMAGE_DIMENSIONS;
 }
@@ -2386,8 +2381,7 @@ _process_jpeg(lxw_image_options *image_options)
 
 file_error:
     LXW_WARN_FORMAT1("worksheet_insert_image()/_opt(): "
-                     "no size data found in file: %s.",
-                     image_options->filename);
+                     "no size data found in: %s.", image_options->filename);
 
     return LXW_ERROR_IMAGE_DIMENSIONS;
 }
@@ -2436,8 +2430,7 @@ _process_bmp(lxw_image_options *image_options)
 
 file_error:
     LXW_WARN_FORMAT1("worksheet_insert_image()/_opt(): "
-                     "no size data found in file: %s.",
-                     image_options->filename);
+                     "no size data found in: %s.", image_options->filename);
 
     return LXW_ERROR_IMAGE_DIMENSIONS;
 }
@@ -2454,7 +2447,7 @@ _get_image_properties(lxw_image_options *image_options)
     /* Read 4 bytes to look for the file header/signature. */
     if (fread(signature, 1, 4, image_options->stream) < 4) {
         LXW_WARN_FORMAT1("worksheet_insert_image()/_opt(): "
-                         "couldn't read file type for file: %s.",
+                         "couldn't read image type for: %s.",
                          image_options->filename);
         return LXW_ERROR_IMAGE_DIMENSIONS;
     }
@@ -2473,7 +2466,7 @@ _get_image_properties(lxw_image_options *image_options)
     }
     else {
         LXW_WARN_FORMAT1("worksheet_insert_image()/_opt(): "
-                         "unsupported image format for file: %s.",
+                         "unsupported image format for: %s.",
                          image_options->filename);
         return LXW_ERROR_IMAGE_DIMENSIONS;
     }
@@ -2574,6 +2567,41 @@ _write_inline_string_cell(lxw_worksheet *self, char *range,
     }
 
     free(string);
+}
+
+/*
+ * Write out an inline rich string. Doesn't use the xml functions as an
+ * optimization in the inner cell writing loop.
+ */
+STATIC void
+_write_inline_rich_string_cell(lxw_worksheet *self, char *range,
+                               int32_t style_index, lxw_cell *cell)
+{
+    char *string = cell->u.string;
+
+    /* Add attribute to preserve leading or trailing whitespace. */
+    if (isspace((unsigned char) string[0])
+        || isspace((unsigned char) string[strlen(string) - 1])) {
+
+        if (style_index)
+            fprintf(self->file,
+                    "<c r=\"%s\" s=\"%d\" t=\"inlineStr\"><is>%s</is></c>",
+                    range, style_index, string);
+        else
+            fprintf(self->file,
+                    "<c r=\"%s\" t=\"inlineStr\"><is>%s</is></c>",
+                    range, string);
+    }
+    else {
+        if (style_index)
+            fprintf(self->file,
+                    "<c r=\"%s\" s=\"%d\" t=\"inlineStr\">"
+                    "<is>%s</is></c>", range, style_index, string);
+        else
+            fprintf(self->file,
+                    "<c r=\"%s\" t=\"inlineStr\">"
+                    "<is>%s</is></c>", range, string);
+    }
 }
 
 /*
@@ -2709,6 +2737,11 @@ _write_cell(lxw_worksheet *self, lxw_cell *cell, lxw_format *row_format)
 
     if (cell->type == INLINE_STRING_CELL) {
         _write_inline_string_cell(self, range, style_index, cell);
+        return;
+    }
+
+    if (cell->type == INLINE_RICH_STRING_CELL) {
+        _write_inline_rich_string_cell(self, range, style_index, cell);
         return;
     }
 
@@ -3093,7 +3126,8 @@ _worksheet_write_sheet_pr(lxw_worksheet *self)
     if (!self->fit_page
         && !self->filter_on
         && self->tab_color == LXW_COLOR_UNSET
-        && !self->outline_changed && !self->vba_codename) {
+        && !self->outline_changed
+        && !self->vba_codename && !self->is_chartsheet) {
         return;
     }
 
@@ -3364,12 +3398,11 @@ mem_error:
  * Write the <sheetProtection> element.
  */
 STATIC void
-_worksheet_write_sheet_protection(lxw_worksheet *self)
+_worksheet_write_sheet_protection(lxw_worksheet *self,
+                                  lxw_protection *protect)
 {
     struct xml_attribute_list attributes;
     struct xml_attribute *attribute;
-
-    struct lxw_protection *protect = &self->protection;
 
     if (!protect->is_configured)
         return;
@@ -3382,7 +3415,7 @@ _worksheet_write_sheet_protection(lxw_worksheet *self)
     if (!protect->no_sheet)
         LXW_PUSH_ATTRIBUTES_INT("sheet", 1);
 
-    if (protect->content)
+    if (!protect->no_content)
         LXW_PUSH_ATTRIBUTES_INT("content", 1);
 
     if (!protect->objects)
@@ -3439,7 +3472,7 @@ _worksheet_write_sheet_protection(lxw_worksheet *self)
  * Write the <drawing> element.
  */
 STATIC void
-_write_drawing(lxw_worksheet *self, uint16_t id)
+_worksheet_write_drawing(lxw_worksheet *self, uint16_t id)
 {
     struct xml_attribute_list attributes;
     struct xml_attribute *attribute;
@@ -3461,14 +3494,14 @@ _write_drawing(lxw_worksheet *self, uint16_t id)
  * Write the <drawing> elements.
  */
 STATIC void
-_write_drawings(lxw_worksheet *self)
+_worksheet_write_drawings(lxw_worksheet *self)
 {
     if (!self->drawing)
         return;
 
     self->rel_count++;
 
-    _write_drawing(self, self->rel_count);
+    _worksheet_write_drawing(self, self->rel_count);
 }
 
 /*
@@ -3690,6 +3723,52 @@ _worksheet_write_data_validations(lxw_worksheet *self)
 }
 
 /*
+ * External functions to call intern XML methods shared with chartsheet.
+ */
+void
+lxw_worksheet_write_sheet_views(lxw_worksheet *self)
+{
+    _worksheet_write_sheet_views(self);
+}
+
+void
+lxw_worksheet_write_page_margins(lxw_worksheet *self)
+{
+    _worksheet_write_page_margins(self);
+}
+
+void
+lxw_worksheet_write_drawings(lxw_worksheet *self)
+{
+    _worksheet_write_drawings(self);
+}
+
+void
+lxw_worksheet_write_sheet_protection(lxw_worksheet *self,
+                                     lxw_protection *protect)
+{
+    _worksheet_write_sheet_protection(self, protect);
+}
+
+void
+lxw_worksheet_write_sheet_pr(lxw_worksheet *self)
+{
+    _worksheet_write_sheet_pr(self);
+}
+
+void
+lxw_worksheet_write_page_setup(lxw_worksheet *self)
+{
+    _worksheet_write_page_setup(self);
+}
+
+void
+lxw_worksheet_write_header_footer(lxw_worksheet *self)
+{
+    _worksheet_write_header_footer(self);
+}
+
+/*
  * Assemble and write the XML file.
  */
 void
@@ -3723,7 +3802,7 @@ lxw_worksheet_assemble_xml_file(lxw_worksheet *self)
         _worksheet_write_optimized_sheet_data(self);
 
     /* Write the sheetProtection element. */
-    _worksheet_write_sheet_protection(self);
+    _worksheet_write_sheet_protection(self, &self->protection);
 
     /* Write the autoFilter element. */
     _worksheet_write_auto_filter(self);
@@ -3756,7 +3835,7 @@ lxw_worksheet_assemble_xml_file(lxw_worksheet *self)
     _worksheet_write_col_breaks(self);
 
     /* Write the drawing element. */
-    _write_drawings(self);
+    _worksheet_write_drawings(self);
 
     /* Close the worksheet tag. */
     lxw_xml_end_tag(self->file, "worksheet");
@@ -3823,7 +3902,7 @@ worksheet_write_string(lxw_worksheet *self,
 
     if (!self->optimize) {
         /* Get the SST element and string id. */
-        sst_element = lxw_get_sst_index(self->sst, string);
+        sst_element = lxw_get_sst_index(self->sst, string, LXW_FALSE);
 
         if (!sst_element)
             return LXW_ERROR_SHARED_STRING_INDEX_NOT_FOUND;
@@ -4296,6 +4375,156 @@ worksheet_write_url(lxw_worksheet *self,
 {
     return worksheet_write_url_opt(self, row_num, col_num, url, format, NULL,
                                    NULL);
+}
+
+/*
+ * Write a rich string to an Excel file.
+ *
+ * Rather than duplicate several of the styles.c font xml methods of styles.c
+ * and write the data to a memory buffer this function creates a temporary
+ * styles object and uses it to write the data to a file. It then reads that
+ * data back into memory and closes the file.
+ */
+lxw_error
+worksheet_write_rich_string(lxw_worksheet *self,
+                            lxw_row_t row_num,
+                            lxw_col_t col_num,
+                            lxw_rich_string_tuple *rich_strings[],
+                            lxw_format *format)
+{
+    lxw_cell *cell;
+    int32_t string_id;
+    struct sst_element *sst_element;
+    lxw_error err;
+    uint8_t i;
+    long file_size;
+    char *rich_string = NULL;
+    char *string_copy = NULL;
+    lxw_styles *styles = NULL;
+    lxw_format *default_format = NULL;
+    lxw_rich_string_tuple *rich_string_tuple = NULL;
+    FILE *tmpfile;
+
+    err = _check_dimensions(self, row_num, col_num, LXW_FALSE, LXW_FALSE);
+    if (err)
+        return err;
+
+    /* Iterate through rich string fragments to check for input errors. */
+    i = 0;
+    err = LXW_NO_ERROR;
+    while ((rich_string_tuple = rich_strings[i++]) != NULL) {
+
+        /* Check for NULL or empty strings. */
+        if (!rich_string_tuple->string || !*rich_string_tuple->string) {
+            err = LXW_ERROR_PARAMETER_VALIDATION;
+        }
+    }
+
+    /* If there are less than 2 fragments it isn't a rich string. */
+    if (i <= 2)
+        err = LXW_ERROR_PARAMETER_VALIDATION;
+
+    if (err)
+        return err;
+
+    /* Create a tmp file for the styles object. */
+    tmpfile = lxw_tmpfile(self->tmpdir);
+    if (!tmpfile)
+        return LXW_ERROR_CREATING_TMPFILE;
+
+    /* Create a temp styles object for writing the font data. */
+    styles = lxw_styles_new();
+    GOTO_LABEL_ON_MEM_ERROR(styles, mem_error);
+    styles->file = tmpfile;
+
+    /* Create a default format for non-formatted text. */
+    default_format = lxw_format_new();
+    GOTO_LABEL_ON_MEM_ERROR(default_format, mem_error);
+
+    /* Iterate through the rich string fragments and write each one out. */
+    i = 0;
+    while ((rich_string_tuple = rich_strings[i++]) != NULL) {
+        lxw_xml_start_tag(tmpfile, "r", NULL);
+
+        if (rich_string_tuple->format) {
+            /* Write the user defined font format. */
+            lxw_styles_write_rich_font(styles, rich_string_tuple->format);
+        }
+        else {
+            /* Write a default font format. Except for the first fragment. */
+            if (i > 1)
+                lxw_styles_write_rich_font(styles, default_format);
+        }
+
+        lxw_styles_write_string_fragment(styles, rich_string_tuple->string);
+        lxw_xml_end_tag(tmpfile, "r");
+    }
+
+    /* Free the temp objects. */
+    lxw_styles_free(styles);
+    lxw_format_free(default_format);
+
+    /* Flush the file and read the size to calculate the required memory. */
+    fflush(tmpfile);
+    file_size = ftell(tmpfile);
+
+    /* Allocate a buffer for the rich string xml data. */
+    rich_string = calloc(file_size + 1, 1);
+    GOTO_LABEL_ON_MEM_ERROR(rich_string, mem_error);
+
+    /* Rewind the file and read the data into the memory buffer. */
+    rewind(tmpfile);
+    if (fread(rich_string, file_size, 1, tmpfile) < 1) {
+        fclose(tmpfile);
+        free(rich_string);
+        return LXW_ERROR_READING_TMPFILE;
+    }
+
+    /* Close the temp file. */
+    fclose(tmpfile);
+
+    if (lxw_utf8_strlen(rich_string) > LXW_STR_MAX) {
+        free(rich_string);
+        return LXW_ERROR_MAX_STRING_LENGTH_EXCEEDED;
+    }
+
+    if (!self->optimize) {
+        /* Get the SST element and string id. */
+        sst_element = lxw_get_sst_index(self->sst, rich_string, LXW_TRUE);
+        free(rich_string);
+
+        if (!sst_element)
+            return LXW_ERROR_SHARED_STRING_INDEX_NOT_FOUND;
+
+        string_id = sst_element->index;
+        cell = _new_string_cell(row_num, col_num, string_id,
+                                sst_element->string, format);
+    }
+    else {
+        /* Look for and escape control chars in the string. */
+        if (strpbrk(rich_string, "\x01\x02\x03\x04\x05\x06\x07\x08\x0B\x0C"
+                    "\x0D\x0E\x0F\x10\x11\x12\x13\x14\x15\x16"
+                    "\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F")) {
+            string_copy = lxw_escape_control_characters(rich_string);
+            free(rich_string);
+        }
+        else {
+            string_copy = rich_string;
+        }
+        cell = _new_inline_rich_string_cell(row_num, col_num, string_copy,
+                                            format);
+    }
+
+    _insert_cell(self, row_num, col_num, cell);
+
+    return LXW_NO_ERROR;
+
+mem_error:
+    lxw_styles_free(styles);
+    lxw_format_free(default_format);
+    fclose(tmpfile);
+
+    return LXW_ERROR_MEMORY_MALLOC_FAILED;
 }
 
 /*
@@ -5234,10 +5463,11 @@ worksheet_protect(lxw_worksheet *self, const char *password,
     }
 
     if (password) {
-        uint16_t hash = _hash_password(password);
+        uint16_t hash = lxw_hash_password(password);
         lxw_snprintf(protect->hash, 5, "%X", hash);
     }
 
+    protect->no_content = LXW_TRUE;
     protect->is_configured = LXW_TRUE;
 }
 
@@ -5289,7 +5519,7 @@ worksheet_insert_image_opt(lxw_worksheet *self,
                            lxw_image_options *user_options)
 {
     FILE *image_stream;
-    char *short_name;
+    char *description;
     lxw_image_options *options;
 
     if (!filename) {
@@ -5307,9 +5537,9 @@ worksheet_insert_image_opt(lxw_worksheet *self,
         return LXW_ERROR_PARAMETER_VALIDATION;
     }
 
-    /* Get the filename from the full path to add to the Drawing object. */
-    short_name = lxw_basename(filename);
-    if (!short_name) {
+    /* Use the filename as the default description, like Excel. */
+    description = lxw_basename(filename);
+    if (!description) {
         LXW_WARN_FORMAT1("worksheet_insert_image()/_opt(): "
                          "couldn't get basename for file: %s.", filename);
         fclose(image_stream);
@@ -5332,7 +5562,7 @@ worksheet_insert_image_opt(lxw_worksheet *self,
 
     /* Copy other options or set defaults. */
     options->filename = lxw_strdup(filename);
-    options->short_name = lxw_strdup(short_name);
+    options->description = lxw_strdup(description);
     options->stream = image_stream;
     options->row = row_num;
     options->col = col_num;
@@ -5349,7 +5579,7 @@ worksheet_insert_image_opt(lxw_worksheet *self,
         return LXW_NO_ERROR;
     }
     else {
-        free(options);
+        _free_image_options(options);
         fclose(image_stream);
         return LXW_ERROR_IMAGE_DIMENSIONS;
     }
@@ -5364,6 +5594,92 @@ worksheet_insert_image(lxw_worksheet *self,
                        const char *filename)
 {
     return worksheet_insert_image_opt(self, row_num, col_num, filename, NULL);
+}
+
+lxw_error
+worksheet_insert_image_buffer_opt(lxw_worksheet *self,
+                                  lxw_row_t row_num,
+                                  lxw_col_t col_num,
+                                  const unsigned char *image_buffer,
+                                  size_t image_size,
+                                  lxw_image_options *user_options)
+{
+    FILE *image_stream;
+    lxw_image_options *options;
+
+    if (!image_size) {
+        LXW_WARN("worksheet_insert_image_buffer()/_opt(): "
+                 "size must be non-zero.");
+        return LXW_ERROR_NULL_PARAMETER_IGNORED;
+    }
+
+    /* Write the image buffer to a temporary file so we can read the
+     * dimensions like an ordinary file. */
+    image_stream = lxw_tmpfile(self->tmpdir);
+    fwrite(image_buffer, 1, image_size, image_stream);
+    rewind(image_stream);
+
+    /* Create a new object to hold the image options. */
+    options = calloc(1, sizeof(lxw_image_options));
+    if (!options) {
+        fclose(image_stream);
+        return LXW_ERROR_MEMORY_MALLOC_FAILED;
+    }
+
+    /* Store the image data in the options structure. */
+    options->image_buffer = calloc(1, image_size);
+    if (!options->image_buffer) {
+        _free_image_options(options);
+        fclose(image_stream);
+        return LXW_ERROR_MEMORY_MALLOC_FAILED;
+    }
+    else {
+        memcpy(options->image_buffer, image_buffer, image_size);
+        options->image_buffer_size = image_size;
+        options->is_image_buffer = LXW_TRUE;
+    }
+
+    if (user_options) {
+        options->x_offset = user_options->x_offset;
+        options->y_offset = user_options->y_offset;
+        options->x_scale = user_options->x_scale;
+        options->y_scale = user_options->y_scale;
+        options->description = lxw_strdup(user_options->description);
+    }
+
+    /* Copy other options or set defaults. */
+    options->filename = lxw_strdup("image_buffer");
+    options->stream = image_stream;
+    options->row = row_num;
+    options->col = col_num;
+
+    if (!options->x_scale)
+        options->x_scale = 1;
+
+    if (!options->y_scale)
+        options->y_scale = 1;
+
+    if (_get_image_properties(options) == LXW_NO_ERROR) {
+        STAILQ_INSERT_TAIL(self->image_data, options, list_pointers);
+        fclose(image_stream);
+        return LXW_NO_ERROR;
+    }
+    else {
+        _free_image_options(options);
+        fclose(image_stream);
+        return LXW_ERROR_IMAGE_DIMENSIONS;
+    }
+}
+
+lxw_error
+worksheet_insert_image_buffer(lxw_worksheet *self,
+                              lxw_row_t row_num,
+                              lxw_col_t col_num,
+                              const unsigned char *image_buffer,
+                              size_t image_size)
+{
+    return worksheet_insert_image_buffer_opt(self, row_num, col_num,
+                                             image_buffer, image_size, NULL);
 }
 
 /*
