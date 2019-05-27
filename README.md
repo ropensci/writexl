@@ -15,7 +15,7 @@ in Microsoft Excel 'xlsx' format.
 ## Installation
 
 ```r
-devtools::install_github("ropensci/writexl")
+install.packages("writexl")
 ```
 
 ## Getting started
