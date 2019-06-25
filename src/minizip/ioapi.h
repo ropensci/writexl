@@ -129,10 +129,8 @@ extern "C" {
  #endif
 #endif
 
-/* Hack for Gentoo: https://github.com/ropensci/writexl/issues/34 */
-#if !defined(OF) && defined(_Z_OF)
-#define OF _Z_OF
-#endif
+
+
 
 typedef voidpf   (ZCALLBACK *open_file_func)      OF((voidpf opaque, const char* filename, int mode));
 typedef uLong    (ZCALLBACK *read_file_func)      OF((voidpf opaque, voidpf stream, void* buf, uLong size));
