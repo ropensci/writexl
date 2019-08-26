@@ -12,7 +12,9 @@ Description: Zero-dependency data frame to xlsx exporter based on 'libxlsxwriter
 License: BSD_2_clause + file LICENSE
 Encoding: UTF-8
 LazyData: true
-URL: https://github.com/ropensci/writexl (devel), https://libxlsxwriter.github.io (upstream)
+URL: https://docs.ropensci.org/writexl (website)
+    https://github.com/ropensci/writexl (devel)
+    https://libxlsxwriter.github.io (upstream)
 BugReports: https://github.com/ropensci/writexl/issues
 RoxygenNote: 6.1.0
 Suggests:
