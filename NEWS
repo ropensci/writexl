@@ -1,5 +1,7 @@
 1.2
   - Update bundled libxlswriter 0.8.8
+  - xl_formula and xl_hyperlink now correctly support NA
+  - Oil clippy a bit
 
 1.1
   - Update bundled libxlswriter 0.8.4

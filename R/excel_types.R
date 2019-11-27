@@ -10,7 +10,7 @@ xl_formula <- function(x){
   if(is.factor(x))
     x <- as.character(x)
   stopifnot(is.character(x))
-  if(!all(grepl("^=",x)))
+  if(!all(grepl("^=",x) | is.na(x)))
     stop("Formulas must start with '='")
   structure(x, class = c('xl_formula', 'xl_object'))
 }
@@ -28,6 +28,7 @@ xl_hyperlink <- function(url, name = NULL){
     hyperlink <- paste(hyperlink, dubquote(name), sep = ",")
   }
   out <- xl_formula(sprintf("=HYPERLINK(%s)", hyperlink))
+  out[is.na(url)] <- NA
   structure(out, class = c('xl_hyperlink', 'xl_formula', 'xl_object'))
 }
 
