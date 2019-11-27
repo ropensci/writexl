@@ -1,7 +1,7 @@
 /*
  * libxlsxwriter
  *
- * Copyright 2014-2018, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2019, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  *
  * styles - A libxlsxwriter library for creating Excel XLSX styles files.
  *
@@ -38,7 +38,7 @@ extern "C" {
 #endif
 /* *INDENT-ON* */
 
-lxw_styles *lxw_styles_new();
+lxw_styles *lxw_styles_new(void);
 void lxw_styles_free(lxw_styles *styles);
 void lxw_styles_assemble_xml_file(lxw_styles *self);
 void lxw_styles_write_string_fragment(lxw_styles *self, char *string);

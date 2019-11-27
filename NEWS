@@ -1,3 +1,6 @@
+1.2
+  - Update bundled libxlswriter 0.8.8
+
 1.1
   - Update bundled libxlswriter 0.8.4
   - Do not write blank xlsx strings for NA and "" character values

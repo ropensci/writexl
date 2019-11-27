@@ -1,7 +1,7 @@
 /*
  * libxlsxwriter
  *
- * Copyright 2014-2018, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2019, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  */
 
 /**
@@ -9,7 +9,7 @@
  *
  * @brief Utility functions for libxlsxwriter.
  *
- * <!-- Copyright 2014-2018, John McNamara, jmcnamara@cpan.org -->
+ * <!-- Copyright 2014-2019, John McNamara, jmcnamara@cpan.org -->
  *
  */
 
@@ -17,6 +17,9 @@
 #define __LXW_UTILITY_H__
 
 #include <stdint.h>
+#ifndef _MSC_VER
+#include <strings.h>
+#endif
 #include "common.h"
 #include "xmlwriter.h"
 
@@ -166,7 +169,15 @@ size_t lxw_utf8_strlen(const char *str);
 
 void lxw_str_tolower(char *str);
 
+/* Define a portable version of strcasecmp(). */
+#ifdef _MSC_VER
+#define lxw_strcasecmp _stricmp
+#else
+#define lxw_strcasecmp strcasecmp
+#endif
+
 FILE *lxw_tmpfile(char *tmpdir);
+FILE *lxw_fopen(const char *filename, const char *mode);
 
 /* Use a user defined function to format doubles in sprintf or else a simple
  * macro (the default). */

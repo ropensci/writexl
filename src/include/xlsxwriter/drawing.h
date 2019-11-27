@@ -1,7 +1,7 @@
 /*
  * libxlsxwriter
  *
- * Copyright 2014-2018, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2019, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  *
  * drawing - A libxlsxwriter library for creating Excel XLSX drawing files.
  *
@@ -10,6 +10,7 @@
 #define __LXW_DRAWING_H__
 
 #include <stdint.h>
+#include <string.h>
 
 #include "common.h"
 
@@ -90,7 +91,7 @@ extern "C" {
 #endif
 /* *INDENT-ON* */
 
-lxw_drawing *lxw_drawing_new();
+lxw_drawing *lxw_drawing_new(void);
 void lxw_drawing_free(lxw_drawing *drawing);
 void lxw_drawing_assemble_xml_file(lxw_drawing *self);
 void lxw_free_drawing_object(struct lxw_drawing_object *drawing_object);

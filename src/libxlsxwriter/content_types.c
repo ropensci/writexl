@@ -3,7 +3,7 @@
  *
  * Used in conjunction with the libxlsxwriter library.
  *
- * Copyright 2014-2018, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2019, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  *
  */
 
@@ -25,7 +25,7 @@
  * Create a new content_types object.
  */
 lxw_content_types *
-lxw_content_types_new()
+lxw_content_types_new(void)
 {
     lxw_content_types *content_types = calloc(1, sizeof(lxw_content_types));
     GOTO_LABEL_ON_MEM_ERROR(content_types, mem_error);
@@ -50,8 +50,6 @@ lxw_content_types_new()
                         LXW_APP_DOCUMENT "spreadsheetml.styles+xml");
     lxw_ct_add_override(content_types, "/xl/theme/theme1.xml",
                         LXW_APP_DOCUMENT "theme+xml");
-    lxw_ct_add_override(content_types, "/xl/workbook.xml",
-                        LXW_APP_DOCUMENT "spreadsheetml.sheet.main+xml");
 
     return content_types;
 

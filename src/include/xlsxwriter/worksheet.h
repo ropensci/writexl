@@ -1,7 +1,7 @@
 /*
  * libxlsxwriter
  *
- * Copyright 2014-2018, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2019, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  */
 
 /**
@@ -259,9 +259,9 @@ struct lxw_table_rows {
 
 STAILQ_HEAD(lxw_merged_ranges, lxw_merged_range);
 STAILQ_HEAD(lxw_selections, lxw_selection);
-STAILQ_HEAD(lxw_data_validations, lxw_data_validation);
-STAILQ_HEAD(lxw_image_data, lxw_image_options);
-STAILQ_HEAD(lxw_chart_data, lxw_image_options);
+STAILQ_HEAD(lxw_data_validations, lxw_data_val_obj);
+STAILQ_HEAD(lxw_image_props, lxw_object_properties);
+STAILQ_HEAD(lxw_chart_props, lxw_object_properties);
 
 /**
  * @brief Options for rows and columns.
@@ -279,9 +279,13 @@ STAILQ_HEAD(lxw_chart_data, lxw_image_options);
  *
  */
 typedef struct lxw_row_col_options {
-    /** Hide the row/column */
+    /** Hide the row/column. @ref ww_outlines_grouping.*/
     uint8_t hidden;
+
+    /** Outline level. See @ref ww_outlines_grouping.*/
     uint8_t level;
+
+    /** Set the outline row as collapsed. See @ref ww_outlines_grouping.*/
     uint8_t collapsed;
 } lxw_row_col_options;
 
@@ -405,8 +409,6 @@ typedef struct lxw_data_validation {
      */
     uint8_t dropdown;
 
-    uint8_t is_between;
-
     /**
      * This parameter is used to set the limiting value to which the criteria
      * is applied using a whole or decimal number.
@@ -519,14 +521,41 @@ typedef struct lxw_data_validation {
      */
     char *error_message;
 
-    char sqref[LXW_MAX_CELL_RANGE_LENGTH];
-
-    STAILQ_ENTRY (lxw_data_validation) list_pointers;
-
 } lxw_data_validation;
 
+
+/* A copy of lxw_data_validation which is used internally and which contains
+ * some additional fields.
+ */
+typedef struct lxw_data_val_obj {
+    uint8_t validate;
+    uint8_t criteria;
+    uint8_t ignore_blank;
+    uint8_t show_input;
+    uint8_t show_error;
+    uint8_t error_type;
+    uint8_t dropdown;
+    double value_number;
+    char *value_formula;
+    char **value_list;
+    double minimum_number;
+    char *minimum_formula;
+    lxw_datetime minimum_datetime;
+    double maximum_number;
+    char *maximum_formula;
+    lxw_datetime maximum_datetime;
+    char *input_title;
+    char *input_message;
+    char *error_title;
+    char *error_message;
+    char sqref[LXW_MAX_CELL_RANGE_LENGTH];
+
+    STAILQ_ENTRY (lxw_data_val_obj) list_pointers;
+} lxw_data_val_obj;
+
+
 /**
- * @brief Options for inserted images
+ * @brief Options for inserted images.
  *
  * Options for modifying images inserted via `worksheet_insert_image_opt()`.
  *
@@ -545,15 +574,61 @@ typedef struct lxw_image_options {
     /** Y scale of the image as a decimal. */
     double y_scale;
 
+    /** Object position - not implemented yet.  Set to 0.*/
+    uint8_t object_position;
+
+    /** Optional description of the image. Defaults to the image filename
+     *  as in Excel. Set to "" to ignore the description field. */
+    char *description;
+
+    /** Image hyperlink - not implemented yet. Set to NULL.*/
+    char *url;
+
+    /** Image hyperlink tip - not implemented yet. Set to NULL. */
+    char *tip;
+
+} lxw_image_options;
+
+/**
+ * @brief Options for inserted charts.
+ *
+ * Options for modifying charts inserted via `worksheet_insert_chart_opt()`.
+ *
+ */
+typedef struct lxw_chart_options {
+
+    /** Offset from the left of the cell in pixels. */
+    int32_t x_offset;
+
+    /** Offset from the top of the cell in pixels. */
+    int32_t y_offset;
+
+    /** X scale of the chart as a decimal. */
+    double x_scale;
+
+    /** Y scale of the chart as a decimal. */
+    double y_scale;
+
+    /** Object position - not implemented yet. Set to 0. */
+    uint8_t object_position;
+
+} lxw_chart_options;
+
+/* Internal struct to represent lxw_image_options and lxw_chart_options
+ * values as well as internal metadata.
+ */
+typedef struct lxw_object_properties {
+    int32_t x_offset;
+    int32_t y_offset;
+    double x_scale;
+    double y_scale;
     lxw_row_t row;
     lxw_col_t col;
     char *filename;
     char *description;
     char *url;
     char *tip;
-    uint8_t anchor;
-
-    /* Internal metadata. */
+    uint8_t object_position;
     FILE *stream;
     uint8_t image_type;
     uint8_t is_image_buffer;
@@ -566,9 +641,8 @@ typedef struct lxw_image_options {
     double y_dpi;
     lxw_chart *chart;
 
-    STAILQ_ENTRY (lxw_image_options) list_pointers;
-
-} lxw_image_options;
+    STAILQ_ENTRY (lxw_object_properties) list_pointers;
+} lxw_object_properties;
 
 /**
  * @brief Header and footer options.
@@ -637,10 +711,32 @@ typedef struct lxw_protection {
     /** Turn off chartsheet objects. */
     uint8_t no_objects;
 
+} lxw_protection;
+
+/* Internal struct to copy lxw_protection options and internal metadata. */
+typedef struct lxw_protection_obj {
+    uint8_t no_select_locked_cells;
+    uint8_t no_select_unlocked_cells;
+    uint8_t format_cells;
+    uint8_t format_columns;
+    uint8_t format_rows;
+    uint8_t insert_columns;
+    uint8_t insert_rows;
+    uint8_t insert_hyperlinks;
+    uint8_t delete_columns;
+    uint8_t delete_rows;
+    uint8_t sort;
+    uint8_t autofilter;
+    uint8_t pivot_tables;
+    uint8_t scenarios;
+    uint8_t objects;
+    uint8_t no_content;
+    uint8_t no_objects;
     uint8_t no_sheet;
     uint8_t is_configured;
     char hash[5];
-} lxw_protection;
+} lxw_protection_obj;
+
 
 /**
  * @brief Struct to represent a rich string format/string pair.
@@ -678,8 +774,8 @@ typedef struct lxw_worksheet {
     struct lxw_merged_ranges *merged_ranges;
     struct lxw_selections *selections;
     struct lxw_data_validations *data_validations;
-    struct lxw_image_data *image_data;
-    struct lxw_chart_data *chart_data;
+    struct lxw_image_props *image_props;
+    struct lxw_chart_props *chart_data;
 
     lxw_row_t dim_rowmin;
     lxw_row_t dim_rowmax;
@@ -741,10 +837,10 @@ typedef struct lxw_worksheet {
     uint8_t right_to_left;
     uint8_t screen_gridlines;
     uint8_t show_zeros;
-    uint8_t vba_codename;
     uint8_t vcenter;
     uint8_t zoom_scale_normal;
     uint8_t num_validations;
+    char *vba_codename;
 
     lxw_color_t tab_color;
 
@@ -785,7 +881,7 @@ typedef struct lxw_worksheet {
 
     struct lxw_panes panes;
 
-    struct lxw_protection protection;
+    struct lxw_protection_obj protection;
 
     lxw_drawing *drawing;
 
@@ -1592,7 +1688,7 @@ lxw_error worksheet_set_row_opt(lxw_worksheet *worksheet,
  *     format_set_bold(bold);
  *
  *     // Set the first column to bold.
- *     worksheet_set_column(worksheet, 0, 0, LXW_DEF_COL_HEIGHT, bold);
+ *     worksheet_set_column(worksheet, 0, 0, LXW_DEF_COL_WIDTH, bold);
  * @endcode
  *
  * The `format` parameter will be applied to any cells in the column that
@@ -1871,10 +1967,10 @@ lxw_error worksheet_insert_chart(lxw_worksheet *worksheet,
  *
  * The `%worksheet_insert_chart_opt()` function is like
  * `worksheet_insert_chart()` function except that it takes an optional
- * #lxw_image_options struct to scale and position the image of the chart:
+ * #lxw_chart_options struct to scale and position the chart:
  *
  * @code
- *    lxw_image_options options = {.x_offset = 30,  .y_offset = 10,
+ *    lxw_chart_options options = {.x_offset = 30,  .y_offset = 10,
  *                                 .x_scale  = 0.5, .y_scale  = 0.75};
  *
  *    worksheet_insert_chart_opt(worksheet, 0, 2, chart, &options);
@@ -1883,14 +1979,11 @@ lxw_error worksheet_insert_chart(lxw_worksheet *worksheet,
  *
  * @image html chart_line_opt.png
  *
- * The #lxw_image_options struct is the same struct used in
- * `worksheet_insert_image_opt()` to position and scale images.
- *
  */
 lxw_error worksheet_insert_chart_opt(lxw_worksheet *worksheet,
                                      lxw_row_t row, lxw_col_t col,
                                      lxw_chart *chart,
-                                     lxw_image_options *user_options);
+                                     lxw_chart_options *user_options);
 
 /**
  * @brief Merge a range of cells.
@@ -3235,18 +3328,44 @@ void worksheet_outline_settings(lxw_worksheet *worksheet, uint8_t visible,
 void worksheet_set_default_row(lxw_worksheet *worksheet, double height,
                                uint8_t hide_unused_rows);
 
+/**
+ * @brief Set the VBA name for the worksheet.
+ *
+ * @param worksheet Pointer to a lxw_worksheet instance.
+ * @param name      Name of the worksheet used by VBA.
+ *
+ * The `worksheet_set_vba_name()` function can be used to set the VBA name for
+ * the worksheet. This is sometimes required when a vbaProject macro included
+ * via `workbook_add_vba_project()` refers to the worksheet by a name other
+ * than the worksheet name:
+ *
+ * @code
+ *     workbook_set_vba_name (workbook,  "MyWorkbook");
+ *     worksheet_set_vba_name(worksheet, "MySheet1");
+ * @endcode
+ *
+ * In general Excel uses the worksheet name such as "Sheet1" as the VBA name.
+ * However, this can be changed in the VBA environment or if the the macro was
+ * extracted from a foreign language version of Excel.
+ *
+ * See also @ref working_with_macros
+ *
+ * @return A #lxw_error.
+ */
+lxw_error worksheet_set_vba_name(lxw_worksheet *worksheet, const char *name);
+
 lxw_worksheet *lxw_worksheet_new(lxw_worksheet_init_data *init_data);
 void lxw_worksheet_free(lxw_worksheet *worksheet);
 void lxw_worksheet_assemble_xml_file(lxw_worksheet *worksheet);
 void lxw_worksheet_write_single_row(lxw_worksheet *worksheet);
 
 void lxw_worksheet_prepare_image(lxw_worksheet *worksheet,
-                                 uint16_t image_ref_id, uint16_t drawing_id,
-                                 lxw_image_options *image_data);
+                                 uint32_t image_ref_id, uint32_t drawing_id,
+                                 lxw_object_properties *object_props);
 
 void lxw_worksheet_prepare_chart(lxw_worksheet *worksheet,
-                                 uint16_t chart_ref_id, uint16_t drawing_id,
-                                 lxw_image_options *image_data,
+                                 uint32_t chart_ref_id, uint32_t drawing_id,
+                                 lxw_object_properties *object_props,
                                  uint8_t is_chartsheet);
 
 lxw_row *lxw_worksheet_find_row(lxw_worksheet *worksheet, lxw_row_t row_num);
@@ -3259,7 +3378,7 @@ void lxw_worksheet_write_sheet_views(lxw_worksheet *worksheet);
 void lxw_worksheet_write_page_margins(lxw_worksheet *worksheet);
 void lxw_worksheet_write_drawings(lxw_worksheet *worksheet);
 void lxw_worksheet_write_sheet_protection(lxw_worksheet *worksheet,
-                                          lxw_protection *protect);
+                                          lxw_protection_obj *protect);
 void lxw_worksheet_write_sheet_pr(lxw_worksheet *worksheet);
 void lxw_worksheet_write_page_setup(lxw_worksheet *worksheet);
 void lxw_worksheet_write_header_footer(lxw_worksheet *worksheet);
@@ -3294,7 +3413,7 @@ STATIC void _worksheet_write_print_options(lxw_worksheet *worksheet);
 STATIC void _worksheet_write_sheet_pr(lxw_worksheet *worksheet);
 STATIC void _worksheet_write_tab_color(lxw_worksheet *worksheet);
 STATIC void _worksheet_write_sheet_protection(lxw_worksheet *worksheet,
-                                              lxw_protection *protect);
+                                              lxw_protection_obj *protect);
 STATIC void _worksheet_write_data_validations(lxw_worksheet *self);
 #endif /* TESTING */
 
