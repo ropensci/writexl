@@ -5,8 +5,12 @@
 \alias{writexl}
 \title{Export to xlsx}
 \usage{
-write_xlsx(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
-  format_headers = TRUE)
+write_xlsx(
+  x,
+  path = tempfile(fileext = ".xlsx"),
+  col_names = TRUE,
+  format_headers = TRUE
+)
 }
 \arguments{
 \item{x}{data frame or named list of data frames that will be sheets in the xlsx}

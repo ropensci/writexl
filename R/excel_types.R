@@ -6,6 +6,17 @@
 #' @param x character vector to be interpreted as formula
 #' @export
 #' @rdname xl_formula
+#' @examples
+#' df <- data.frame(
+#'   name = c("UCLA", "Berkeley", "Jeroen"),
+#'   founded = c(1919, 1868, 2030),
+#'   website = xl_hyperlink(c("http://www.ucla.edu", "http://www.berkeley.edu", NA), "homepage")
+#' )
+#' df$age <- xl_formula('=(YEAR(TODAY()) - INDIRECT("B" & ROW()))')
+#' write_xlsx(df, 'universities.xlsx')
+#'
+#' # cleanup
+#' unlink('universities.xlsx')
 xl_formula <- function(x){
   if(is.factor(x))
     x <- as.character(x)

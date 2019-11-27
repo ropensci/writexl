@@ -13,12 +13,7 @@ PKG_CFLAGS=$(C_VISIBILITY)
 PKG_CPPFLAGS=-Iinclude -DNOCRYPT -DNOUNCRYPT
 PKG_LIBS=-Llibxlsxwriter -lstatxlsxwriter -lz
 
-all: clean
-
 $(SHLIB): $(STATICLIB)
 
 $(STATICLIB): $(LIBXLSXWRITER)
 	$(AR) rcs $(STATICLIB) $(LIBXLSXWRITER)
-
-clean:
-	rm -f $(SHLIB) $(STATICLIB) $(OBJECTS) $(LIBXLSXWRITER)

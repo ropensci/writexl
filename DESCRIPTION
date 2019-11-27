@@ -1,7 +1,7 @@
 Package: writexl
 Type: Package
 Title: Export Data Frames to Excel 'xlsx' Format
-Version: 1.1.9000
+Version: 1.2
 Authors@R: c(
     person("Jeroen", "Ooms", ,"jeroen@berkeley.edu", role = c("aut", "cre"),
       comment = c(ORCID = "0000-0002-4035-0289")),
@@ -16,7 +16,7 @@ URL: https://docs.ropensci.org/writexl (website)
     https://github.com/ropensci/writexl (devel)
     https://libxlsxwriter.github.io (upstream)
 BugReports: https://github.com/ropensci/writexl/issues
-RoxygenNote: 6.1.0
+RoxygenNote: 7.0.1
 Suggests:
     spelling,
     readxl,

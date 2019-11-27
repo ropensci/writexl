@@ -19,4 +19,16 @@ xl_hyperlink(url, name = NULL)
 \description{
 Create special column types to write to a spreadsheet
 }
+\examples{
+df <- data.frame(
+  name = c("UCLA", "Berkeley", "Jeroen"),
+  founded = c(1919, 1868, 2030),
+  website = xl_hyperlink(c("http://www.ucla.edu", "http://www.berkeley.edu", NA), "homepage")
+)
+df$age <- xl_formula('=(YEAR(TODAY()) - INDIRECT("B" & ROW()))')
+write_xlsx(df, 'universities.xlsx')
+
+# cleanup
+unlink('universities.xlsx')
+}
 \concept{writexl}
