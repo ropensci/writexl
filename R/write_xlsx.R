@@ -29,6 +29,15 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
   if(!is.list(x) || !all(vapply(x, is.data.frame, logical(1))))
     stop("Argument x must be a data frame or list of data frames")
   x <- lapply(x, normalize_df)
+  if(any(nchar(names(x)) > 31)){
+    warning("Truncating sheet name(s) to 31 characters")
+    names(x) <- substring(names(x), 1, 29)
+  }
+  nm <- names(x)
+  if(length(unique(nm)) <  length(nm)){
+    warning("Deduplicating sheet names")
+    names(x) <- make.unique(substring(names(x), 1, 28), sep = "_")
+  }
   stopifnot(is.character(path) && length(path))
   path <- normalizePath(path, mustWork = FALSE)
   ret <- .Call(C_write_data_frame_list, x, path, col_names, format_headers)
