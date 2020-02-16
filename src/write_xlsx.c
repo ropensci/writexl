@@ -196,7 +196,7 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP forma
   }
 
   //this both writes the xlsx file and frees the memory
-  workbook_close(workbook);
+  assert_lxw(workbook_close(workbook));
   UNPROTECT(1);
   return file;
 }
