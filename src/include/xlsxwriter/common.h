@@ -218,7 +218,7 @@ enum lxw_custom_property_types {
 #define LXW_SCHEMA_CONTENT   LXW_SCHEMA_ROOT "/package/2006/content-types"
 
 #define LXW_ERROR(message)                      \
-    fprintf(stderr, "[ERROR][%s:%d]: " message "\n", __FILE__, __LINE__)
+    REprintf("[ERROR][%s:%d]: " message "\n", __FILE__, __LINE__)
 
 #define LXW_MEM_ERROR()                         \
     LXW_ERROR("Memory allocation failed.")
