@@ -9,7 +9,8 @@ write_xlsx(
   x,
   path = tempfile(fileext = ".xlsx"),
   col_names = TRUE,
-  format_headers = TRUE
+  format_headers = TRUE,
+  use_zip64 = FALSE
 )
 }
 \arguments{
@@ -20,6 +21,9 @@ write_xlsx(
 \item{col_names}{write column names at the top of the file?}
 
 \item{format_headers}{make the \code{col_names} in the xlsx centered and bold}
+
+\item{use_zip64}{use \href{https://en.wikipedia.org/wiki/Zip_(file_format)#ZIP64}{zip64}
+to enable support for 4GB+ xlsx files. Not all platforms can read this.}
 }
 \description{
 Writes a data frame to an xlsx file. To create an xlsx with (multiple) named

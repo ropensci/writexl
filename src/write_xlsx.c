@@ -58,21 +58,25 @@ static R_COL_TYPE get_type(SEXP col){
 
 //global options
 static char TEMPDIR[2048] = {0};
-static lxw_workbook_options options = {.constant_memory = 1, .tmpdir = TEMPDIR};
 
 //set to R tempdir when pkg is loaded
 SEXP C_set_tempdir(SEXP dir){
   strcpy(TEMPDIR, Rf_translateChar(STRING_ELT(dir, 0)));
-  return Rf_mkString(options.tmpdir);
+  return Rf_mkString(TEMPDIR);
 }
 
-SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP format_headers){
+SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP format_headers, SEXP use_zip64){
   assert_that(Rf_isVectorList(df_list), "Object is not a list");
   assert_that(Rf_isString(file) && Rf_length(file), "Invalid file path");
   assert_that(Rf_isLogical(col_names), "col_names must be logical");
   assert_that(Rf_isLogical(format_headers), "format_headers must be logical");
 
   //create workbook
+  lxw_workbook_options options = {
+    .constant_memory = 1,
+    .tmpdir = TEMPDIR,
+    .use_zip64 = Rf_asLogical(use_zip64)
+  };
   lxw_workbook *workbook = workbook_new_opt(Rf_translateChar(STRING_ELT(file, 0)), &options);
   assert_that(workbook, "failed to create workbook");
 
@@ -208,7 +212,7 @@ SEXP C_lxw_version(){
 static const R_CallMethodDef CallEntries[] = {
   {"C_lxw_version",           (DL_FUNC) &C_lxw_version,           0},
   {"C_set_tempdir",           (DL_FUNC) &C_set_tempdir,           1},
-  {"C_write_data_frame_list", (DL_FUNC) &C_write_data_frame_list, 4},
+  {"C_write_data_frame_list", (DL_FUNC) &C_write_data_frame_list, 5},
   {NULL, NULL, 0}
 };
 
