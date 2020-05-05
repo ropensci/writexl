@@ -15,6 +15,11 @@ cache:
 
 # Adapt as necessary starting from here
 
+environment:
+  matrix:
+    - R_VERSION: 3.6.3
+    - R_VERSION: patched
+
 build_script:
   - travis-tool.sh install_deps
 
