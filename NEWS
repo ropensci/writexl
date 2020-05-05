@@ -2,6 +2,7 @@
   - write_xlsx gains option use_zip64 for 4GB+ file support
   - libxslxwriter error messages are printed to REprintf instead of fprintf
   - Handle overly long or duplicate sheet names
+  - The help assistant only appears once per session
 
 1.2
   - Update bundled libxlswriter 0.8.8
