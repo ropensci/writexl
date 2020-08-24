@@ -14,6 +14,7 @@ test_that("Types roundtrip properly",{
   input <- data.frame(num = num, int = int, bigint = bigint, str = str, time = time, stringsAsFactors = FALSE)
   expect_warning(output <- roundtrip(input), "int64")
   output$bigint <- bit64::as.integer64(output$bigint)
+  attr(output$time, 'tzone') <- attr(time, 'tzone')
   expect_equal(input, as.data.frame(output))
 })
 
