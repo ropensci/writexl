@@ -11,7 +11,6 @@ Description: Zero-dependency data frame to xlsx exporter based on 'libxlsxwriter
     Fast and no Java or Excel required.
 License: BSD_2_clause + file LICENSE
 Encoding: UTF-8
-LazyData: true
 URL: https://docs.ropensci.org/writexl/ (website)
     https://github.com/ropensci/writexl (devel)
     https://libxlsxwriter.github.io (upstream)
