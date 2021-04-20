@@ -3,7 +3,7 @@
  *
  * Used in conjunction with the libxlsxwriter library.
  *
- * Copyright 2014-2019, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2021, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  *
  */
 
@@ -320,6 +320,25 @@ void
 lxw_ct_add_drawing_name(lxw_content_types *self, const char *name)
 {
     lxw_ct_add_override(self, name, LXW_APP_DOCUMENT "drawing+xml");
+}
+
+/*
+ * Add the name of a VML drawing to the ContentTypes overrides.
+ */
+void
+lxw_ct_add_vml_name(lxw_content_types *self)
+{
+    lxw_ct_add_default(self, "vml", LXW_APP_DOCUMENT "vmlDrawing");
+}
+
+/*
+ * Add the name of a comment to the ContentTypes overrides.
+ */
+void
+lxw_ct_add_comment_name(lxw_content_types *self, const char *name)
+{
+    lxw_ct_add_override(self, name,
+                        LXW_APP_DOCUMENT "spreadsheetml.comments+xml");
 }
 
 /*

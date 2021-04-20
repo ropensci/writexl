@@ -1,7 +1,7 @@
 /*
  * libxlsxwriter
  *
- * Copyright 2014-2019, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2021, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  *
  * xmlwriter - A libxlsxwriter library for creating Excel XLSX
  *             XML files.
@@ -24,7 +24,7 @@
 #include <stdint.h>
 #include "utility.h"
 
-#define LXW_MAX_ATTRIBUTE_LENGTH 256
+#define LXW_MAX_ATTRIBUTE_LENGTH 2080   /* Max URL length. */
 #define LXW_ATTR_32              32
 
 #define LXW_ATTRIBUTE_COPY(dst, src)                    \
@@ -167,7 +167,9 @@ void lxw_xml_data_element(FILE * xmlfile,
 
 void lxw_xml_rich_si_element(FILE * xmlfile, const char *string);
 
+uint8_t lxw_has_control_characters(const char *string);
 char *lxw_escape_control_characters(const char *string);
+char *lxw_escape_url_characters(const char *string, uint8_t escape_hash);
 
 char *lxw_escape_data(const char *data);
 

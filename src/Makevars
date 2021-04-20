@@ -5,12 +5,13 @@ LIBXLSXWRITER	= \
   libxlsxwriter/core.o libxlsxwriter/relationships.o libxlsxwriter/worksheet.o \
   libxlsxwriter/custom.o libxlsxwriter/shared_strings.o libxlsxwriter/xmlwriter.o \
   libxlsxwriter/drawing.o libxlsxwriter/styles.o tmpfileplus/tmpfileplus.o \
-  libxlsxwriter/chartsheet.o minizip/ioapi.o minizip/zip.o
+  libxlsxwriter/chartsheet.o minizip/ioapi.o minizip/zip.o \
+  libxlsxwriter/comment.o libxlsxwriter/vml.o md5/md5.o
 
 STATICLIB=libxlsxwriter/libstatxlsxwriter.a
 
 PKG_CFLAGS=$(C_VISIBILITY)
-PKG_CPPFLAGS=-Iinclude -DNOCRYPT -DNOUNCRYPT
+PKG_CPPFLAGS=-Iinclude -DUSE_R_LANG
 PKG_LIBS=-Llibxlsxwriter -lstatxlsxwriter -lz
 
 $(SHLIB): $(STATICLIB)
