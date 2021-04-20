@@ -1,9 +1,6 @@
 # writexl
 
 [![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](http://www.repostatus.org/badges/latest/active.svg)](http://www.repostatus.org/#active)
-[![Build Status](https://travis-ci.org/ropensci/writexl.svg?branch=master)](https://travis-ci.org/ropensci/writexl)
-[![AppVeyor Build Status](https://ci.appveyor.com/api/projects/status/github/ropensci/writexl?branch=master&svg=true)](https://ci.appveyor.com/project/jeroen/writexl)
-[![Coverage Status](https://codecov.io/github/ropensci/writexl/coverage.svg?branch=master)](https://codecov.io/github/ropensci/writexl?branch=master)
 [![CRAN_Status_Badge](http://www.r-pkg.org/badges/version/writexl)](http://cran.r-project.org/package=writexl)
 [![CRAN RStudio mirror downloads](http://cranlogs.r-pkg.org/badges/writexl)](http://cran.r-project.org/web/packages/writexl/index.html)
 
