@@ -1,7 +1,7 @@
 /*
  * libxlsxwriter
  *
- * Copyright 2014-2019, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2021, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  *
  * packager - A libxlsxwriter library for creating Excel XLSX packager files.
  *
@@ -29,6 +29,8 @@
 #include "format.h"
 #include "content_types.h"
 #include "relationships.h"
+#include "vml.h"
+#include "comment.h"
 
 #define LXW_ZIP_BUFFER_SIZE (16384)
 

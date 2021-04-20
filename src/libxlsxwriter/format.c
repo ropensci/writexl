@@ -3,7 +3,7 @@
  *
  * Used in conjunction with the libxlsxwriter library.
  *
- * Copyright 2014-2019, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2021, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  *
  */
 
@@ -27,9 +27,11 @@ lxw_format_new(void)
     GOTO_LABEL_ON_MEM_ERROR(format, mem_error);
 
     format->xf_format_indices = NULL;
+    format->dxf_format_indices = NULL;
 
     format->xf_index = LXW_PROPERTY_UNSET;
     format->dxf_index = LXW_PROPERTY_UNSET;
+    format->xf_id = 0;
 
     format->font_name[0] = '\0';
     format->font_scheme[0] = '\0';
@@ -42,7 +44,7 @@ lxw_format_new(void)
     format->bold = LXW_FALSE;
     format->italic = LXW_FALSE;
     format->font_color = LXW_COLOR_UNSET;
-    format->underline = LXW_FALSE;
+    format->underline = LXW_UNDERLINE_NONE;
     format->font_strikeout = LXW_FALSE;
     format->font_outline = LXW_FALSE;
     format->font_shadow = LXW_FALSE;
@@ -51,7 +53,7 @@ lxw_format_new(void)
     format->font_charset = LXW_FALSE;
     format->font_condense = LXW_FALSE;
     format->font_extend = LXW_FALSE;
-    format->theme = LXW_FALSE;
+    format->theme = 0;
     format->hyperlink = LXW_FALSE;
 
     format->hidden = LXW_FALSE;
@@ -117,18 +119,6 @@ lxw_format_free(lxw_format *format)
 }
 
 /*
- * Check a user input color.
- */
-lxw_color_t
-lxw_format_check_colorz(lxw_color_t color)
-{
-    if (color == LXW_COLOR_UNSET)
-        return color;
-    else
-        return color & LXW_COLOR_MASK;
-}
-
-/*
  * Check a user input border.
  */
 STATIC uint8_t
@@ -160,7 +150,9 @@ _get_format_key(lxw_format *self)
 
     /* Set pointer members to NULL since they aren't part of the comparison. */
     key->xf_format_indices = NULL;
+    key->dxf_format_indices = NULL;
     key->num_xf_formats = NULL;
+    key->num_dxf_formats = NULL;
     key->list_pointers.stqe_next = NULL;
 
     return key;
@@ -182,8 +174,9 @@ lxw_format_get_font_key(lxw_format *self)
     key->font_size = self->font_size;
     key->bold = self->bold;
     key->italic = self->italic;
-    key->font_color = self->font_color;
     key->underline = self->underline;
+    key->theme = self->theme;
+    key->font_color = self->font_color;
     key->font_strikeout = self->font_strikeout;
     key->font_outline = self->font_outline;
     key->font_shadow = self->font_shadow;
@@ -290,6 +283,57 @@ lxw_format_get_xf_index(lxw_format *self)
         /* New format requiring an index. */
         index = formats_hash_table->unique_count;
         self->xf_index = index;
+        lxw_insert_hash_element(formats_hash_table, format_key, self,
+                                sizeof(lxw_format));
+        return index;
+    }
+}
+
+/*
+ * Returns the DXF index number used by Excel to identify a format.
+ */
+int32_t
+lxw_format_get_dxf_index(lxw_format *self)
+{
+    lxw_format *format_key;
+    lxw_format *existing_format;
+    lxw_hash_element *hash_element;
+    lxw_hash_table *formats_hash_table = self->dxf_format_indices;
+    int32_t index;
+
+    /* Note: The formats_hash_table/dxf_format_indices contains the unique and
+     * more importantly the *used* formats in the workbook.
+     */
+
+    /* Format already has an index number so return it. */
+    if (self->dxf_index != LXW_PROPERTY_UNSET) {
+        return self->dxf_index;
+    }
+
+    /* Otherwise, the format doesn't have an index number so we assign one.
+     * First generate a unique key to identify the format in the hash table.
+     */
+    format_key = _get_format_key(self);
+
+    /* Return the default format index if the key generation failed. */
+    if (!format_key)
+        return 0;
+
+    /* Look up the format in the hash table. */
+    hash_element =
+        lxw_hash_key_exists(formats_hash_table, format_key,
+                            sizeof(lxw_format));
+
+    if (hash_element) {
+        /* Format matches existing format with an index. */
+        free(format_key);
+        existing_format = hash_element->value;
+        return existing_format->dxf_index;
+    }
+    else {
+        /* New format requiring an index. */
+        index = formats_hash_table->unique_count;
+        self->dxf_index = index;
         lxw_insert_hash_element(formats_hash_table, format_key, self,
                                 sizeof(lxw_format));
         return index;
@@ -724,4 +768,34 @@ void
 format_set_theme(lxw_format *self, uint8_t value)
 {
     self->theme = value;
+}
+
+/*
+ * Set the color_indexed property.
+ */
+void
+format_set_color_indexed(lxw_format *self, uint8_t value)
+{
+    self->color_indexed = value;
+}
+
+/*
+ * Set the font_only property.
+ */
+void
+format_set_font_only(lxw_format *self)
+{
+    self->font_only = LXW_TRUE;
+}
+
+/*
+ * Set the theme property.
+ */
+void
+format_set_hyperlink(lxw_format *self)
+{
+    self->hyperlink = LXW_TRUE;
+    self->xf_id = 1;
+    self->underline = LXW_UNDERLINE_SINGLE;
+    self->theme = 10;
 }

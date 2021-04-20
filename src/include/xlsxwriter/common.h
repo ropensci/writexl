@@ -1,7 +1,7 @@
 /*
  * libxlsxwriter
  *
- * Copyright 2014-2019, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2021, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  */
 
 /**
@@ -9,7 +9,7 @@
  *
  * @brief Common functions and defines for the libxlsxwriter library.
  *
- * <!-- Copyright 2014-2019, John McNamara, jmcnamara@cpan.org -->
+ * <!-- Copyright 2014-2021, John McNamara, jmcnamara@cpan.org -->
  *
  */
 #ifndef __LXW_COMMON_H__
@@ -19,16 +19,13 @@
 #include "third_party/queue.h"
 #include "third_party/tree.h"
 
-void REprintf(const char *, ...);
-
-
 #ifndef TESTING
 #define STATIC static
 #else
 #define STATIC
 #endif
 
-#ifdef __GNUC__
+#if __GNUC__ >= 5
 #define DEPRECATED(func, msg) func __attribute__ ((deprecated(msg)))
 #elif defined(_MSC_VER)
 #define DEPRECATED(func, msg) __declspec(deprecated, msg) func
@@ -97,6 +94,9 @@ typedef enum lxw_error {
     /** Unknown zip error when closing xlsx file. */
     LXW_ERROR_ZIP_CLOSE,
 
+    /** Feature is not currently supported in this configuration. */
+    LXW_ERROR_FEATURE_NOT_SUPPORTED,
+
     /** NULL function parameter ignored. */
     LXW_ERROR_NULL_PARAMETER_IGNORED,
 
@@ -115,9 +115,6 @@ typedef enum lxw_error {
     /** Worksheet name is already in use. */
     LXW_ERROR_SHEETNAME_ALREADY_USED,
 
-    /** Worksheet name 'History' is reserved by Excel. */
-    LXW_ERROR_SHEETNAME_RESERVED,
-
     /** Parameter exceeds Excel's limit of 32 characters. */
     LXW_ERROR_32_STRING_LENGTH_EXCEEDED,
 
@@ -135,6 +132,9 @@ typedef enum lxw_error {
 
     /** Worksheet row or column index out of range. */
     LXW_ERROR_WORKSHEET_INDEX_OUT_OF_RANGE,
+
+    /** Maximum hyperlink length (2079) exceeded. */
+    LXW_ERROR_WORKSHEET_MAX_URL_LENGTH_EXCEEDED,
 
     /** Maximum number of worksheet URLs (65530) exceeded. */
     LXW_ERROR_WORKSHEET_MAX_NUMBER_URLS_EXCEEDED,
@@ -175,6 +175,9 @@ enum lxw_custom_property_types {
     LXW_CUSTOM_DATETIME
 };
 
+/* Size of MD5 byte arrays. */
+#define LXW_MD5_SIZE              16
+
 /* Excel sheetname max of 31 chars. */
 #define LXW_SHEETNAME_MAX         31
 
@@ -199,6 +202,9 @@ enum lxw_custom_property_types {
 /* Datetime string length. */
 #define LXW_DATETIME_LENGTH       sizeof("2016-12-12T23:00:00Z")
 
+/* GUID string length. */
+#define LXW_GUID_LENGTH           sizeof("{12345678-1234-1234-1234-1234567890AB}")
+
 #define LXW_EPOCH_1900            0
 #define LXW_EPOCH_1904            1
 
@@ -217,8 +223,17 @@ enum lxw_custom_property_types {
 #define LXW_SCHEMA_DOCUMENT  LXW_SCHEMA_ROOT "/officeDocument/2006/relationships"
 #define LXW_SCHEMA_CONTENT   LXW_SCHEMA_ROOT "/package/2006/content-types"
 
+#ifdef USE_R_LANG
+#include <R.h>
+  #define LXW_PRINTF REprintf
+  #define LXW_STDERR
+#else
+  #define LXW_PRINTF fprintf
+  #define LXW_STDERR stderr,
+#endif
+
 #define LXW_ERROR(message)                      \
-    REprintf("[ERROR][%s:%d]: " message "\n", __FILE__, __LINE__)
+    LXW_PRINTF(LXW_STDERR "[ERROR][%s:%d]: " message "\n", __FILE__, __LINE__)
 
 #define LXW_MEM_ERROR()                         \
     LXW_ERROR("Memory allocation failed.")
@@ -245,51 +260,57 @@ enum lxw_custom_property_types {
     if (error)                                  \
         return error;
 
+#define RETURN_AND_ZIPCLOSE_ON_ERROR(error)     \
+    if (error) {                                \
+        zipClose(self->zipfile, NULL);          \
+        return error;                           \
+}
+
 #define LXW_WARN(message)                       \
-    REprintf("[WARNING]: " message "\n")
+    LXW_PRINTF(LXW_STDERR "[WARNING]: " message "\n")
 
 /* We can't use variadic macros here since we support ANSI C. */
 #define LXW_WARN_FORMAT(message)                \
-    REprintf("[WARNING]: " message "\n")
+    LXW_PRINTF(LXW_STDERR "[WARNING]: " message "\n")
 
 #define LXW_WARN_FORMAT1(message, var)          \
-    REprintf("[WARNING]: " message "\n", var)
+    LXW_PRINTF(LXW_STDERR "[WARNING]: " message "\n", var)
 
 #define LXW_WARN_FORMAT2(message, var1, var2)    \
-    REprintf("[WARNING]: " message "\n", var1, var2)
+    LXW_PRINTF(LXW_STDERR "[WARNING]: " message "\n", var1, var2)
 
 /* Chart axis type checks. */
 #define LXW_WARN_CAT_AXIS_ONLY(function)                                   \
     if (!axis->is_category) {                                              \
-        fprintf(stderr, "[WARNING]: "                                      \
+        LXW_PRINTF(LXW_STDERR "[WARNING]: "                                \
                 function "() is only valid for category axes\n");          \
        return;                                                             \
     }
 
 #define LXW_WARN_VALUE_AXIS_ONLY(function)                                 \
     if (!axis->is_value) {                                                 \
-        fprintf(stderr, "[WARNING]: "                                      \
+        LXW_PRINTF(LXW_STDERR "[WARNING]: "                                \
                 function "() is only valid for value axes\n");             \
        return;                                                             \
     }
 
 #define LXW_WARN_DATE_AXIS_ONLY(function)                                  \
     if (!axis->is_date) {                                                  \
-        fprintf(stderr, "[WARNING]: "                                      \
+        LXW_PRINTF(LXW_STDERR "[WARNING]: "                                \
                 function "() is only valid for date axes\n");              \
        return;                                                             \
     }
 
 #define LXW_WARN_CAT_AND_DATE_AXIS_ONLY(function)                          \
     if (!axis->is_category && !axis->is_date) {                            \
-        fprintf(stderr, "[WARNING]: "                                      \
+        LXW_PRINTF(LXW_STDERR "[WARNING]: "                                \
                 function "() is only valid for category and date axes\n"); \
        return;                                                             \
     }
 
 #define LXW_WARN_VALUE_AND_DATE_AXIS_ONLY(function)                        \
     if (!axis->is_value && !axis->is_date) {                               \
-        fprintf(stderr, "[WARNING]: "                                      \
+        LXW_PRINTF(LXW_STDERR "[WARNING]: "                                \
                 function "() is only valid for value and date axes\n");    \
        return;                                                             \
     }

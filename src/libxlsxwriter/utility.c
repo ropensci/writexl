@@ -3,7 +3,7 @@
  *
  * Used in conjunction with the libxlsxwriter library.
  *
- * Copyright 2014-2019, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2021, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  *
  */
 
@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include "xlsxwriter.h"
+#include "xlsxwriter/common.h"
 #include "xlsxwriter/third_party/tmpfileplus.h"
 
 char *error_strings[LXW_MAX_ERRNO + 1] = {
@@ -27,19 +28,20 @@ char *error_strings[LXW_MAX_ERRNO + 1] = {
     "Zip error ZIP_INTERNALERROR while creating the xlsx file.",
     "File error or unknown zip error when adding sub file to xlsx file.",
     "Unknown zip error when closing xlsx file.",
+    "Feature is not currently supported in this configuration.",
     "NULL function parameter ignored.",
     "Function parameter validation error.",
     "Worksheet name exceeds Excel's limit of 31 characters.",
     "Worksheet name cannot contain invalid characters: '[ ] : * ? / \\'",
     "Worksheet name cannot start or end with an apostrophe.",
     "Worksheet name is already in use.",
-    "Worksheet name 'History' is reserved by Excel.",
     "Parameter exceeds Excel's limit of 32 characters.",
     "Parameter exceeds Excel's limit of 128 characters.",
     "Parameter exceeds Excel's limit of 255 characters.",
     "String exceeds Excel's limit of 32,767 characters.",
     "Error finding internal string index.",
     "Worksheet row or column index out of range.",
+    "Maximum hyperlink length (2079) exceeded.",
     "Maximum number of worksheet URLs (65530) exceeded.",
     "Couldn't read image dimensions or DPI.",
     "Unknown error number."
@@ -62,7 +64,7 @@ lxw_col_to_name(char *col_name, lxw_col_t col_num, uint8_t absolute)
 {
     uint8_t pos = 0;
     size_t len;
-    uint8_t i;
+    size_t i;
 
     /* Change from 0 index to 1 index. */
     col_num++;
@@ -312,10 +314,11 @@ lxw_name_to_col_2(const char *col_str)
 }
 
 /*
- * Convert a lxw_datetime struct to an Excel serial date.
+ * Convert a lxw_datetime struct to an Excel serial date, with a 1900
+ * or 1904 epoch.
  */
 double
-lxw_datetime_to_excel_date(lxw_datetime *datetime, uint8_t date_1904)
+lxw_datetime_to_excel_date_epoch(lxw_datetime *datetime, uint8_t date_1904)
 {
     int year = datetime->year;
     int month = datetime->month;
@@ -405,6 +408,15 @@ lxw_datetime_to_excel_date(lxw_datetime *datetime, uint8_t date_1904)
         days++;
 
     return days + seconds;
+}
+
+/*
+ * Convert a lxw_datetime struct to an Excel serial date, for the 1900 epoch.
+ */
+double
+lxw_datetime_to_excel_datetime(lxw_datetime *datetime)
+{
+    return lxw_datetime_to_excel_date_epoch(datetime, LXW_FALSE);
 }
 
 /* Simple strdup() implementation since it isn't ANSI C. */
@@ -561,12 +573,21 @@ lxw_sprintf_dbl(char *data, double number)
 #endif
 
 /*
- * Retrieve runtime library version
+ * Retrieve runtime library version.
  */
 const char *
 lxw_version(void)
 {
     return LXW_VERSION;
+}
+
+/*
+ * Retrieve runtime library version ID.
+ */
+uint16_t
+lxw_version_id(void)
+{
+    return LXW_VERSION_ID;
 }
 
 /*
@@ -577,12 +598,12 @@ uint16_t
 lxw_hash_password(const char *password)
 {
     size_t count;
-    uint8_t i;
+    size_t i;
     uint16_t hash = 0x0000;
 
     count = strlen(password);
 
-    for (i = 0; i < count; i++) {
+    for (i = 0; i < (uint8_t) count; i++) {
         uint32_t low_15;
         uint32_t high_15;
         uint32_t letter = password[i] << (i + 1);

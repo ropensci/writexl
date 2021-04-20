@@ -1,7 +1,7 @@
 /*
  * libxlsxwriter
  *
- * Copyright 2014-2019, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2021, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  */
 
 /**
@@ -92,8 +92,10 @@ typedef uint32_t lxw_color_t;
 
 /** Format underline values for format_set_underline(). */
 enum lxw_format_underlines {
+    LXW_UNDERLINE_NONE = 0,
+
     /** Single underline */
-    LXW_UNDERLINE_SINGLE = 1,
+    LXW_UNDERLINE_SINGLE,
 
     /** Double underline */
     LXW_UNDERLINE_DOUBLE,
@@ -157,9 +159,19 @@ enum lxw_format_alignments {
     LXW_ALIGN_VERTICAL_DISTRIBUTED
 };
 
+/**
+ * Diagonal border types.
+ *
+ */
 enum lxw_format_diagonal_types {
+
+    /** Cell diagonal border from bottom left to top right. */
     LXW_DIAGONAL_BORDER_UP = 1,
+
+    /** Cell diagonal border from top left to bottom right. */
     LXW_DIAGONAL_BORDER_DOWN,
+
+    /** Cell diagonal border in both directions. */
     LXW_DIAGONAL_BORDER_UP_DOWN
 };
 
@@ -348,10 +360,13 @@ typedef struct lxw_format {
     FILE *file;
 
     lxw_hash_table *xf_format_indices;
+    lxw_hash_table *dxf_format_indices;
     uint16_t *num_xf_formats;
+    uint16_t *num_dxf_formats;
 
     int32_t xf_index;
     int32_t dxf_index;
+    int32_t xf_id;
 
     char num_format[LXW_FORMAT_FIELD_LEN];
     char font_name[LXW_FORMAT_FIELD_LEN];
@@ -387,6 +402,8 @@ typedef struct lxw_format {
 
     lxw_color_t fg_color;
     lxw_color_t bg_color;
+    lxw_color_t dxf_fg_color;
+    lxw_color_t dxf_bg_color;
     uint8_t pattern;
     uint8_t has_fill;
     uint8_t has_dxf_fill;
@@ -431,6 +448,7 @@ typedef struct lxw_font {
     uint8_t bold;
     uint8_t italic;
     uint8_t underline;
+    uint8_t theme;
     uint8_t font_strikeout;
     uint8_t font_outline;
     uint8_t font_shadow;
@@ -483,6 +501,7 @@ extern "C" {
 lxw_format *lxw_format_new(void);
 void lxw_format_free(lxw_format *format);
 int32_t lxw_format_get_xf_index(lxw_format *format);
+int32_t lxw_format_get_dxf_index(lxw_format *format);
 lxw_font *lxw_format_get_font_key(lxw_format *format);
 lxw_border *lxw_format_get_border_key(lxw_format *format);
 lxw_fill *lxw_format_get_fill_key(lxw_format *format);
@@ -1189,9 +1208,76 @@ void format_set_left_color(lxw_format *format, lxw_color_t color);
  */
 void format_set_right_color(lxw_format *format, lxw_color_t color);
 
-void format_set_diag_type(lxw_format *format, uint8_t value);
+/**
+ * @brief Set the diagonal cell border type.
+ *
+ * @param format Pointer to a Format instance.
+ * @param type   The #lxw_format_diagonal_types diagonal border type.
+ *
+ * Set the diagonal cell border type:
+ *
+ * @code
+ *     lxw_format *format1 = workbook_add_format(workbook);
+ *     format_set_diag_type(  format1, LXW_DIAGONAL_BORDER_UP);
+ *
+ *     lxw_format *format2 = workbook_add_format(workbook);
+ *     format_set_diag_type(  format2, LXW_DIAGONAL_BORDER_DOWN);
+ *
+ *     lxw_format *format3 = workbook_add_format(workbook);
+ *     format_set_diag_type(  format3, LXW_DIAGONAL_BORDER_UP_DOWN);
+ *
+ *     lxw_format *format4 = workbook_add_format(workbook);
+ *     format_set_diag_type(  format4, LXW_DIAGONAL_BORDER_UP_DOWN);
+ *     format_set_diag_border(format4, LXW_BORDER_HAIR);
+ *     format_set_diag_color( format4, LXW_COLOR_RED);
+ *
+ *     worksheet_write_string(worksheet, CELL("B3"),  "Text", format1);
+ *     worksheet_write_string(worksheet, CELL("B6"),  "Text", format2);
+ *     worksheet_write_string(worksheet, CELL("B9"),  "Text", format3);
+ *     worksheet_write_string(worksheet, CELL("B12"), "Text", format4);
+ * @endcode
+ *
+ * @image html diagonal_border.png
+ *
+ * The allowable border types are defined in #lxw_format_diagonal_types:
+ *
+ * - #LXW_DIAGONAL_BORDER_UP: Cell diagonal border from bottom left to top
+ *   right.
+ *
+ * - #LXW_DIAGONAL_BORDER_DOWN: Cell diagonal border from top left to bottom
+ *   right.
+ *
+ * - #LXW_DIAGONAL_BORDER_UP_DOWN: Cell diagonal border from top left to
+ *   bottom right. A combination of the 2 previous types.
+ *
+ * If the border style isn't specified with `format_set_diag_border()` then it
+ * will default to #LXW_BORDER_THIN.
+ */
+void format_set_diag_type(lxw_format *format, uint8_t type);
+
+/**
+ * @brief Set the diagonal cell border style.
+ *
+ * @param format Pointer to a Format instance.
+ * @param style  The #lxw_format_borders style.
+ *
+ * Set the diagonal border style. This should be a #lxw_format_borders value.
+ * See the example above.
+ *
+ */
+void format_set_diag_border(lxw_format *format, uint8_t style);
+
+/**
+ * @brief Set the diagonal cell border color.
+ *
+ * @param format Pointer to a Format instance.
+ * @param color  The cell diagonal border color.
+ *
+ * Set the diagonal border color. The color should be an RGB integer value,
+ * see @ref working_with_colors and the above example.
+ */
 void format_set_diag_color(lxw_format *format, lxw_color_t color);
-void format_set_diag_border(lxw_format *format, uint8_t value);
+
 void format_set_font_outline(lxw_format *format);
 void format_set_font_shadow(lxw_format *format);
 void format_set_font_family(lxw_format *format, uint8_t value);
@@ -1201,6 +1287,9 @@ void format_set_font_condense(lxw_format *format);
 void format_set_font_extend(lxw_format *format);
 void format_set_reading_order(lxw_format *format, uint8_t value);
 void format_set_theme(lxw_format *format, uint8_t value);
+void format_set_hyperlink(lxw_format *format);
+void format_set_color_indexed(lxw_format *format, uint8_t value);
+void format_set_font_only(lxw_format *format);
 
 /* Declarations required for unit testing. */
 #ifdef TESTING

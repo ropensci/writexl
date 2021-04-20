@@ -3,13 +3,14 @@
  *
  * Used in conjunction with the libxlsxwriter library.
  *
- * Copyright 2014-2019, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2021, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  *
  */
 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include "xlsxwriter/xmlwriter.h"
 
 #define LXW_AMP  "&amp;"
@@ -227,7 +228,24 @@ lxw_escape_data(const char *data)
 }
 
 /*
- * Escape control characters in strings with with _xHHHH_.
+ * Check for control characters in strings.
+ */
+uint8_t
+lxw_has_control_characters(const char *string)
+{
+    while (string) {
+        /* 0xE0 == 0b11100000 masks values > 0x19 == 0b00011111. */
+        if (!(*string & 0xE0) && *string != 0x0A && *string != 0x09)
+            return LXW_TRUE;
+
+        string++;
+    }
+
+    return LXW_FALSE;
+}
+
+/*
+ * Escape control characters in strings with _xHHHH_.
  */
 char *
 lxw_escape_control_characters(const char *string)
@@ -271,6 +289,67 @@ lxw_escape_control_characters(const char *string)
             case '\x1F':
                 lxw_snprintf(p_encoded, escape_len + 1, "_x%04X_", *string);
                 p_encoded += escape_len;
+                break;
+            default:
+                *p_encoded = *string;
+                p_encoded++;
+                break;
+        }
+        string++;
+    }
+
+    return encoded;
+}
+
+/*
+ * Escape special characters in URL strings with with %XX.
+ */
+char *
+lxw_escape_url_characters(const char *string, uint8_t escape_hash)
+{
+
+    size_t escape_len = sizeof("%XX") - 1;
+    size_t encoded_len = (strlen(string) * escape_len + 1);
+
+    char *encoded = (char *) calloc(encoded_len, 1);
+    char *p_encoded = encoded;
+
+    while (*string) {
+        switch (*string) {
+            case (' '):
+            case ('"'):
+            case ('<'):
+            case ('>'):
+            case ('['):
+            case (']'):
+            case ('`'):
+            case ('^'):
+            case ('{'):
+            case ('}'):
+                lxw_snprintf(p_encoded, escape_len + 1, "%%%2x", *string);
+                p_encoded += escape_len;
+                break;
+            case ('#'):
+                /* This is only escaped for "external:" style links. */
+                if (escape_hash) {
+                    lxw_snprintf(p_encoded, escape_len + 1, "%%%2x", *string);
+                    p_encoded += escape_len;
+                }
+                else {
+                    *p_encoded = *string;
+                    p_encoded++;
+                }
+                break;
+            case ('%'):
+                /* Only escape % if it isn't already an escape. */
+                if (!isxdigit(*(string + 1)) || !isxdigit(*(string + 2))) {
+                    lxw_snprintf(p_encoded, escape_len + 1, "%%%2x", *string);
+                    p_encoded += escape_len;
+                }
+                else {
+                    *p_encoded = *string;
+                    p_encoded++;
+                }
                 break;
             default:
                 *p_encoded = *string;
