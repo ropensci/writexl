@@ -3,6 +3,7 @@
 [![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](http://www.repostatus.org/badges/latest/active.svg)](http://www.repostatus.org/#active)
 [![CRAN_Status_Badge](http://www.r-pkg.org/badges/version/writexl)](http://cran.r-project.org/package=writexl)
 [![CRAN RStudio mirror downloads](http://cranlogs.r-pkg.org/badges/writexl)](http://cran.r-project.org/web/packages/writexl/index.html)
+[![badge](https://ropensci.r-universe.dev/badges/writexl)](https://ropensci.r-universe.dev)
 
 > Portable, light-weight data frame to xlsx exporter based on libxlsxwriter.  No Java or Excel required.
 
