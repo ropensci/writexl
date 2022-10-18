@@ -208,7 +208,7 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP forma
   return file;
 }
 
-SEXP C_lxw_version(){
+SEXP C_lxw_version(void){
   return Rf_mkString(LXW_VERSION);
 }
 
