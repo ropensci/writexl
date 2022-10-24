@@ -153,11 +153,12 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP forma
         }; continue;
         case COL_POSIXCT: {
           double val = REAL(col)[i];
-          if(R_FINITE(val))
+          if(R_FINITE(val)){
             val = 25568.0 + val / (24*60*60);
             if(val >= 60.0)
               val = val + 1.0;
             assert_lxw(worksheet_write_number(sheet, cursor, j, val , NULL));
+          }
         }; continue;
         case COL_STRING:{
           SEXP val = STRING_ELT(col, i);
