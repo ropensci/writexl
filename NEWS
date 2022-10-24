@@ -1,3 +1,6 @@
+1.4.2
+  - Bugfix for NA timestamps
+
 1.4.1
   - Fix strict-prototypes warnings
 
