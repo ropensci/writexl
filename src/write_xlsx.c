@@ -270,7 +270,7 @@ SEXP C_lxw_version(void){
 static const R_CallMethodDef CallEntries[] = {
   {"C_lxw_version",           (DL_FUNC) &C_lxw_version,           0},
   {"C_set_tempdir",           (DL_FUNC) &C_set_tempdir,           1},
-  {"C_write_data_frame_list", (DL_FUNC) &C_write_data_frame_list, 5},
+  {"C_write_data_frame_list", (DL_FUNC) &C_write_data_frame_list, 10},
   {NULL, NULL, 0}
 };
 
