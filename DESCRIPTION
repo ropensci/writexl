@@ -17,11 +17,14 @@ URL: https://docs.ropensci.org/writexl/ (website)
     https://github.com/ropensci/writexl (devel)
     https://libxlsxwriter.github.io (upstream)
 BugReports: https://github.com/ropensci/writexl/issues
-RoxygenNote: 7.0.2
+RoxygenNote: 7.2.1
 Suggests:
     spelling,
     readxl,
     nycflights13,
     testthat,
-    bit64
+    bit64,
+    knitr,
+    rmarkdown
 Language: en-US
+VignetteBuilder: knitr

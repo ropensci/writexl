@@ -1,0 +1,104 @@
+---
+title: "Simple Usage of writexl Ecel Formating Options"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Simple Usage of writexl}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+
+## Intorduction
+
+This is intended to show the options for simple Excel formatting with **writexl::write_xlsx**  function.
+Any combination of those options should work together.
+
+```{r}
+#set the path to seave the files to the basePath directory 
+basePath <- paste0(getwd(),  "/write_xlsx_examples/")
+if(!dir.exists(basePath)){dir.create(basePath)}
+
+savefileName <- "example.xlsx"
+```
+
+
+```{r}
+#the default behaviour has not changed
+writexl::write_xlsx(list(cars, nycflights13::flights[1:100,]),
+                    path=paste0(basePath, "default-", savefileName))
+```
+
+
+```{r}
+writexl::write_xlsx(list(cars, nycflights13::flights[1:100,]),
+                    path=paste0(basePath, "guess_from_header-", savefileName), col_widths = "guess_from_header")
+
+writexl::write_xlsx(list(cars, nycflights13::flights[1:100,]),
+                    path=paste0(basePath, "guess_from_row_4-", savefileName), col_widths = "guess_from_row_4")
+
+writexl::write_xlsx(list(cars, nycflights13::flights[1:100,]),
+                    path=paste0(basePath, "guess_from_row_4_and_set20-", savefileName), col_widths = list(20, "guess_from_header"))
+writexl::write_xlsx(list(cars, nycflights13::flights[1:100,]),
+                    path=paste0(basePath, "guess_from_row_4_add4-", savefileName), col_widths = "guess_from_row_4",
+                    guessed_column_width_padding = 4)
+
+```
+
+
+```{r}
+#Numeric column widths
+writexl::write_xlsx(list(cars, nycflights13::flights[1:100,]),
+                    path=paste0(basePath, "custom_widths_one_value-", savefileName), col_widths = list(18, NA))
+
+writexl::write_xlsx(list(cars, nycflights13::flights[1:100,]),
+                    path=paste0(basePath, "custom_widths_several_values-", savefileName), col_widths = list(c(10,20), c(NA, NA, 20,20)))
+
+writexl::write_xlsx(list(cars, nycflights13::flights[1:100,]),
+                    path=paste0(basePath, "custom_widths_one_and_several_values-", savefileName), col_widths = list(20, seq(10,100, by=10)))
+
+#same custom widths to all +10 each
+writexl::write_xlsx(list(cars, nycflights13::flights[1:100,]),
+                    path=paste0(basePath, "custom_widths_same_values-", savefileName), col_widths = seq(10,100, by=10))
+
+```
+
+
+
+
+```{r}
+#header column color
+writexl::write_xlsx(list(cars, nycflights13::flights[1:100,]),
+                    path=paste0(basePath, "lightgreen_header_background-", savefileName), header_bg_color = "lightgreen")
+
+# autofilter
+writexl::write_xlsx(list(cars, nycflights13::flights[1:100,]),
+                    path=paste0(basePath, "autofilter_gray_bg-", savefileName), header_bg_color = "lightgray",autofilter = T)
+
+```
+
+
+```{r}
+#freeze columns
+writexl::write_xlsx(list(cars, nycflights13::flights[1:100,]),
+                    path=paste0(basePath, "freeze_top_row-", savefileName), freeze_rows = 1)
+
+writexl::write_xlsx(list(cars, nycflights13::flights[1:100,]),
+                    path=paste0(basePath, "freeze_left_col-", savefileName), freeze_cols = 1)
+
+writexl::write_xlsx(list(cars, nycflights13::flights[1:100,], data.frame()),
+                    path=paste0(basePath, "freeze_top_row_left_col-", savefileName), freeze_cols = 1, freeze_rows = 1)
+```
+
+
+```{r}
+#finally delete the example files created
+if(dir.exists(basePath)){unlink(basePath, recursive = TRUE)}
+```
+
