@@ -1,3 +1,6 @@
+1.4.3
+  - added header formating suport for freezing panes, changing background color and autofiltering
+
 1.4.2
   - Bugfix for NA timestamps
 
