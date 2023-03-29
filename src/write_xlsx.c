@@ -73,7 +73,8 @@ SEXP C_write_data_frame_list(SEXP df_list,
                              SEXP freeze_rows,
                              SEXP freeze_cols,
                              SEXP header_bg_color,
-                             SEXP autofilter){
+                             SEXP autofilter,
+                             SEXP col_widths){
   assert_that(Rf_isVectorList(df_list), "Object is not a list");
   assert_that(Rf_isString(file) && Rf_length(file), "Invalid file path");
   assert_that(Rf_isLogical(col_names), "col_names must be logical");
@@ -82,6 +83,7 @@ SEXP C_write_data_frame_list(SEXP df_list,
   assert_that(Rf_isInteger(freeze_cols), "freeze_cols must be integer");
   assert_that(Rf_isInteger(header_bg_color), "header_bg_color must be integer");
   assert_that(Rf_isLogical(autofilter), "autofilter must be logical");
+  assert_that(Rf_isVectorList(col_widths), "col_widths must be a list of vectors");
 
   //create workbook
   lxw_workbook_options options = {
@@ -228,6 +230,28 @@ SEXP C_write_data_frame_list(SEXP df_list,
 
     if(Rf_asLogical(autofilter)){
          worksheet_autofilter(sheet, 0, 0, rows, cols-1);
+    }
+
+    //set column widths
+    SEXP sheet_col_widths = VECTOR_ELT(col_widths, s);
+    size_t len_widths = Rf_length(sheet_col_widths);
+    double *widths_value;
+    int widths_type = TYPEOF(sheet_col_widths);
+    if (widths_type == REALSXP) {
+      widths_value = REAL(sheet_col_widths);
+    } else {
+      len_widths = 1;
+      widths_value = (double *)malloc(len_widths * sizeof(double));
+      widths_value[0] =LXW_DEF_COL_WIDTH;
+    }
+    if (len_widths == 1) {
+      double width = ISNA(widths_value[0]) ? LXW_DEF_COL_WIDTH : widths_value[0];
+      worksheet_set_column(sheet, 0, cols - 1, width, NULL);
+    } else {
+      for (size_t j = 0; j < len_widths; j++) {
+        double width = ISNA(widths_value[j]) ? LXW_DEF_COL_WIDTH : widths_value[j];
+        worksheet_set_column(sheet, j, j, width, NULL);
+      }
     }
   }
 

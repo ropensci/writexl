@@ -30,15 +30,33 @@
 #' @param header_bg_color background colour for header row cells (default: NA
 #'  meaning no color) other values could include any R colours like
 #'   "lightgray", "green", "lightblue" etc.
+#' @param col_widths A list of numeric vectors with column widths to use
+#'  (in inches). A length one vector is recycled. NA gives the default
+#'  behaviour. You can have the function guess the column width from the number
+#'  of characters in a row for this use one string value per data frame.
+#'  The possible string values include:
+#'   \itemize{
+#'     \item "guess_from_header": The widths are guessed from the character
+#'      count of the header.
+#'     \item "guess_from_row_2": The widths are guessed from the character
+#'      count of the 2nd row. You can use any row number here.
+#'   }
+#'  @param guessed_column_width_padding numeric inches to add to guessed
+#'   column widths (default:2)
 #' @examples # Roundtrip example with single excel sheet named 'mysheet'
 #' tmp <- write_xlsx(list(mysheet = iris))
 #' readxl::read_xlsx(tmp)
 write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
                        format_headers = TRUE, use_zip64 = FALSE,
                        freeze_rows = 0L,  freeze_cols = 0L,
-                       autofilter=FALSE, header_bg_color=NA){
-  if(is.data.frame(x))
-    x <- list(x)
+                       autofilter=FALSE, header_bg_color=NA,
+                       col_widths = NA,
+                       guessed_column_width_padding = 2){
+
+  if(!is.list(col_widths)){col_widths <- list(col_widths)}
+
+  if(is.data.frame(x)){ x <- list(x)}
+
   if(!is.list(x) || !all(vapply(x, is.data.frame, logical(1))))
     stop("Argument x must be a data frame or list of data frames")
   x <- lapply(x, normalize_df)
@@ -71,13 +89,28 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
 
   if(!is.logical(autofilter)){stop("autofilter expects a logical value!")}
 
-  if(!is.numeric(col_widths)){stop("col_widths expects numeric values!")}
+  if(length(x) != length(col_widths)){
+    #Recycling col_widths
+    if(length(col_widths) == 1){
+      col_widths <- lapply(1:length(x),
+                           function(x, cw){col_widths[[1]]}, col_widths)
+    } else{
+      stop("The col_widths don't have the same number of width vectors as the ",
+           "input data frames")
+    }
+  }
+  #convert the column widths to numeric and guess if needed
+  col_widths <- lapply(1:length(x), guess_col_widths,
+                       cw=col_widths,
+                       dfs = x,
+                       extra_space = guessed_column_width_padding)
+
 
   stopifnot(is.character(path) && length(path))
   path <- normalizePath(path, mustWork = FALSE)
   ret <- .Call(C_write_data_frame_list, x, path, col_names, format_headers,
                use_zip64, freeze_rows, freeze_cols, hex_color(header_bg_color),
-               autofilter)
+               autofilter, col_widths)
   invisible(ret)
 }
 
@@ -94,4 +127,28 @@ normalize_df <- function(df){
     df[[i]] <- bit64::as.double.integer64(df[[i]])
   }
   df
+}
+
+
+guess_col_widths <- function(i, cws, dfs, extra_space = 2){
+  cw <- cws[[i]]
+
+  if(is.numeric(cw)){return(cw)}
+  if(length(cw) != 1){stop("If not numeric, col_widths should have lenght 1!")}
+  if(is.na(cw)){return(NA)}
+  guess_names <- NULL
+  if(grepl("guess_from_head", cw)){
+    guess_names <- colnames(dfs[[i]])
+  }
+  if(grepl("guess_from_row",cw)){
+    row_num <- as.numeric(gsub("[^0-9]", "", cw))
+    if(nrow(dfs[[i]]) < row_num){
+      stop("Rows in data frame: ", nrow(dfs[[i]]),
+           "\nGuess row asked: ", row_num)
+      }
+    guess_names <- dfs[[i]][row_num, ]
+  }
+  if(is.null(guess_names)){stop("Unexpected col_widths string: ", cw)}
+
+  nchar(as.character(guess_names)) + extra_space
 }
