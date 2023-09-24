@@ -23,3 +23,4 @@ Suggests:
     testthat,
     bit64
 Language: en-US
+SystemRequirements: zlib
