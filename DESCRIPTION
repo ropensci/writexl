@@ -28,3 +28,5 @@ Suggests:
     rmarkdown
 Language: en-US
 VignetteBuilder: knitr
+SystemRequirements: zlib
+
