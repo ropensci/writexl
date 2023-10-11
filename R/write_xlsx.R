@@ -41,7 +41,7 @@
 #'     \item "guess_from_row_2": The widths are guessed from the character
 #'      count of the 2nd row. You can use any row number here.
 #'   }
-#'  @param guessed_column_width_padding numeric inches to add to guessed
+#' @param guessed_column_width_padding numeric, inches to add to guessed
 #'   column widths (default:2)
 #' @examples # Roundtrip example with single excel sheet named 'mysheet'
 #' tmp <- write_xlsx(list(mysheet = iris))

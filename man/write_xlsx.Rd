@@ -54,9 +54,10 @@ The possible string values include:
     count of the header.
    \item "guess_from_row_2": The widths are guessed from the character
     count of the 2nd row. You can use any row number here.
- }
-@param guessed_column_width_padding numeric inches to add to guessed
- column widths (default:2)}
+ }}
+
+\item{guessed_column_width_padding}{numeric, inches to add to guessed
+column widths (default:2)}
 }
 \description{
 Writes a data frame to an xlsx file. To create an xlsx with (multiple) named
