@@ -42,16 +42,16 @@
 #'      count of the 2nd row. You can use any row number here.
 #'   }
 #' @param guessed_column_width_padding numeric, inches to add to guessed
-#'   column widths (default:2)
+#'   column widths (default:3)
 #' @examples # Roundtrip example with single excel sheet named 'mysheet'
 #' tmp <- write_xlsx(list(mysheet = iris))
 #' readxl::read_xlsx(tmp)
 write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
                        format_headers = TRUE, use_zip64 = FALSE,
-                       freeze_rows = 0L,  freeze_cols = 0L,
-                       autofilter=FALSE, header_bg_color=NA,
-                       col_widths = NA,
-                       guessed_column_width_padding = 2){
+                       freeze_rows = 1L,  freeze_cols = 0L,
+                       autofilter=TRUE, header_bg_color='lightgray',
+                       col_widths = "guess_from_header",
+                       guessed_column_width_padding = 3){
 
   if(!is.list(col_widths)){col_widths <- list(col_widths)}
 
