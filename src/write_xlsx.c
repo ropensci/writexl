@@ -105,10 +105,13 @@ SEXP C_write_data_frame_list(SEXP df_list,
   //how to format headers (bold + center + background color)
   lxw_format * title = workbook_add_format(workbook);
   format_set_bold(title);
-  //set only
+  format_set_align(title, LXW_ALIGN_CENTER);
+
+  //set bg color
   if(Rf_asInteger(header_bg_color) > -1){
     format_set_bg_color(title, Rf_asInteger(header_bg_color));
   }
+
 
 
 
@@ -150,17 +153,36 @@ SEXP C_write_data_frame_list(SEXP df_list,
     size_t cols = Rf_length(df);
     size_t rows = 0;
 
-    // determinte how to format each column
+    // set column widths and determine format
+    SEXP sheet_col_widths = VECTOR_ELT(col_widths, s);
+    size_t len_widths = Rf_length(sheet_col_widths);
+    double *widths_value;
+    int widths_type = TYPEOF(sheet_col_widths);
+    if (widths_type == REALSXP) {
+      widths_value = REAL(sheet_col_widths);
+    } else {
+      widths_value = (double *)malloc(len_widths * sizeof(double));
+      for(size_t i = 0; i < len_widths; i++){
+        widths_value[i] = LXW_DEF_COL_WIDTH;
+      }
+    }
+
     R_COL_TYPE coltypes[cols];
     for(size_t i = 0; i < cols; i++){
+      // set column width
+      double width;
+      width = ISNA(widths_value[i]) ? LXW_DEF_COL_WIDTH : widths_value[i];
+      worksheet_set_column(sheet, i, i, width, NULL);
+
+      // determine format
       SEXP COL = VECTOR_ELT(df, i);
       coltypes[i] = get_type(COL);
       if(!Rf_isMatrix(COL) && !Rf_inherits(COL, "data.frame"))
         rows = max(rows, Rf_length(COL));
       if(coltypes[i] == COL_DATE)
-        assert_lxw(worksheet_set_column(sheet, i, i, 20, date));
+        assert_lxw(worksheet_set_column(sheet, i, i, width, date));
       if(coltypes[i] == COL_POSIXCT)
-        assert_lxw(worksheet_set_column(sheet, i, i, 20, datetime));
+        assert_lxw(worksheet_set_column(sheet, i, i, width, datetime));
     }
 
     // Need to iterate by row first for performance
@@ -232,27 +254,6 @@ SEXP C_write_data_frame_list(SEXP df_list,
          worksheet_autofilter(sheet, 0, 0, rows, cols-1);
     }
 
-    //set column widths
-    SEXP sheet_col_widths = VECTOR_ELT(col_widths, s);
-    size_t len_widths = Rf_length(sheet_col_widths);
-    double *widths_value;
-    int widths_type = TYPEOF(sheet_col_widths);
-    if (widths_type == REALSXP) {
-      widths_value = REAL(sheet_col_widths);
-    } else {
-      len_widths = 1;
-      widths_value = (double *)malloc(len_widths * sizeof(double));
-      widths_value[0] =LXW_DEF_COL_WIDTH;
-    }
-    if (len_widths == 1) {
-      double width = ISNA(widths_value[0]) ? LXW_DEF_COL_WIDTH : widths_value[0];
-      worksheet_set_column(sheet, 0, cols - 1, width, NULL);
-    } else {
-      for (size_t j = 0; j < len_widths; j++) {
-        double width = ISNA(widths_value[j]) ? LXW_DEF_COL_WIDTH : widths_value[j];
-        worksheet_set_column(sheet, j, j, width, NULL);
-      }
-    }
   }
 
 
