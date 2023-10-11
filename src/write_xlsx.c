@@ -102,10 +102,10 @@ SEXP C_write_data_frame_list(SEXP df_list,
   lxw_format * datetime = workbook_add_format(workbook);
   format_set_num_format(datetime, "yyyy-mm-dd HH:mm:ss UTC");
 
-  //how to format headers (bold + center + background color)
+  //how to format headers (bold + left + background color)
   lxw_format * title = workbook_add_format(workbook);
   format_set_bold(title);
-  format_set_align(title, LXW_ALIGN_CENTER);
+  format_set_align(title, LXW_ALIGN_LEFT); // works better with filter
 
   //set bg color
   if(Rf_asInteger(header_bg_color) > -1){

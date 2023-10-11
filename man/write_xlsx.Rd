@@ -11,12 +11,12 @@ write_xlsx(
   col_names = TRUE,
   format_headers = TRUE,
   use_zip64 = FALSE,
-  freeze_rows = 0L,
+  freeze_rows = 1L,
   freeze_cols = 0L,
-  autofilter = FALSE,
-  header_bg_color = NA,
-  col_widths = NA,
-  guessed_column_width_padding = 2
+  autofilter = TRUE,
+  header_bg_color = "lightgray",
+  col_widths = "guess_from_header",
+  guessed_column_width_padding = 3
 )
 }
 \arguments{
@@ -57,7 +57,7 @@ The possible string values include:
  }}
 
 \item{guessed_column_width_padding}{numeric, inches to add to guessed
-column widths (default:2)}
+column widths (default:3)}
 }
 \description{
 Writes a data frame to an xlsx file. To create an xlsx with (multiple) named
