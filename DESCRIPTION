@@ -27,8 +27,6 @@ Suggests:
     knitr,
     rmarkdown
 Language: en-US
-<<<<<<< HEAD
 VignetteBuilder: knitr
-=======
 SystemRequirements: zlib
->>>>>>> f3de8ebf8a482389d746675f76292796901616e4
+
