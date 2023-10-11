@@ -169,7 +169,7 @@ SEXP C_write_data_frame_list(SEXP df_list,
 
     R_COL_TYPE coltypes[cols];
     for(size_t i = 0; i < cols; i++){
-      // set column width
+      // set column width keep date and datetime widhts
       double width;
       width = ISNA(widths_value[i]) ? LXW_DEF_COL_WIDTH : widths_value[i];
       worksheet_set_column(sheet, i, i, width, NULL);
@@ -180,9 +180,9 @@ SEXP C_write_data_frame_list(SEXP df_list,
       if(!Rf_isMatrix(COL) && !Rf_inherits(COL, "data.frame"))
         rows = max(rows, Rf_length(COL));
       if(coltypes[i] == COL_DATE)
-        assert_lxw(worksheet_set_column(sheet, i, i, width, date));
+        assert_lxw(worksheet_set_column(sheet, i, i, 20, date));
       if(coltypes[i] == COL_POSIXCT)
-        assert_lxw(worksheet_set_column(sheet, i, i, width, datetime));
+        assert_lxw(worksheet_set_column(sheet, i, i, 20, datetime));
     }
 
     // Need to iterate by row first for performance
