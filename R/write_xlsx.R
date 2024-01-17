@@ -122,6 +122,9 @@ normalize_df <- function(df){
   for(i in which(vapply(df, inherits, logical(1), c("factor", "hms")))){
     df[[i]] <- as.character(df[[i]])
   }
+  for(i in which(vapply(df, function(x){is.integer(x) && inherits(x, "POSIXct")}, logical(1)))){
+    df[[i]] <- as.POSIXct(as.double(df[[i]]))
+  }
   for(i in which(vapply(df, inherits, logical(1), "POSIXlt"))){
     df[[i]] <- as.POSIXct(df[[i]])
   }
