@@ -1,7 +1,7 @@
 /*
  * libxlsxwriter
  *
- * Copyright 2014-2021, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2022, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  */
 
 /**
@@ -9,7 +9,7 @@
  *
  * @brief Utility functions for libxlsxwriter.
  *
- * <!-- Copyright 2014-2021, John McNamara, jmcnamara@cpan.org -->
+ * <!-- Copyright 2014-2022, John McNamara, jmcnamara@cpan.org -->
  *
  */
 
@@ -183,7 +183,7 @@ uint16_t lxw_name_to_col_2(const char *col_str);
  * @return A double representing an Excel datetime.
  *
  * The `%lxw_datetime_to_excel_datetime()` function converts a datetime in
- * #lxw_datetime to and Excel datetime number:
+ * #lxw_datetime to an Excel datetime number:
  *
  * @code
  *     lxw_datetime datetime = {2013, 2, 28, 12, 0, 0.0};
@@ -197,6 +197,26 @@ double lxw_datetime_to_excel_datetime(lxw_datetime *datetime);
 
 double lxw_datetime_to_excel_date_epoch(lxw_datetime *datetime,
                                         uint8_t date_1904);
+
+/**
+ * @brief Converts a unix datetime to an Excel datetime number.
+ *
+ * @param unixtime Unix time (seconds since 1970-01-01)
+ *
+ * @return A double representing an Excel datetime.
+ *
+ * The `%lxw_unixtime_to_excel_date()` function converts a unix datetime to
+ * an Excel datetime number:
+ *
+ * @code
+ *     double excel_datetime = lxw_unixtime_to_excel_date(946684800);
+ * @endcode
+ *
+ * See @ref working_with_dates for more details.
+ */
+double lxw_unixtime_to_excel_date(int64_t unixtime);
+
+double lxw_unixtime_to_excel_date_epoch(int64_t unixtime, uint8_t date_1904);
 
 char *lxw_strdup(const char *str);
 char *lxw_strdup_formula(const char *formula);
@@ -212,16 +232,19 @@ void lxw_str_tolower(char *str);
 #define lxw_strcasecmp strcasecmp
 #endif
 
-FILE *lxw_tmpfile(char *tmpdir);
+FILE *lxw_tmpfile(const char *tmpdir);
+FILE *lxw_get_filehandle(char **buf, size_t *size, const char *tmpdir);
 FILE *lxw_fopen(const char *filename, const char *mode);
 
-/* Use a user defined function to format doubles in sprintf or else a simple
- * macro (the default). */
-#ifdef USE_DOUBLE_FUNCTION
+/* Use the third party dtoa function to avoid locale issues with sprintf
+ * double formatting. Otherwise we use a simple macro that falls back to the
+ * default c-lib sprintf.
+ */
+#ifdef USE_DTOA_LIBRARY
 int lxw_sprintf_dbl(char *data, double number);
 #else
 #define lxw_sprintf_dbl(data, number) \
-        lxw_snprintf(data, LXW_ATTR_32, "%.16g", number)
+        lxw_snprintf(data, LXW_ATTR_32, "%.16G", number)
 #endif
 
 uint16_t lxw_hash_password(const char *password);

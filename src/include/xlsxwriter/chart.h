@@ -1,7 +1,7 @@
 /*
  * libxlsxwriter
  *
- * Copyright 2014-2021, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2022, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  *
  * chart - A libxlsxwriter library for creating Excel XLSX chart files.
  *
@@ -699,7 +699,7 @@ typedef struct lxw_chart_pattern {
 typedef struct lxw_chart_font {
 
     /** The chart font name, such as "Arial" or "Calibri". */
-    char *name;
+    const char *name;
 
     /** The chart font size. The default is 11. */
     double size;
@@ -713,9 +713,12 @@ typedef struct lxw_chart_font {
     /** The chart font underline property. Set to 0 or 1. */
     uint8_t underline;
 
-    /** The chart font rotation property. Range: -90 to 90, and 270-271.
-     *  The angle 270 gives a stacked (top to bottom) alignment.
-     *  The angle 271 gives a stacked alignment for East Asian fonts.
+    /** The chart font rotation property. Range: -90 to 90, and 270, 271 and 360:
+     *
+     *  - The angles -90 to 90 are the normal range shown in the Excel user interface.
+     *  - The angle 270 gives a stacked (top to bottom) alignment.
+     *  - The angle 271 gives a stacked alignment for East Asian fonts.
+     *  - The angle 360 gives an explicit angle of 0 to override the y axis default.
      * */
     int32_t rotation;
 
@@ -797,7 +800,7 @@ typedef struct lxw_chart_data_label {
 
     /** The string or formula value for the data label. See
      *  @ref chart_custom_labels. */
-    char *value;
+    const char *value;
 
     /** Option to hide/delete the data label from the chart series.
      *  See @ref chart_custom_labels. */
@@ -3232,13 +3235,27 @@ void chart_title_set_name_range(lxw_chart *chart, const char *sheetname,
  * chart title:
  *
  * @code
- *     lxw_chart_font font = {.bold = LXW_TRUE, .color = LXW_COLOR_BLUE};
+ *     lxw_chart_font font = {.color = LXW_COLOR_BLUE};
  *
  *     chart_title_set_name(chart, "Year End Results");
  *     chart_title_set_name_font(chart, &font);
  * @endcode
  *
  * @image html chart_title_set_name_font.png
+ *
+ * In Excel a chart title font is bold by default (as shown in the image
+ * above). To turn off bold in the font you cannot use #LXW_FALSE (0) since
+ * that is indistinguishable from an uninitialized value. Instead you should
+ * use #LXW_EXPLICIT_FALSE:
+ *
+ * @code
+ *     lxw_chart_font font = {.bold = LXW_EXPLICIT_FALSE, .color = LXW_COLOR_BLUE};
+ *
+ *     chart_title_set_name(chart, "Year End Results");
+ *     chart_title_set_name_font(chart, &font);
+ * @endcode
+ *
+ * @image html chart_title_set_name_font2.png
  *
  * For more information see @ref chart_fonts.
  */

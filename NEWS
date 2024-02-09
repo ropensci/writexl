@@ -1,3 +1,6 @@
+1.5.0
+  - Update libxlsxwriter from b0c76b33
+
 1.4.2
   - Bugfix for NA timestamps
 
