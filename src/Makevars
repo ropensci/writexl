@@ -5,8 +5,9 @@ LIBXLSXWRITER	= \
   libxlsxwriter/core.o libxlsxwriter/relationships.o libxlsxwriter/worksheet.o \
   libxlsxwriter/custom.o libxlsxwriter/shared_strings.o libxlsxwriter/xmlwriter.o \
   libxlsxwriter/drawing.o libxlsxwriter/styles.o tmpfileplus/tmpfileplus.o \
-  libxlsxwriter/chartsheet.o minizip/ioapi.o minizip/zip.o \
-  libxlsxwriter/comment.o libxlsxwriter/vml.o md5/md5.o
+  libxlsxwriter/chartsheet.o minizip/ioapi.o minizip/zip.o libxlsxwriter/metadata.o \
+  libxlsxwriter/comment.o libxlsxwriter/vml.o md5/md5.o libxlsxwriter/table.o \
+
 
 STATICLIB=libxlsxwriter/libstatxlsxwriter.a
 

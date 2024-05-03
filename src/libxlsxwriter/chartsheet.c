@@ -3,7 +3,7 @@
  *
  * Used in conjunction with the libxlsxwriter library.
  *
- * Copyright 2014-2021, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2022, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  *
  */
 
@@ -66,8 +66,8 @@ lxw_chartsheet_free(lxw_chartsheet *chartsheet)
         return;
 
     lxw_worksheet_free(chartsheet->worksheet);
-    free(chartsheet->name);
-    free(chartsheet->quoted_name);
+    free((void *) chartsheet->name);
+    free((void *) chartsheet->quoted_name);
     free(chartsheet);
 }
 
@@ -271,14 +271,13 @@ chartsheet_set_chart_opt(lxw_chartsheet *self,
         object_props->y_scale = user_options->y_scale;
     }
 
-    /* TODO. Read defaults from chart. */
     object_props->width = 480;
     object_props->height = 288;
 
-    if (!object_props->x_scale)
+    if (object_props->x_scale == 0.0)
         object_props->x_scale = 1;
 
-    if (!object_props->y_scale)
+    if (object_props->y_scale == 0.0)
         object_props->y_scale = 1;
 
     /* Store chart references so they can be ordered in the workbook. */

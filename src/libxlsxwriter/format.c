@@ -3,7 +3,7 @@
  *
  * Used in conjunction with the libxlsxwriter library.
  *
- * Copyright 2014-2021, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2022, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  *
  */
 
@@ -97,6 +97,8 @@ lxw_format_new(void)
     format->just_distrib = LXW_FALSE;
     format->color_indexed = LXW_FALSE;
     format->font_only = LXW_FALSE;
+
+    format->quote_prefix = LXW_FALSE;
 
     return format;
 
@@ -798,4 +800,13 @@ format_set_hyperlink(lxw_format *self)
     self->xf_id = 1;
     self->underline = LXW_UNDERLINE_SINGLE;
     self->theme = 10;
+}
+
+/*
+ * Set the quote_prefix property.
+ */
+void
+format_set_quote_prefix(lxw_format *self)
+{
+    self->quote_prefix = LXW_TRUE;
 }

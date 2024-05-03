@@ -1,7 +1,7 @@
 /*
  * libxlsxwriter
  *
- * Copyright 2014-2021, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2022, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  *
  * xmlwriter - A libxlsxwriter library for creating Excel XLSX
  *             XML files.
@@ -55,7 +55,7 @@ STAILQ_HEAD(xml_attribute_list, xml_attribute);
 /* Create a new attribute struct to add to a xml_attribute_list. */
 struct xml_attribute *lxw_new_attribute_str(const char *key,
                                             const char *value);
-struct xml_attribute *lxw_new_attribute_int(const char *key, uint32_t value);
+struct xml_attribute *lxw_new_attribute_int(const char *key, uint64_t value);
 struct xml_attribute *lxw_new_attribute_dbl(const char *key, double value);
 
 /* Macro to initialize the xml_attribute_list pointers. */
@@ -85,11 +85,13 @@ struct xml_attribute *lxw_new_attribute_dbl(const char *key, double value);
 
 /* Macro to free xml_attribute_list and attribute. */
 #define LXW_FREE_ATTRIBUTES()                                 \
-    while (!STAILQ_EMPTY(&attributes)) {                      \
-        attribute = STAILQ_FIRST(&attributes);                \
-        STAILQ_REMOVE_HEAD(&attributes, list_entries);        \
-        free(attribute);                                      \
-    }
+    do {                                                      \
+        while (!STAILQ_EMPTY(&attributes)) {                  \
+            attribute = STAILQ_FIRST(&attributes);            \
+            STAILQ_REMOVE_HEAD(&attributes, list_entries);    \
+            free(attribute);                                  \
+        }                                                     \
+    } while (0)
 
 /**
  * Create the XML declaration in an XML file.

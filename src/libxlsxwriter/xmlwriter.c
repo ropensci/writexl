@@ -3,7 +3,7 @@
  *
  * Used in conjunction with the libxlsxwriter library.
  *
- * Copyright 2014-2021, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2022, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  *
  */
 
@@ -17,6 +17,7 @@
 #define LXW_LT   "&lt;"
 #define LXW_GT   "&gt;"
 #define LXW_QUOT "&quot;"
+#define LXW_NL   "&#xA;"
 
 /* Defines. */
 #define LXW_MAX_ENCODED_ATTRIBUTE_LENGTH (LXW_MAX_ATTRIBUTE_LENGTH*6)
@@ -178,6 +179,10 @@ _escape_attributes(struct xml_attribute *attribute)
                 memcpy(p_encoded, LXW_QUOT, sizeof(LXW_QUOT) - 1);
                 p_encoded += sizeof(LXW_QUOT) - 1;
                 break;
+            case '\n':
+                memcpy(p_encoded, LXW_NL, sizeof(LXW_NL) - 1);
+                p_encoded += sizeof(LXW_NL) - 1;
+                break;
             default:
                 *p_encoded = *p_attr;
                 p_encoded++;
@@ -316,20 +321,20 @@ lxw_escape_url_characters(const char *string, uint8_t escape_hash)
 
     while (*string) {
         switch (*string) {
-            case (' '):
-            case ('"'):
-            case ('<'):
-            case ('>'):
-            case ('['):
-            case (']'):
-            case ('`'):
-            case ('^'):
-            case ('{'):
-            case ('}'):
+            case ' ':
+            case '"':
+            case '<':
+            case '>':
+            case '[':
+            case ']':
+            case '`':
+            case '^':
+            case '{':
+            case '}':
                 lxw_snprintf(p_encoded, escape_len + 1, "%%%2x", *string);
                 p_encoded += escape_len;
                 break;
-            case ('#'):
+            case '#':
                 /* This is only escaped for "external:" style links. */
                 if (escape_hash) {
                     lxw_snprintf(p_encoded, escape_len + 1, "%%%2x", *string);
@@ -340,7 +345,7 @@ lxw_escape_url_characters(const char *string, uint8_t escape_hash)
                     p_encoded++;
                 }
                 break;
-            case ('%'):
+            case '%':
                 /* Only escape % if it isn't already an escape. */
                 if (!isxdigit(*(string + 1)) || !isxdigit(*(string + 2))) {
                     lxw_snprintf(p_encoded, escape_len + 1, "%%%2x", *string);
@@ -373,7 +378,7 @@ _fprint_escaped_attributes(FILE * xmlfile,
         STAILQ_FOREACH(attribute, attributes, list_entries) {
             fprintf(xmlfile, " %s=", attribute->key);
 
-            if (!strpbrk(attribute->value, "&<>\"")) {
+            if (!strpbrk(attribute->value, "&<>\"\n")) {
                 fprintf(xmlfile, "\"%s\"", attribute->value);
             }
             else {
@@ -420,12 +425,18 @@ lxw_new_attribute_str(const char *key, const char *value)
 
 /* Create a new integer XML attribute. */
 struct xml_attribute *
-lxw_new_attribute_int(const char *key, uint32_t value)
+lxw_new_attribute_int(const char *key, uint64_t value)
 {
     struct xml_attribute *attribute = malloc(sizeof(struct xml_attribute));
 
     LXW_ATTRIBUTE_COPY(attribute->key, key);
-    lxw_snprintf(attribute->value, LXW_MAX_ATTRIBUTE_LENGTH, "%d", value);
+
+#if defined(_MSC_VER)
+    lxw_snprintf(attribute->value, LXW_MAX_ATTRIBUTE_LENGTH, "%lld", value);
+#else
+    lxw_snprintf(attribute->value, LXW_MAX_ATTRIBUTE_LENGTH, "%ld",
+                 (long) value);
+#endif
 
     return attribute;
 }

@@ -3,9 +3,13 @@
  *
  * Used in conjunction with the libxlsxwriter library.
  *
- * Copyright 2014-2021, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2022, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  *
  */
+
+#ifdef USE_FMEMOPEN
+#define _POSIX_C_SOURCE 200809L
+#endif
 
 #include <ctype.h>
 #include <stdio.h>
@@ -15,6 +19,10 @@
 #include "xlsxwriter.h"
 #include "xlsxwriter/common.h"
 #include "xlsxwriter/third_party/tmpfileplus.h"
+
+#ifdef USE_DTOA_LIBRARY
+#include "xlsxwriter/third_party/emyg_dtoa.h"
+#endif
 
 char *error_strings[LXW_MAX_ERRNO + 1] = {
     "No error.",
@@ -395,7 +403,7 @@ lxw_datetime_to_excel_date_epoch(lxw_datetime *datetime, uint8_t date_1904)
     /* Add days for all previous years.  */
     days += range * 365;
     /* Add 4 year leapdays. */
-    days += (range) / 4;
+    days += range / 4;
     /* Remove 100 year leapdays. */
     days -= (range + offset) / 100;
     /* Add 400 year leapdays. */
@@ -417,6 +425,34 @@ double
 lxw_datetime_to_excel_datetime(lxw_datetime *datetime)
 {
     return lxw_datetime_to_excel_date_epoch(datetime, LXW_FALSE);
+}
+
+/*
+ * Convert a unix datetime (1970/01/01 epoch) to an Excel serial date, with a
+ * 1900 epoch.
+ */
+double
+lxw_unixtime_to_excel_date(int64_t unixtime)
+{
+    return lxw_unixtime_to_excel_date_epoch(unixtime, LXW_FALSE);
+}
+
+/*
+ * Convert a unix datetime (1970/01/01 epoch) to an Excel serial date, with a
+ * 1900 or 1904 epoch.
+ */
+double
+lxw_unixtime_to_excel_date_epoch(int64_t unixtime, uint8_t date_1904)
+{
+    double excel_datetime = 0.0;
+    double epoch = date_1904 ? 24107.0 : 25568.0;
+
+    excel_datetime = epoch + (unixtime / (24 * 60 * 60.0));
+
+    if (!date_1904 && excel_datetime >= 60.0)
+        excel_datetime = excel_datetime + 1.0;
+
+    return excel_datetime;
 }
 
 /* Simple strdup() implementation since it isn't ANSI C. */
@@ -536,7 +572,7 @@ lxw_quote_sheetname(const char *str)
  * version if required for safety or portability.
  */
 FILE *
-lxw_tmpfile(char *tmpdir)
+lxw_tmpfile(const char *tmpdir)
 {
 #ifndef USE_STANDARD_TMPFILE
     return tmpfileplus(tmpdir, NULL, NULL, 0);
@@ -546,28 +582,34 @@ lxw_tmpfile(char *tmpdir)
 #endif
 }
 
-/*
- * Sample function to handle sprintf of doubles for locale portable code. This
- * is usually handled by a lxw_sprintf_dbl() macro but it can be replaced with
- * a function of the same name.
- *
- * The code below is a simplified example that changes numbers like 123,45 to
- * 123.45. End-users can replace this with something more rigorous if
- * required.
+/**
+ * Return a memory-backed file if supported, otherwise a temporary one
  */
-#ifdef USE_DOUBLE_FUNCTION
+FILE *
+lxw_get_filehandle(char **buf, size_t *size, const char *tmpdir)
+{
+    static size_t s;
+    if (!size)
+        size = &s;
+    *buf = NULL;
+    *size = 0;
+#ifdef USE_FMEMOPEN
+    (void) tmpdir;
+    return open_memstream(buf, size);
+#else
+    return lxw_tmpfile(tmpdir);
+#endif
+}
+
+/*
+ * Use third party function to handle sprintf of doubles for locale portable
+ * code.
+ */
+#ifdef USE_DTOA_LIBRARY
 int
 lxw_sprintf_dbl(char *data, double number)
 {
-    char *tmp;
-
-    lxw_snprintf(data, LXW_ATTR_32, "%.16g", number);
-
-    /* Replace comma with decimal point. */
-    tmp = strchr(data, ',');
-    if (tmp)
-        *tmp = '.';
-
+    emyg_dtoa(number, data);
     return 0;
 }
 #endif
@@ -591,32 +633,27 @@ lxw_version_id(void)
 }
 
 /*
- * Hash a worksheet password. Based on the algorithm provided by Daniel Rentz
- * of OpenOffice.
+ * Hash a worksheet password. Based on the algorithm in ECMA-376-4:2016,
+ * Office Open XML File Formats - Transitional Migration Features,
+ * Additional attributes for workbookProtection element (Part 1, §18.2.29).
  */
 uint16_t
 lxw_hash_password(const char *password)
 {
-    size_t count;
-    size_t i;
-    uint16_t hash = 0x0000;
+    uint16_t byte_count = (uint16_t) strlen(password);
+    uint16_t hash = 0;
+    const char *p = &password[byte_count];
 
-    count = strlen(password);
+    if (!byte_count)
+        return hash;
 
-    for (i = 0; i < (uint8_t) count; i++) {
-        uint32_t low_15;
-        uint32_t high_15;
-        uint32_t letter = password[i] << (i + 1);
-
-        low_15 = letter & 0x7fff;
-        high_15 = letter & (0x7fff << 15);
-        high_15 = high_15 >> 15;
-        letter = low_15 | high_15;
-
-        hash ^= letter;
+    while (p-- != password) {
+        hash = ((hash >> 14) & 0x01) | ((hash << 1) & 0x7fff);
+        hash ^= *p & 0xFF;
     }
 
-    hash ^= count;
+    hash = ((hash >> 14) & 0x01) | ((hash << 1) & 0x7fff);
+    hash ^= byte_count;
     hash ^= 0xCE4B;
 
     return hash;

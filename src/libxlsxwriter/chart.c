@@ -3,7 +3,7 @@
  *
  * Used in conjunction with the libxlsxwriter library.
  *
- * Copyright 2014-2021, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2022, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  *
  */
 
@@ -78,7 +78,7 @@ _chart_free_font(lxw_chart_font *font)
     if (!font)
         return;
 
-    free(font->name);
+    free((void *) font->name);
     free(font);
 }
 
@@ -466,7 +466,7 @@ _chart_set_default_marker_type(lxw_chart *self, uint8_t type)
 /*
  * Set an axis number format.
  */
-void
+STATIC void
 _chart_axis_set_default_num_format(lxw_chart_axis *axis, char *num_format)
 {
     if (!num_format)
@@ -1142,6 +1142,11 @@ _chart_write_a_body_pr(lxw_chart *self, int32_t rotation,
             LXW_PUSH_ATTRIBUTES_STR("rot", "0");
             LXW_PUSH_ATTRIBUTES_STR("vert", "eaVert");
         }
+        else if (rotation == 21600000) {
+            /* 360 deg = 0 for y axis. */
+            LXW_PUSH_ATTRIBUTES_STR("rot", "0");
+            LXW_PUSH_ATTRIBUTES_STR("vert", "horz");
+        }
         else {
             LXW_PUSH_ATTRIBUTES_INT("rot", rotation);
             LXW_PUSH_ATTRIBUTES_STR("vert", "horz");
@@ -1673,28 +1678,33 @@ _chart_write_a_ln(lxw_chart *self, lxw_chart_line *line)
     /* Convert to internal units. */
     width_int = (uint32_t) (0.5 + (12700.0 * width_flt));
 
-    if (width_int)
+    if (line->width > 0.0)
         LXW_PUSH_ATTRIBUTES_INT("w", width_int);
 
-    lxw_xml_start_tag(self->file, "a:ln", &attributes);
+    if (line->none || line->color || line->dash_type) {
+        lxw_xml_start_tag(self->file, "a:ln", &attributes);
 
-    /* Write the line fill. */
-    if (line->none) {
-        /* Write the a:noFill element. */
-        _chart_write_a_no_fill(self);
-    }
-    else if (line->color) {
-        /* Write the a:solidFill element. */
-        _chart_write_a_solid_fill(self, line->color, line->transparency);
-    }
+        /* Write the line fill. */
+        if (line->none) {
+            /* Write the a:noFill element. */
+            _chart_write_a_no_fill(self);
+        }
+        else if (line->color) {
+            /* Write the a:solidFill element. */
+            _chart_write_a_solid_fill(self, line->color, line->transparency);
+        }
 
-    /* Write the line/dash type. */
-    if (line->dash_type) {
-        /* Write the a:prstDash element. */
-        _chart_write_a_prst_dash(self, line->dash_type);
-    }
+        /* Write the line/dash type. */
+        if (line->dash_type) {
+            /* Write the a:prstDash element. */
+            _chart_write_a_prst_dash(self, line->dash_type);
+        }
 
-    lxw_xml_end_tag(self->file, "a:ln");
+        lxw_xml_end_tag(self->file, "a:ln");
+    }
+    else {
+        lxw_xml_empty_tag(self->file, "a:ln", &attributes);
+    }
 
     LXW_FREE_ATTRIBUTES();
 }
@@ -4659,17 +4669,15 @@ _chart_write_scatter_chart(lxw_chart *self)
 
         /* Add default scatter chart formatting to the series data unless
          * it has already been specified by the user.*/
-        if (self->type == LXW_CHART_SCATTER) {
-            if (!series->line) {
-                lxw_chart_line line = {
-                    0x000000,
-                    LXW_TRUE,
-                    2.25,
-                    LXW_CHART_LINE_DASH_SOLID,
-                    0
-                };
-                series->line = _chart_convert_line_args(&line);
-            }
+        if (self->type == LXW_CHART_SCATTER && !series->line) {
+            lxw_chart_line line = {
+                0x000000,
+                LXW_TRUE,
+                2.25,
+                LXW_CHART_LINE_DASH_SOLID,
+                0
+            };
+            series->line = _chart_convert_line_args(&line);
         }
 
         /* Write the c:ser element. */
@@ -5588,7 +5596,7 @@ chart_series_set_labels_custom(lxw_chart_series *series,
     for (i = 0; i < data_label_count; i++) {
         lxw_chart_data_label *user_label = data_labels[i];
         lxw_chart_custom_label *data_label = &series->data_labels[i];
-        char *src_value = user_label->value;
+        const char *src_value = user_label->value;
 
         data_label->hide = user_label->hide;
         data_label->font = _chart_convert_font_args(user_label->font);

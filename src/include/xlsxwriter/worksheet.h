@@ -1,7 +1,7 @@
 /*
  * libxlsxwriter
  *
- * Copyright 2014-2021, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2022, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  */
 
 /**
@@ -504,11 +504,11 @@ enum lxw_conditional_icon_types {
     /** Icon style: 3 symbols with tick mark, exclamation and cross. */
     LXW_CONDITIONAL_ICONS_3_SYMBOLS_UNCIRCLED,
 
-    /** Icon style: 3 colored arrows showing up, diagonal up, diagonal down
+    /** Icon style: 4 colored arrows showing up, diagonal up, diagonal down
      *  and down. */
     LXW_CONDITIONAL_ICONS_4_ARROWS_COLORED,
 
-    /** Icon style: 3 gray arrows showing up, diagonal up, diagonal down and
+    /** Icon style: 4 gray arrows showing up, diagonal up, diagonal down and
      * down. */
     LXW_CONDITIONAL_ICONS_4_ARROWS_GRAY,
 
@@ -536,6 +536,121 @@ enum lxw_conditional_icon_types {
     LXW_CONDITIONAL_ICONS_5_QUARTERS
 };
 
+/** @brief The type of table style.
+ *
+ * The type of table style (Light, Medium or Dark).
+ */
+enum lxw_table_style_type {
+
+    LXW_TABLE_STYLE_TYPE_DEFAULT,
+
+    /** Light table style. */
+    LXW_TABLE_STYLE_TYPE_LIGHT,
+
+    /** Light table style. */
+    LXW_TABLE_STYLE_TYPE_MEDIUM,
+
+    /** Light table style. */
+    LXW_TABLE_STYLE_TYPE_DARK
+};
+
+/**
+ * @brief Standard Excel functions for totals in tables.
+ *
+ * Definitions for the standard Excel functions that are available via the
+ * dropdown in the total row of an Excel table.
+ *
+ */
+enum lxw_table_total_functions {
+
+    LXW_TABLE_FUNCTION_NONE = 0,
+
+    /** Use the average function as the table total. */
+    LXW_TABLE_FUNCTION_AVERAGE = 101,
+
+    /** Use the count numbers function as the table total. */
+    LXW_TABLE_FUNCTION_COUNT_NUMS = 102,
+
+    /** Use the count function as the table total. */
+    LXW_TABLE_FUNCTION_COUNT = 103,
+
+    /** Use the max function as the table total. */
+    LXW_TABLE_FUNCTION_MAX = 104,
+
+    /** Use the min function as the table total. */
+    LXW_TABLE_FUNCTION_MIN = 105,
+
+    /** Use the standard deviation function as the table total. */
+    LXW_TABLE_FUNCTION_STD_DEV = 107,
+
+    /** Use the sum function as the table total. */
+    LXW_TABLE_FUNCTION_SUM = 109,
+
+    /** Use the var function as the table total. */
+    LXW_TABLE_FUNCTION_VAR = 110
+};
+
+/** @brief The criteria used in autofilter rules.
+ *
+ * Criteria used to define an autofilter rule condition.
+ */
+enum lxw_filter_criteria {
+    LXW_FILTER_CRITERIA_NONE,
+
+    /** Filter cells equal to a value. */
+    LXW_FILTER_CRITERIA_EQUAL_TO,
+
+    /** Filter cells not equal to a value. */
+    LXW_FILTER_CRITERIA_NOT_EQUAL_TO,
+
+    /** Filter cells greater than a value. */
+    LXW_FILTER_CRITERIA_GREATER_THAN,
+
+    /** Filter cells less than a value. */
+    LXW_FILTER_CRITERIA_LESS_THAN,
+
+    /** Filter cells greater than or equal to a value. */
+    LXW_FILTER_CRITERIA_GREATER_THAN_OR_EQUAL_TO,
+
+    /** Filter cells less than or equal to a value. */
+    LXW_FILTER_CRITERIA_LESS_THAN_OR_EQUAL_TO,
+
+    /** Filter cells that are blank. */
+    LXW_FILTER_CRITERIA_BLANKS,
+
+    /** Filter cells that are not blank. */
+    LXW_FILTER_CRITERIA_NON_BLANKS
+};
+
+/**
+ * @brief And/or operator when using 2 filter rules.
+ *
+ * And/or operator conditions when using 2 filter rules with
+ * worksheet_filter_column2(). In general LXW_FILTER_OR is used with
+ * LXW_FILTER_CRITERIA_EQUAL_TO and LXW_FILTER_AND is used with the other
+ * filter criteria.
+ */
+enum lxw_filter_operator {
+    /** Logical "and" of 2 filter rules. */
+    LXW_FILTER_AND,
+
+    /** Logical "or" of 2 filter rules. */
+    LXW_FILTER_OR
+};
+
+/* Internal filter types. */
+enum lxw_filter_type {
+    LXW_FILTER_TYPE_NONE,
+
+    LXW_FILTER_TYPE_SINGLE,
+
+    LXW_FILTER_TYPE_AND,
+
+    LXW_FILTER_TYPE_OR,
+
+    LXW_FILTER_TYPE_STRING_LIST
+};
+
 /** Options to control the positioning of worksheet objects such as images
  *  or charts. See @ref working_with_object_positioning. */
 enum lxw_object_position {
@@ -543,10 +658,10 @@ enum lxw_object_position {
     /** Default positioning for the object. */
     LXW_OBJECT_POSITION_DEFAULT,
 
-    /** Move and size with the worksheet object with the cells. */
+    /** Move and size the worksheet object with the cells. */
     LXW_OBJECT_MOVE_AND_SIZE,
 
-    /** Move but don't size with the worksheet object with the cells. */
+    /** Move but don't size the worksheet object with the cells. */
     LXW_OBJECT_MOVE_DONT_SIZE,
 
     /** Don't move or size the worksheet object with the cells. */
@@ -602,6 +717,7 @@ enum cell_types {
     INLINE_RICH_STRING_CELL,
     FORMULA_CELL,
     ARRAY_FORMULA_CELL,
+    DYNAMIC_ARRAY_FORMULA_CELL,
     BLANK_CELL,
     BOOLEAN_CELL,
     COMMENT,
@@ -703,6 +819,7 @@ STAILQ_HEAD(lxw_cond_format_list, lxw_cond_format_obj);
 STAILQ_HEAD(lxw_image_props, lxw_object_properties);
 STAILQ_HEAD(lxw_chart_props, lxw_object_properties);
 STAILQ_HEAD(lxw_comment_objs, lxw_vml_obj);
+STAILQ_HEAD(lxw_table_objs, lxw_table_obj);
 
 /**
  * @brief Options for rows and columns.
@@ -771,6 +888,7 @@ typedef struct lxw_print_area {
 
 typedef struct lxw_autofilter {
     uint8_t in_use;
+    uint8_t has_rules;
     lxw_row_t first_row;
     lxw_row_t last_row;
     lxw_col_t first_col;
@@ -861,7 +979,7 @@ typedef struct lxw_data_validation {
      * is applied using a cell reference. It is valid for any of the
      * `_FORMULA` validation types.
      */
-    char *value_formula;
+    const char *value_formula;
 
     /**
      * This parameter is used to set a list of strings for a drop down list.
@@ -880,7 +998,7 @@ typedef struct lxw_data_validation {
      * Note, the string list is restricted by Excel to 255 characters,
      * including comma separators.
      */
-    char **value_list;
+    const char **value_list;
 
     /**
      * This parameter is used to set the limiting value to which the date or
@@ -898,7 +1016,7 @@ typedef struct lxw_data_validation {
      * This parameter is the same as `value_formula` but for the minimum value
      * when a `BETWEEN` criteria is used.
      */
-    char *minimum_formula;
+    const char *minimum_formula;
 
     /**
      * This parameter is the same as `value_datetime` but for the minimum value
@@ -916,7 +1034,7 @@ typedef struct lxw_data_validation {
      * This parameter is the same as `value_formula` but for the maximum value
      * when a `BETWEEN` criteria is used.
      */
-    char *maximum_formula;
+    const char *maximum_formula;
 
     /**
      * This parameter is the same as `value_datetime` but for the maximum value
@@ -932,7 +1050,7 @@ typedef struct lxw_data_validation {
      *
      * The maximum title length is 32 characters.
      */
-    char *input_title;
+    const char *input_title;
 
     /**
      * The input_message parameter is used to set the input message that is
@@ -941,7 +1059,7 @@ typedef struct lxw_data_validation {
      * The message can be split over several lines using newlines. The maximum
      * message length is 255 characters.
      */
-    char *input_message;
+    const char *input_message;
 
     /**
      * The error_title parameter is used to set the title of the error message
@@ -949,7 +1067,7 @@ typedef struct lxw_data_validation {
      * default error title is 'Microsoft Excel'. The maximum title length is
      * 32 characters.
      */
-    char *error_title;
+    const char *error_title;
 
     /**
      * The error_message parameter is used to set the error message that is
@@ -960,7 +1078,7 @@ typedef struct lxw_data_validation {
      * The message can be split over several lines using newlines. The maximum
      * message length is 255 characters.
      */
-    char *error_message;
+    const char *error_message;
 
 } lxw_data_validation;
 
@@ -1024,7 +1142,7 @@ typedef struct lxw_conditional_format {
      *  value_string exists in the struct then the number value is
      *  ignored. Note, if the condition refers to a text string then it must
      *  be double quoted like this `"foo"`. */
-    char *value_string;
+    const char *value_string;
 
     /** The format field is used to specify the #lxw_format format that will
      *  be applied to the cell when the conditional formatting criterion is
@@ -1045,7 +1163,7 @@ typedef struct lxw_conditional_format {
 
     /** The minimum string value used for Cell, Color Scale and Data Bar conditional
      *  formats. Usually used to set ranges like `=A1`. */
-    char *min_value_string;
+    const char *min_value_string;
 
     /** The rule used for the minimum condition in Color Scale and Data Bar
      *  conditional formats. The rule types are defined in
@@ -1062,7 +1180,7 @@ typedef struct lxw_conditional_format {
 
     /** The middle string value used for Color Scale and Data Bar conditional
      *  formats. Usually used to set ranges like `=A1`. */
-    char *mid_value_string;
+    const char *mid_value_string;
 
     /** The rule used for the middle condition in Color Scale and Data Bar
      *  conditional formats. The rule types are defined in
@@ -1080,7 +1198,7 @@ typedef struct lxw_conditional_format {
 
     /** The maximum string value used for Cell, Color Scale and Data Bar conditional
      *  formats. Usually used to set ranges like `=A1`. */
-    char *max_value_string;
+    const char *max_value_string;
 
     /** The rule used for the maximum condition in Color Scale and Data Bar
      *  conditional formats. The rule types are defined in
@@ -1186,7 +1304,7 @@ typedef struct lxw_conditional_format {
      *  conditional format and any others separated by spaces. For example
      *  `"A1 C1:C5 E2 G1:G100"`.
      */
-    char *multi_range;
+    const char *multi_range;
 
     /** The stop_if_true parameter can be used to set the "stop if true"
      *  feature of a conditional formatting rule when more than one rule is
@@ -1262,6 +1380,319 @@ typedef struct lxw_cond_format_hash_element {
 } lxw_cond_format_hash_element;
 
 /**
+ * @brief Table columns options.
+ *
+ * Structure to set the options of a table column added with
+ * worksheet_add_table(). See @ref ww_tables_columns.
+ */
+typedef struct lxw_table_column {
+
+    /** Set the header name/caption for the column. If NULL the header defaults
+     *  to  Column 1, Column 2, etc. */
+    const char *header;
+
+    /** Set the formula for the column. */
+    const char *formula;
+
+    /** Set the string description for the column total.  */
+    const char *total_string;
+
+    /** Set the function for the column total.  */
+    uint8_t total_function;
+
+    /** Set the format for the column header.  */
+    lxw_format *header_format;
+
+    /** Set the format for the data rows in the column.  */
+    lxw_format *format;
+
+    /** Set the formula value for the column total (not generally required). */
+    double total_value;
+
+} lxw_table_column;
+
+/**
+ * @brief Worksheet table options.
+ *
+ * Options used to define worksheet tables. See @ref working_with_tables for
+ * more information.
+ *
+ */
+typedef struct lxw_table_options {
+
+    /**
+     * The `name` parameter is used to set the name of the table. This
+     * parameter is optional and by default tables are named `Table1`,
+     * `Table2`, etc. in the worksheet order that they are added.
+     *
+     * @code
+     *     lxw_table_options options = {.name = "Sales"};
+     *
+     *     worksheet_add_table(worksheet, RANGE("B3:G8"), &options);
+     * @endcode
+     *
+     * If you override the table name you must ensure that it doesn't clash
+     * with an existing table name and that it follows Excel's requirements
+     * for table names, see the Microsoft Office documentation on
+     * [Naming an Excel Table]
+     * (https://support.microsoft.com/en-us/office/rename-an-excel-table-fbf49a4f-82a3-43eb-8ba2-44d21233b114).
+     */
+    const char *name;
+
+    /**
+     * The `no_header_row` parameter can be used to turn off the header row in
+     * the table. It is on by default:
+     *
+     * @code
+     *     lxw_table_options options = {.no_header_row = LXW_TRUE};
+     *
+     *     worksheet_add_table(worksheet, RANGE("B4:F7"), &options);
+     * @endcode
+     *
+     * @image html tables4.png
+     *
+     * Without this option the header row will contain default captions such
+     * as `Column 1`, ``Column 2``, etc. These captions can be overridden
+     * using the `columns` parameter shown below.
+     *
+     */
+    uint8_t no_header_row;
+
+    /**
+     * The `no_autofilter` parameter can be used to turn off the autofilter in
+     * the header row. It is on by default:
+     *
+     * @code
+     *     lxw_table_options options = {.no_autofilter = LXW_TRUE};
+     *
+     *     worksheet_add_table(worksheet, RANGE("B3:F7"), &options);
+     * @endcode
+     *
+     * @image html tables3.png
+     *
+     * The autofilter is only shown if the `no_header_row` parameter is off
+     * (the default). Filter conditions within the table are not supported.
+     *
+     */
+    uint8_t no_autofilter;
+
+    /**
+     * The `no_banded_rows` parameter can be used to turn off the rows of alternating
+     * color in the table. It is on by default:
+     *
+     * @code
+     *     lxw_table_options options = {.no_banded_rows = LXW_TRUE};
+     *
+     *     worksheet_add_table(worksheet, RANGE("B3:F7"), &options);
+     * @endcode
+     *
+     * @image html tables6.png
+     *
+     */
+    uint8_t no_banded_rows;
+
+    /**
+     * The `banded_columns` parameter can be used to used to create columns of
+     * alternating color in the table. It is off by default:
+     *
+     * @code
+     *     lxw_table_options options = {.banded_columns = LXW_TRUE};
+     *
+     *     worksheet_add_table(worksheet, RANGE("B3:F7"), &options);
+     * @endcode
+     *
+     * The banded columns formatting is shown in the image in the previous
+     * section above.
+     */
+    uint8_t banded_columns;
+
+    /**
+     * The `first_column` parameter can be used to highlight the first column
+     * of the table. The type of highlighting will depend on the `style_type`
+     * of the table. It may be bold text or a different color. It is off by
+     * default:
+     *
+     * @code
+     *     lxw_table_options options = {.first_column = LXW_TRUE, .last_column = LXW_TRUE};
+     *
+     *     worksheet_add_table(worksheet, RANGE("B3:F7"), &options);
+     * @endcode
+     *
+     * @image html tables5.png
+     */
+    uint8_t first_column;
+
+    /**
+     * The `last_column` parameter can be used to highlight the last column of
+     * the table. The type of highlighting will depend on the `style` of the
+     * table. It may be bold text or a different color. It is off by default:
+     *
+     * @code
+     *     lxw_table_options options = {.first_column = LXW_TRUE, .last_column = LXW_TRUE};
+     *
+     *     worksheet_add_table(worksheet, RANGE("B3:F7"), &options);
+     * @endcode
+     *
+     * The `last_column` formatting is shown in the image in the previous
+     * section above.
+     */
+    uint8_t last_column;
+
+    /**
+     * The `style_type` parameter can be used to set the style of the table,
+     * in conjunction with the `style_type_number` parameter:
+     *
+     * @code
+     *     lxw_table_options options = {
+     *         .style_type = LXW_TABLE_STYLE_TYPE_LIGHT,
+     *         .style_type_number = 11,
+     *     };
+     *
+     *     worksheet_add_table(worksheet, RANGE("B3:G8"), &options);
+     * @endcode
+     *
+     *
+     * @image html tables11.png
+     *
+     * There are three types of table style in Excel: Light, Medium and Dark
+     * which are represented using the #lxw_table_style_type enum values:
+     *
+     * - #LXW_TABLE_STYLE_TYPE_LIGHT
+     *
+     * - #LXW_TABLE_STYLE_TYPE_MEDIUM
+     *
+     * - #LXW_TABLE_STYLE_TYPE_DARK
+     *
+     * Within those ranges there are between 11 and 28 other style types which
+     * can be set with `style_type_number` (depending on the style type).
+     * Check Excel to find the style that you want. The dialog with the
+     * options laid out in numeric order are shown below:
+     *
+     * @image html tables14.png
+     *
+     * The default table style in Excel is 'Table Style Medium 9' (highlighted
+     * with a green border in the image above), which is set by default in
+     * libxlsxwriter as:
+     *
+     * @code
+     *     lxw_table_options options = {
+     *         .style_type = LXW_TABLE_STYLE_TYPE_MEDIUM,
+     *         .style_type_number = 9,
+     *     };
+     * @endcode
+     *
+     * You can also turn the table style off by setting it to Light 0:
+     *
+     * @code
+     *     lxw_table_options options = {
+     *         .style_type = LXW_TABLE_STYLE_TYPE_LIGHT,
+     *         .style_type_number = 0,
+     *     };
+     * @endcode
+     *
+     * @image html tables13.png
+     *
+     */
+    uint8_t style_type;
+
+    /**
+     * The `style_type_number` parameter is used with `style_type` to set the
+     * style of a worksheet table. */
+    uint8_t style_type_number;
+
+    /**
+     * The `total_row` parameter can be used to turn on the total row in the
+     * last row of a table. It is distinguished from the other rows by a
+     * different formatting and also with dropdown `SUBTOTAL` functions:
+     *
+     * @code
+     *     lxw_table_options options = {.total_row = LXW_TRUE};
+     *
+     *     worksheet_add_table(worksheet, RANGE("B3:G8"), &options);
+     * @endcode
+     *
+     * @image html tables9.png
+     *
+     * The default total row doesn't have any captions or functions. These
+     * must by specified via the `columns` parameter below.
+     */
+    uint8_t total_row;
+
+    /**
+     * The `columns` parameter can be used to set properties for columns
+     * within the table. See @ref ww_tables_columns for a detailed
+     * explanation.
+     */
+    lxw_table_column **columns;
+
+} lxw_table_options;
+
+typedef struct lxw_table_obj {
+    char *name;
+    char *total_string;
+    lxw_table_column **columns;
+    uint8_t banded_columns;
+    uint8_t first_column;
+    uint8_t last_column;
+    uint8_t no_autofilter;
+    uint8_t no_banded_rows;
+    uint8_t no_header_row;
+    uint8_t style_type;
+    uint8_t style_type_number;
+    uint8_t total_row;
+
+    lxw_row_t first_row;
+    lxw_col_t first_col;
+    lxw_row_t last_row;
+    lxw_col_t last_col;
+    lxw_col_t num_cols;
+    uint32_t id;
+
+    char sqref[LXW_MAX_ATTRIBUTE_LENGTH];
+    char filter_sqref[LXW_MAX_ATTRIBUTE_LENGTH];
+    STAILQ_ENTRY (lxw_table_obj) list_pointers;
+
+} lxw_table_obj;
+
+/**
+ * @brief Options for autofilter rules.
+ *
+ * Options to define an autofilter rule.
+ *
+ */
+typedef struct lxw_filter_rule {
+
+    /** The #lxw_filter_criteria to define the rule. */
+    uint8_t criteria;
+
+    /** String value to which the criteria applies. */
+    const char *value_string;
+
+    /** Numeric value to which the criteria applies (if value_string isn't used). */
+    double value;
+
+} lxw_filter_rule;
+
+typedef struct lxw_filter_rule_obj {
+
+    uint8_t type;
+    uint8_t is_custom;
+    uint8_t has_blanks;
+    lxw_col_t col_num;
+
+    uint8_t criteria1;
+    uint8_t criteria2;
+    double value1;
+    double value2;
+    char *value1_string;
+    char *value2_string;
+
+    uint16_t num_list_filters;
+    char **list;
+
+} lxw_filter_rule_obj;
+
+/**
  * @brief Options for inserted images.
  *
  * Options for modifying images inserted via `worksheet_insert_image_opt()`.
@@ -1289,7 +1720,7 @@ typedef struct lxw_image_options {
      *  used to provide a text description of the image to help
      *  accessibility. Defaults to the image filename as in Excel. Set to ""
      *  to ignore the description field. */
-    char *description;
+    const char *description;
 
     /** Optional parameter to help accessibility. It is used to mark the image
      *  as decorative, and thus uninformative, for automated screen
@@ -1299,10 +1730,10 @@ typedef struct lxw_image_options {
 
     /** Add an optional hyperlink to the image. Follows the same URL rules
      *  and types as `worksheet_write_url()`. */
-    char *url;
+    const char *url;
 
     /** Add an optional mouseover tip for a hyperlink to the image. */
-    char *tip;
+    const char *tip;
 
 } lxw_image_options;
 
@@ -1330,6 +1761,18 @@ typedef struct lxw_chart_options {
      *  See @ref working_with_object_positioning.*/
     uint8_t object_position;
 
+    /** Optional description or "Alt text" for the chart. This field can be
+     *  used to provide a text description of the chart to help
+     *  accessibility. Defaults to the image filename as in Excel. Set to NULL
+     *  to ignore the description field. */
+    const char *description;
+
+    /** Optional parameter to help accessibility. It is used to mark the chart
+     *  as decorative, and thus uninformative, for automated screen
+     *  readers. As in Excel, if this parameter is in use the `description`
+     *  field isn't written. */
+    uint8_t decorative;
+
 } lxw_chart_options;
 
 /* Internal struct to represent lxw_image_options and lxw_chart_options
@@ -1350,7 +1793,7 @@ typedef struct lxw_object_properties {
     FILE *stream;
     uint8_t image_type;
     uint8_t is_image_buffer;
-    unsigned char *image_buffer;
+    char *image_buffer;
     size_t image_buffer_size;
     double width;
     double height;
@@ -1359,6 +1802,7 @@ typedef struct lxw_object_properties {
     double y_dpi;
     lxw_chart *chart;
     uint8_t is_duplicate;
+    uint8_t is_background;
     char *md5;
     char *image_position;
     uint8_t decorative;
@@ -1388,7 +1832,7 @@ typedef struct lxw_comment_options {
      *  worksheet. The default author for all cell comments in a worksheet can
      *  be set using the `worksheet_set_comments_author()` function. Set to
      *  NULL if not required.  See also @ref ww_comments_author. */
-    char *author;
+    const char *author;
 
     /** This option is used to set the width of the cell comment box
      *  explicitly in pixels. The default width is 128 pixels. See also @ref
@@ -1415,7 +1859,7 @@ typedef struct lxw_comment_options {
 
     /** This option is used to set the font for the comment. The default font
      *  is 'Tahoma'.  See also @ref ww_comments_font_name. */
-    char *font_name;
+    const char *font_name;
 
      /** This option is used to set the font size for the comment. The default
       * is 8. See also @ref ww_comments_font_size. */
@@ -1447,6 +1891,50 @@ typedef struct lxw_comment_options {
 
 } lxw_comment_options;
 
+/**
+ * @brief Options for inserted buttons.
+ *
+ * Options for modifying buttons inserted via `worksheet_insert_button()`.
+ *
+ */
+typedef struct lxw_button_options {
+
+    /** Sets the caption on the button. The default is "Button n" where n is
+     *  the current number of buttons in the worksheet, including this
+     *  button. */
+    const char *caption;
+
+    /** Name of the macro to run when the button is pressed. The macro must be
+     *  included with workbook_add_vba_project(). */
+    const char *macro;
+
+    /** Optional description or "Alt text" for the button. This field can be
+     *  used to provide a text description of the button to help
+     *  accessibility. Set to NULL to ignore the description field. */
+    const char *description;
+
+    /** This option is used to set the width of the cell button box
+     *  explicitly in pixels. The default width is 64 pixels. */
+    uint16_t width;
+
+    /** This option is used to set the height of the cell button box
+     *  explicitly in pixels. The default height is 20 pixels. */
+    uint16_t height;
+
+    /** X scale of the button as a decimal. */
+    double x_scale;
+
+    /** Y scale of the button as a decimal. */
+    double y_scale;
+
+    /** Offset from the left of the cell in pixels.  */
+    int32_t x_offset;
+
+    /** Offset from the top of the cell in pixels. */
+    int32_t y_offset;
+
+} lxw_button_options;
+
 /* Internal structure for VML object options. */
 typedef struct lxw_vml_obj {
 
@@ -1456,8 +1944,8 @@ typedef struct lxw_vml_obj {
     lxw_col_t start_col;
     int32_t x_offset;
     int32_t y_offset;
-    uint32_t col_absolute;
-    uint32_t row_absolute;
+    uint64_t col_absolute;
+    uint64_t row_absolute;
     uint32_t width;
     uint32_t height;
     double x_dpi;
@@ -1475,6 +1963,7 @@ typedef struct lxw_vml_obj {
     char *text;
     char *image_position;
     char *name;
+    char *macro;
     STAILQ_ENTRY (lxw_vml_obj) list_pointers;
 
 } lxw_vml_obj;
@@ -1494,17 +1983,17 @@ typedef struct lxw_header_footer_options {
     /** The left header image filename, with path if required. This should
      * have a corresponding `&G/&[Picture]` placeholder in the `&L` section of
      * the header/footer string. See `worksheet_set_header_opt()`. */
-    char *image_left;
+    const char *image_left;
 
     /** The center header image filename, with path if required. This should
      * have a corresponding `&G/&[Picture]` placeholder in the `&C` section of
      * the header/footer string. See `worksheet_set_header_opt()`. */
-    char *image_center;
+    const char *image_center;
 
     /** The right header image filename, with path if required. This should
      * have a corresponding `&G/&[Picture]` placeholder in the `&R` section of
      * the header/footer string. See `worksheet_set_header_opt()`. */
-    char *image_right;
+    const char *image_right;
 
 } lxw_header_footer_options;
 
@@ -1605,7 +2094,7 @@ typedef struct lxw_rich_string_tuple {
     lxw_format *format;
 
     /** The string fragment. */
-    char *string;
+    const char *string;
 } lxw_rich_string_tuple;
 
 /**
@@ -1619,6 +2108,8 @@ typedef struct lxw_worksheet {
 
     FILE *file;
     FILE *optimize_tmpfile;
+    char *optimize_buffer;
+    size_t optimize_buffer_size;
     struct lxw_table_rows *table;
     struct lxw_table_rows *hyperlinks;
     struct lxw_table_rows *comments;
@@ -1633,6 +2124,9 @@ typedef struct lxw_worksheet {
     struct lxw_vml_drawing_rel_ids *vml_drawing_rel_ids;
     struct lxw_comment_objs *comment_objs;
     struct lxw_comment_objs *header_image_objs;
+    struct lxw_comment_objs *button_objs;
+    struct lxw_table_objs *table_objs;
+    uint16_t table_count;
 
     lxw_row_t dim_rowmin;
     lxw_row_t dim_rowmax;
@@ -1640,11 +2134,11 @@ typedef struct lxw_worksheet {
     lxw_col_t dim_colmax;
 
     lxw_sst *sst;
-    char *name;
-    char *quoted_name;
-    char *tmpdir;
+    const char *name;
+    const char *quoted_name;
+    const char *tmpdir;
 
-    uint32_t index;
+    uint16_t index;
     uint8_t active;
     uint8_t selected;
     uint8_t hidden;
@@ -1696,8 +2190,11 @@ typedef struct lxw_worksheet {
     uint8_t show_zeros;
     uint8_t vcenter;
     uint8_t zoom_scale_normal;
+    uint8_t black_white;
     uint8_t num_validations;
+    uint8_t has_dynamic_arrays;
     char *vba_codename;
+    uint16_t num_buttons;
 
     lxw_color_t tab_color;
 
@@ -1739,8 +2236,10 @@ typedef struct lxw_worksheet {
     struct lxw_rel_tuples *external_drawing_links;
     struct lxw_rel_tuples *drawing_links;
     struct lxw_rel_tuples *vml_drawing_links;
+    struct lxw_rel_tuples *external_table_links;
 
     struct lxw_panes panes;
+    char top_left_cell[LXW_MAX_CELL_NAME_LENGTH];
 
     struct lxw_protection_obj protection;
 
@@ -1750,9 +2249,12 @@ typedef struct lxw_worksheet {
     uint8_t has_vml;
     uint8_t has_comments;
     uint8_t has_header_vml;
+    uint8_t has_background_image;
+    uint8_t has_buttons;
     lxw_rel_tuple *external_vml_comment_link;
     lxw_rel_tuple *external_comment_link;
     lxw_rel_tuple *external_vml_header_link;
+    lxw_rel_tuple *external_background_link;
     char *comment_author;
     char *vml_data_id_str;
     char *vml_header_id_str;
@@ -1782,6 +2284,10 @@ typedef struct lxw_worksheet {
     lxw_object_properties *footer_left_object_props;
     lxw_object_properties *footer_center_object_props;
     lxw_object_properties *footer_right_object_props;
+    lxw_object_properties *background_image;
+
+    lxw_filter_rule_obj **filter_rules;
+    lxw_col_t num_filter_rules;
 
     STAILQ_ENTRY (lxw_worksheet) list_pointers;
 
@@ -1791,15 +2297,15 @@ typedef struct lxw_worksheet {
  * Worksheet initialization data.
  */
 typedef struct lxw_worksheet_init_data {
-    uint32_t index;
+    uint16_t index;
     uint8_t hidden;
     uint8_t optimize;
     uint16_t *active_sheet;
     uint16_t *first_sheet;
     lxw_sst *sst;
-    char *name;
-    char *quoted_name;
-    char *tmpdir;
+    const char *name;
+    const char *quoted_name;
+    const char *tmpdir;
     lxw_format *default_url_format;
     uint16_t max_url_length;
 
@@ -1834,7 +2340,7 @@ typedef struct lxw_cell {
     union {
         double number;
         int32_t string_id;
-        char *string;
+        const char *string;
     } u;
 
     double formula_result;
@@ -2014,16 +2520,16 @@ lxw_error worksheet_write_formula(lxw_worksheet *worksheet,
  * @brief Write an array formula to a worksheet cell.
  *
  * @param worksheet Pointer to a lxw_worksheet instance to be updated.
- * @param first_row   The first row of the range. (All zero indexed.)
- * @param first_col   The first column of the range.
- * @param last_row    The last row of the range.
- * @param last_col    The last col of the range.
- * @param formula     Array formula to write to cell.
- * @param format      A pointer to a Format instance or NULL.
+ * @param first_row The first row of the range. (All zero indexed.)
+ * @param first_col The first column of the range.
+ * @param last_row  The last row of the range.
+ * @param last_col  The last col of the range.
+ * @param formula   Array formula to write to cell.
+ * @param format    A pointer to a Format instance or NULL.
  *
  * @return A #lxw_error code.
  *
-  * The `%worksheet_write_array_formula()` function writes an array formula to
+ * The `%worksheet_write_array_formula()` function writes an array formula to
  * a cell range. In Excel an array formula is a formula that performs a
  * calculation on a set of values.
  *
@@ -2060,6 +2566,94 @@ lxw_error worksheet_write_array_formula(lxw_worksheet *worksheet,
                                         const char *formula,
                                         lxw_format *format);
 
+/**
+ * @brief Write an Excel 365 dynamic array formula to a worksheet range.
+ *
+ * @param worksheet Pointer to a lxw_worksheet instance to be updated.
+ * @param first_row The first row of the range. (All zero indexed.)
+ * @param first_col The first column of the range.
+ * @param last_row  The last row of the range.
+ * @param last_col  The last col of the range.
+ * @param formula   Dynamic Array formula to write to cell.
+ * @param format    A pointer to a Format instance or NULL.
+ *
+ * @return A #lxw_error code.
+ *
+ *
+ * The `%worksheet_write_dynamic_array_formula()` function writes an Excel 365
+ * dynamic array formula to a cell range. Some examples of functions that
+ * return dynamic arrays are:
+ *
+ * - `FILTER`
+ * - `RANDARRAY`
+ * - `SEQUENCE`
+ * - `SORTBY`
+ * - `SORT`
+ * - `UNIQUE`
+ * - `XLOOKUP`
+ * - `XMATCH`
+ *
+ * Dynamic array formulas and their usage in libxlsxwriter is explained in
+ * detail @ref ww_formulas_dynamic_arrays. The following is a example usage:
+ *
+ * @code
+ *     worksheet_write_dynamic_array_formula(worksheet, 1, 5, 1, 5,
+ *                                           "=_xlfn._xlws.FILTER(A1:D17,C1:C17=K2)",
+ *                                           NULL);
+ * @endcode
+ *
+ * This formula gives the results shown in the image below.
+ *
+ * @image html dynamic_arrays02.png
+ *
+ * The need for the `_xlfn._xlws.` prefix in the formula is explained in @ref
+ * ww_formulas_future.
+ */
+lxw_error worksheet_write_dynamic_array_formula(lxw_worksheet *worksheet,
+                                                lxw_row_t first_row,
+                                                lxw_col_t first_col,
+                                                lxw_row_t last_row,
+                                                lxw_col_t last_col,
+                                                const char *formula,
+                                                lxw_format *format);
+
+/**
+ * @brief Write an Excel 365 dynamic array formula to a worksheet cell.
+ *
+ * @param worksheet Pointer to a lxw_worksheet instance to be updated.
+ * @param row       The zero indexed row number.
+ * @param col       The zero indexed column number.
+ * @param formula   Formula string to write to cell.
+ * @param format    A pointer to a Format instance or NULL.
+ *
+ * @return A #lxw_error code.
+ *
+ * The `%worksheet_write_dynamic_formula()` function is similar to the
+ * `worksheet_write_dynamic_array_formula()` function, shown above, except
+ * that it writes a dynamic array formula to a single cell, rather than a
+ * range. This is a syntactic shortcut since the array range isn't generally
+ * known for a dynamic range and specifying the initial cell is sufficient for
+ * Excel, as shown in the example below:
+ *
+ * @code
+ *     worksheet_write_dynamic_formula(worksheet, 7, 1,
+ *                                     "=_xlfn._xlws.SORT(_xlfn.UNIQUE(B2:B17))",
+ *                                     NULL);
+ * @endcode
+ *
+ * This formula gives the following result:
+ *
+ * @image html dynamic_arrays01.png
+ *
+ * The need for the `_xlfn.` and `_xlfn._xlws.` prefixes in the formula is
+ * explained in @ref ww_formulas_future.
+ */
+lxw_error worksheet_write_dynamic_formula(lxw_worksheet *worksheet,
+                                          lxw_row_t row,
+                                          lxw_col_t col,
+                                          const char *formula,
+                                          lxw_format *format);
+
 lxw_error worksheet_write_array_formula_num(lxw_worksheet *worksheet,
                                             lxw_row_t first_row,
                                             lxw_col_t first_col,
@@ -2068,6 +2662,22 @@ lxw_error worksheet_write_array_formula_num(lxw_worksheet *worksheet,
                                             const char *formula,
                                             lxw_format *format,
                                             double result);
+
+lxw_error worksheet_write_dynamic_array_formula_num(lxw_worksheet *worksheet,
+                                                    lxw_row_t first_row,
+                                                    lxw_col_t first_col,
+                                                    lxw_row_t last_row,
+                                                    lxw_col_t last_col,
+                                                    const char *formula,
+                                                    lxw_format *format,
+                                                    double result);
+
+lxw_error worksheet_write_dynamic_formula_num(lxw_worksheet *worksheet,
+                                              lxw_row_t row,
+                                              lxw_col_t col,
+                                              const char *formula,
+                                              lxw_format *format,
+                                              double result);
 
 /**
  * @brief Write a date or time to a worksheet cell.
@@ -2080,7 +2690,7 @@ lxw_error worksheet_write_array_formula_num(lxw_worksheet *worksheet,
  *
  * @return A #lxw_error code.
  *
- * The `worksheet_write_datetime()` function can be used to write a date or
+ * The `%worksheet_write_datetime()` function can be used to write a date or
  * time to the cell specified by `row` and `column`:
  *
  * @dontinclude dates_and_times02.c
@@ -2099,6 +2709,49 @@ lxw_error worksheet_write_array_formula_num(lxw_worksheet *worksheet,
 lxw_error worksheet_write_datetime(lxw_worksheet *worksheet,
                                    lxw_row_t row,
                                    lxw_col_t col, lxw_datetime *datetime,
+                                   lxw_format *format);
+
+/**
+ * @brief Write a Unix datetime to a worksheet cell.
+ *
+ * @param worksheet Pointer to a lxw_worksheet instance to be updated.
+ * @param row       The zero indexed row number.
+ * @param col       The zero indexed column number.
+ * @param unixtime  The Unix datetime to write to the cell.
+ * @param format    A pointer to a Format instance or NULL.
+ *
+ * @return A #lxw_error code.
+ *
+ * The `%worksheet_write_unixtime()` function can be used to write dates and
+ * times in Unix date format to the cell specified by `row` and
+ * `column`. [Unix Time](https://en.wikipedia.org/wiki/Unix_time) which is a
+ * common integer time format. It is defined as the number of seconds since
+ * the Unix epoch (1970-01-01 00:00 UTC). Negative values can also be used for
+ * dates prior to 1970:
+ *
+ * @dontinclude dates_and_times03.c
+ * @skip 1970
+ * @until 2208988800
+ *
+ * The `format` parameter should be used to apply formatting to the cell using
+ * a @ref format.h "Format" object as shown above. Without a date format the
+ * datetime will appear as a number only.
+ *
+ * The output from this code sample is:
+ *
+ * @image html date_example03.png
+ *
+ * Unixtime is generally represented with a 32 bit `time_t` type which has a
+ * range of approximately 1900-12-14 to 2038-01-19. To access the full Excel
+ * date range of 1900-01-01 to 9999-12-31 this function uses a 64 bit
+ * parameter.
+ *
+ * See @ref working_with_dates for more information about handling dates and
+ * times in libxlsxwriter.
+ */
+lxw_error worksheet_write_unixtime(lxw_worksheet *worksheet,
+                                   lxw_row_t row,
+                                   lxw_col_t col, int64_t unixtime,
                                    lxw_format *format);
 
 /**
@@ -2954,7 +3607,7 @@ lxw_error worksheet_set_column_pixels_opt(lxw_worksheet *worksheet,
  * @return A #lxw_error code.
  *
  * This function can be used to insert a image into a worksheet. The image can
- * be in PNG, JPEG or BMP format:
+ * be in PNG, JPEG, GIF or BMP format:
  *
  * @code
  *     worksheet_insert_image(worksheet, 2, 1, "logo.png");
@@ -3130,6 +3783,70 @@ lxw_error worksheet_insert_image_buffer_opt(lxw_worksheet *worksheet,
                                             lxw_image_options *options);
 
 /**
+ * @brief Set the background image for a worksheet.
+ *
+ * @param worksheet Pointer to a lxw_worksheet instance to be updated.
+ * @param filename  The image filename, with path if required.
+ *
+ * @return A #lxw_error code.
+ *
+ * The `%worksheet_set_background()` function can be used to set the
+ * background image for a worksheet:
+ *
+ * @code
+ *      worksheet_set_background(worksheet, "logo.png");
+ * @endcode
+ *
+ * @image html background.png
+ *
+ * The ``set_background()`` method supports all the image formats supported by
+ * `worksheet_insert_image()`.
+ *
+ * Some people use this method to add a watermark background to their
+ * document. However, Microsoft recommends using a header image [to set a
+ * watermark][watermark]. The choice of method depends on whether you want the
+ * watermark to be visible in normal viewing mode or just when the file is
+ * printed. In libxlsxwriter you can get the header watermark effect using
+ * `worksheet_set_header()`:
+ *
+ * @code
+ *     lxw_header_footer_options header_options = {.image_center = "watermark.png"};
+ *     worksheet_set_header_opt(worksheet, "&C&G", &header_options);
+ * @endcode
+ *
+ * [watermark]:https://support.microsoft.com/en-us/office/add-a-watermark-in-excel-a372182a-d733-484e-825c-18ddf3edf009
+ *
+ */
+lxw_error worksheet_set_background(lxw_worksheet *worksheet,
+                                   const char *filename);
+
+/**
+ * @brief Set the background image for a worksheet, from a buffer.
+ *
+ * @param worksheet    Pointer to a lxw_worksheet instance to be updated.
+ * @param image_buffer Pointer to an array of bytes that holds the image data.
+ * @param image_size   The size of the array of bytes.
+ *
+ * @return A #lxw_error code.
+ *
+ * This function can be used to insert a background image into a worksheet
+ * from a memory buffer:
+ *
+ * @code
+ *     worksheet_set_background_buffer(worksheet, image_buffer, image_size);
+ * @endcode
+ *
+ * The buffer should be a pointer to an array of unsigned char data with a
+ * specified size.
+ *
+ * See `worksheet_set_background()` for more details.
+ *
+ */
+lxw_error worksheet_set_background_buffer(lxw_worksheet *worksheet,
+                                          const unsigned char *image_buffer,
+                                          size_t image_size);
+
+/**
  * @brief Insert a chart object into a worksheet.
  *
  * @param worksheet Pointer to a lxw_worksheet instance to be updated.
@@ -3282,7 +3999,7 @@ lxw_error worksheet_merge_range(lxw_worksheet *worksheet, lxw_row_t first_row,
  * range of worksheet data. This allows users to filter the data based on
  * simple criteria so that some data is shown and some is hidden.
  *
- * @image html autofilter.png
+ * @image html autofilter3.png
  *
  * To add an autofilter to a worksheet:
  *
@@ -3293,12 +4010,146 @@ lxw_error worksheet_merge_range(lxw_worksheet *worksheet, lxw_row_t first_row,
  *     worksheet_autofilter(worksheet, RANGE("A1:D51"));
  * @endcode
  *
- * Note: it isn't currently possible to apply filter conditions to the
- * autofilter.
+ * In order to apply a filter condition it is necessary to add filter rules to
+ * the columns using either the `%worksheet_filter_column()`,
+ * `%worksheet_filter_column2()` or `%worksheet_filter_list()` functions:
+ *
+ * - `worksheet_filter_column()`: filter on a single criterion such as "Column ==
+ *   East". More complex conditions such as "<=" or ">=" can also be use.
+ *
+ * - `worksheet_filter_column2()`: filter on two criteria such as "Column == East
+ *   or Column == West". Complex conditions can also be used.
+ *
+ * - `worksheet_filter_list()`: filter on a list of values such as "Column in (East, West,
+ *   North)".
+ *
+ * These functions are explained below. It isn't sufficient to just specify
+ * the filter condition. You must also hide any rows that don't match the
+ * filter condition. See @ref ww_autofilters_data for more details.
+ *
  */
 lxw_error worksheet_autofilter(lxw_worksheet *worksheet, lxw_row_t first_row,
                                lxw_col_t first_col, lxw_row_t last_row,
                                lxw_col_t last_col);
+
+/**
+ * @brief Write a filter rule to an autofilter column.
+ *
+ * @param worksheet Pointer to a lxw_worksheet instance to be updated.
+ * @param col       The column in the autofilter that the rule applies to.
+ * @param rule      The lxw_filter_rule autofilter rule.
+ *
+ * @return A #lxw_error code.
+ *
+ * The `worksheet_filter_column` function can be used to filter columns in a
+ * autofilter range based on single rule conditions:
+ *
+ * @code
+ *     lxw_filter_rule filter_rule = {.criteria     = LXW_FILTER_CRITERIA_EQUAL_TO,
+ *                                    .value_string = "East"};
+ *
+ *    worksheet_filter_column(worksheet, 0, &filter_rule);
+ *@endcode
+ *
+ * @image html autofilter4.png
+ *
+ * The rules and criteria are explained in more detail in @ref
+ * ww_autofilters_criteria in @ref working_with_autofilters.
+ *
+ * The `col` parameter is a zero indexed column number and must refer to a
+ * column in an existing autofilter created with `worksheet_autofilter()`.
+ *
+ * It isn't sufficient to just specify the filter condition. You must also
+ * hide any rows that don't match the filter condition. See @ref
+ * ww_autofilters_data for more details.
+ */
+lxw_error worksheet_filter_column(lxw_worksheet *worksheet, lxw_col_t col,
+                                  lxw_filter_rule *rule);
+
+/**
+ * @brief Write two filter rules to an autofilter column.
+ *
+ * @param worksheet Pointer to a lxw_worksheet instance to be updated.
+ * @param col       The column in the autofilter that the rules applies to.
+ * @param rule1     First lxw_filter_rule autofilter rule.
+ * @param rule2     Second lxw_filter_rule autofilter rule.
+ * @param and_or    A #lxw_filter_operator and/or operator.
+ *
+ * @return A #lxw_error code.
+ *
+ * The `worksheet_filter_column2` function can be used to filter columns in a autofilter
+ * range based on two rule conditions:
+ *
+ * @code
+ *     lxw_filter_rule filter_rule1 = {.criteria     = LXW_FILTER_CRITERIA_EQUAL_TO,
+ *                                     .value_string = "East"};
+ *
+ *     lxw_filter_rule filter_rule2 = {.criteria     = LXW_FILTER_CRITERIA_EQUAL_TO,
+ *                                     .value_string = "South"};
+ *
+ *     worksheet_filter_column2(worksheet, 0, &filter_rule1, &filter_rule2, LXW_FILTER_OR);
+ * @endcode
+ *
+ * @image html autofilter5.png
+ *
+ * The rules and criteria are explained in more detail in @ref
+ * ww_autofilters_criteria in @ref working_with_autofilters.
+ *
+ * The `col` parameter is a zero indexed column number and must refer to a
+ * column in an existing autofilter created with `worksheet_autofilter()`.
+ *
+ * The `and_or` parameter is either "and (LXW_FILTER_AND)" or "or  (LXW_FILTER_OR)".
+ *
+ * It isn't sufficient to just specify the filter condition. You must also
+ * hide any rows that don't match the filter condition. See @ref
+ * ww_autofilters_data for more details.
+ */
+lxw_error worksheet_filter_column2(lxw_worksheet *worksheet, lxw_col_t col,
+                                   lxw_filter_rule *rule1,
+                                   lxw_filter_rule *rule2, uint8_t and_or);
+/**
+ * @brief Write multiple string filters to an autofilter column.
+ *
+ * @param worksheet Pointer to a lxw_worksheet instance to be updated.
+ * @param col       The column in the autofilter that the rules applies to.
+ * @param list      A NULL terminated array of strings to filter on.
+ *
+ * @return A #lxw_error code.
+ *
+ * The `worksheet_filter_column_list()` function can be used specify multiple
+ * string matching criteria. This is a newer type of filter introduced in
+ * Excel 2007. Prior to that it was only possible to have either 1 or 2 filter
+ * conditions, such as the ones used by `worksheet_filter_column()` and
+ * `worksheet_filter_column2()`.
+ *
+ * As an example, consider a column that contains data for the months of the
+ * year. The `%worksheet_filter_list()` function can be used to filter out
+ * data rows for different months:
+ *
+ * @code
+ *     char* list[] = {"March", "April", "May", NULL};
+ *
+ *     worksheet_filter_list(worksheet, 0, list);
+ * @endcode
+ *
+ * @image html autofilter2.png
+ *
+ *
+ * Note, the array must be NULL terminated to indicate the end of the array of
+ * strings. To filter blanks as part of the list use `Blanks` as a list item:
+ *
+ * @code
+ *     char* list[] = {"March", "April", "May", "Blanks", NULL};
+ *
+ *     worksheet_filter_list(worksheet, 0, list);
+ * @endcode
+ *
+ * It isn't sufficient to just specify the filter condition. You must also
+ * hide any rows that don't match the filter condition. See @ref
+ * ww_autofilters_data for more details.
+ */
+lxw_error worksheet_filter_list(lxw_worksheet *worksheet, lxw_col_t col,
+                                const char **list);
 
 /**
  * @brief Add a data validation to a cell.
@@ -3459,6 +4310,70 @@ lxw_error worksheet_conditional_format_range(lxw_worksheet *worksheet,
                                              lxw_col_t last_col,
                                              lxw_conditional_format
                                              *conditional_format);
+/**
+ * @brief Insert a button object into a worksheet.
+ *
+ * @param worksheet  Pointer to a lxw_worksheet instance to be updated.
+ * @param row        The zero indexed row number.
+ * @param col        The zero indexed column number.
+ * @param options    A #lxw_button_options object to set the button properties.
+ *
+ * @return A #lxw_error code.
+ *
+ * The `%worksheet_insert_button()` function can be used to insert an Excel
+ * form button into a worksheet. This function is generally only useful when
+ * used in conjunction with the `workbook_add_vba_project()` function to tie
+ * the button to a macro from an embedded VBA project:
+ *
+ * @code
+ *     lxw_button_options options = {.caption = "Press Me",
+ *                                   .macro   = "say_hello"};
+ *
+ *     worksheet_insert_button(worksheet, 2, 1, &options);
+ * @endcode
+ *
+ * @image html macros.png
+ *
+ * The button properties are set using the lxw_button_options struct.
+ *
+ * See also @ref working_with_macros
+ */
+lxw_error worksheet_insert_button(lxw_worksheet *worksheet, lxw_row_t row,
+                                  lxw_col_t col, lxw_button_options *options);
+
+/**
+ * @brief Add an Excel table to a worksheet.
+ *
+ * @param worksheet  Pointer to a lxw_worksheet instance to be updated.
+ * @param first_row  The first row of the range. (All zero indexed.)
+ * @param first_col  The first column of the range.
+ * @param last_row   The last row of the range.
+ * @param last_col   The last col of the range.
+ * @param options    A #lxw_table_options struct to define the table options.
+ *
+ * @return A #lxw_error code.
+ *
+ * The `%worksheet_add_table()` function is used to add a table to a
+ * worksheet. Tables in Excel are a way of grouping a range of cells into a
+ * single entity that has common formatting or that can be referenced from
+ * formulas. Tables can have column headers, autofilters, total rows, column
+ * formulas and default formatting.
+ *
+ * @code
+ *     worksheet_add_table(worksheet, 2, 1, 6, 5, NULL);
+ * @endcode
+ *
+ * Output:
+ *
+ * @image html tables1.png
+ *
+ * See @ref working_with_tables for more detailed usage information and also
+ * @ref tables.c.
+ *
+ */
+lxw_error worksheet_add_table(lxw_worksheet *worksheet, lxw_row_t first_row,
+                              lxw_col_t first_col, lxw_row_t last_row,
+                              lxw_col_t last_col, lxw_table_options *options);
 
  /**
   * @brief Make a worksheet the active, i.e., visible worksheet.
@@ -3666,6 +4581,27 @@ void worksheet_split_panes_opt(lxw_worksheet *worksheet,
 void worksheet_set_selection(lxw_worksheet *worksheet,
                              lxw_row_t first_row, lxw_col_t first_col,
                              lxw_row_t last_row, lxw_col_t last_col);
+
+/**
+ * @brief Set the first visible cell at the top left of a worksheet.
+ *
+ * @param worksheet Pointer to a lxw_worksheet instance to be updated.
+ * @param row       The cell row (zero indexed).
+ * @param col       The cell column (zero indexed).
+ *
+ * The `%worksheet_set_top_left_cell()` function can be used to set the
+ * top leftmost visible cell in the worksheet:
+ *
+ * @code
+ *     worksheet_set_top_left_cell(worksheet, 31, 26);
+ *     worksheet_set_top_left_cell(worksheet, CELL("AA32")); // Same as above.
+ * @endcode
+ *
+ * @image html top_left_cell.png
+ *
+ */
+void worksheet_set_top_left_cell(lxw_worksheet *worksheet, lxw_row_t row,
+                                 lxw_col_t col);
 
 /**
  * @brief Set the page orientation as landscape.
@@ -4397,13 +5333,14 @@ void worksheet_fit_to_pages(lxw_worksheet *worksheet, uint16_t width,
                             uint16_t height);
 
 /**
- * @brief Set the start page number when printing.
+ * @brief Set the start/first page number when printing.
  *
  * @param worksheet  Pointer to a lxw_worksheet instance to be updated.
- * @param start_page Starting page number.
+ * @param start_page Page number of the starting page when printing.
  *
- * The `%worksheet_set_start_page()` function is used to set the number of
- * the starting page when the worksheet is printed out:
+ * The `%worksheet_set_start_page()` function is used to set the number number
+ * of the first page when the worksheet is printed out. It is the same as the
+ * "First Page Number" option in Excel:
  *
  * @code
  *     // Start print from page 2.
@@ -4437,6 +5374,18 @@ void worksheet_set_start_page(lxw_worksheet *worksheet, uint16_t start_page);
  *
  */
 void worksheet_set_print_scale(lxw_worksheet *worksheet, uint16_t scale);
+
+/**
+ * @brief Set the worksheet to print in black and white
+ *
+ * @param worksheet Pointer to a lxw_worksheet instance to be updated.
+ *
+ * Set the option to print the worksheet in black and white:
+ * @code
+ *     worksheet_print_black_and_white(worksheet);
+ * @endcode
+ */
+void worksheet_print_black_and_white(lxw_worksheet *worksheet);
 
 /**
  * @brief Display the worksheet cells from right to left for some versions of
@@ -4826,6 +5775,10 @@ void lxw_worksheet_prepare_header_image(lxw_worksheet *worksheet,
                                         uint32_t image_ref_id,
                                         lxw_object_properties *object_props);
 
+void lxw_worksheet_prepare_background(lxw_worksheet *worksheet,
+                                      uint32_t image_ref_id,
+                                      lxw_object_properties *object_props);
+
 void lxw_worksheet_prepare_chart(lxw_worksheet *worksheet,
                                  uint32_t chart_ref_id, uint32_t drawing_id,
                                  lxw_object_properties *object_props,
@@ -4837,9 +5790,12 @@ uint32_t lxw_worksheet_prepare_vml_objects(lxw_worksheet *worksheet,
                                            uint32_t vml_drawing_id,
                                            uint32_t comment_id);
 
-void lxw_worksheet_prepare_header_vml_objects(lxw_worksheet *self,
+void lxw_worksheet_prepare_header_vml_objects(lxw_worksheet *worksheet,
                                               uint32_t vml_header_id,
                                               uint32_t vml_drawing_id);
+
+void lxw_worksheet_prepare_tables(lxw_worksheet *worksheet,
+                                  uint32_t table_id);
 
 lxw_row *lxw_worksheet_find_row(lxw_worksheet *worksheet, lxw_row_t row_num);
 lxw_cell *lxw_worksheet_find_cell_in_row(lxw_row *row, lxw_col_t col_num);
@@ -4890,6 +5846,8 @@ STATIC void _worksheet_write_data_validations(lxw_worksheet *self);
 
 STATIC double _pixels_to_height(double pixels);
 STATIC double _pixels_to_width(double pixels);
+
+STATIC void _worksheet_write_auto_filter(lxw_worksheet *worksheet);
 #endif /* TESTING */
 
 /* *INDENT-OFF* */

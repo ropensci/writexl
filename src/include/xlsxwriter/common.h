@@ -1,7 +1,7 @@
 /*
  * libxlsxwriter
  *
- * Copyright 2014-2021, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
+ * Copyright 2014-2022, John McNamara, jmcnamara@cpan.org. See LICENSE.txt.
  */
 
 /**
@@ -9,7 +9,7 @@
  *
  * @brief Common functions and defines for the libxlsxwriter library.
  *
- * <!-- Copyright 2014-2021, John McNamara, jmcnamara@cpan.org -->
+ * <!-- Copyright 2014-2022, John McNamara, jmcnamara@cpan.org -->
  *
  */
 #ifndef __LXW_COMMON_H__
@@ -50,7 +50,10 @@ enum lxw_boolean {
     /** False value. */
     LXW_FALSE,
     /** True value. */
-    LXW_TRUE
+    LXW_TRUE,
+    /** False value. Used to turn off a property that is default on, in order
+     *  to distinguish it from an uninitialized value. */
+    LXW_EXPLICIT_FALSE
 };
 
 /**
@@ -203,7 +206,7 @@ enum lxw_custom_property_types {
 #define LXW_DATETIME_LENGTH       sizeof("2016-12-12T23:00:00Z")
 
 /* GUID string length. */
-#define LXW_GUID_LENGTH           sizeof("{12345678-1234-1234-1234-1234567890AB}")
+#define LXW_GUID_LENGTH           sizeof("{12345678-1234-1234-1234-1234567890AB}\0")
 
 #define LXW_EPOCH_1900            0
 #define LXW_EPOCH_1904            1
@@ -223,13 +226,14 @@ enum lxw_custom_property_types {
 #define LXW_SCHEMA_DOCUMENT  LXW_SCHEMA_ROOT "/officeDocument/2006/relationships"
 #define LXW_SCHEMA_CONTENT   LXW_SCHEMA_ROOT "/package/2006/content-types"
 
+/* Use REprintf() for error handling when compiled as an R library. */
 #ifdef USE_R_LANG
 #include <R.h>
-  #define LXW_PRINTF REprintf
-  #define LXW_STDERR
+#define LXW_PRINTF REprintf
+#define LXW_STDERR
 #else
-  #define LXW_PRINTF fprintf
-  #define LXW_STDERR stderr,
+#define LXW_PRINTF fprintf
+#define LXW_STDERR stderr,
 #endif
 
 #define LXW_ERROR(message)                      \
@@ -239,32 +243,42 @@ enum lxw_custom_property_types {
     LXW_ERROR("Memory allocation failed.")
 
 #define GOTO_LABEL_ON_MEM_ERROR(pointer, label) \
-    if (!pointer) {                             \
-        LXW_MEM_ERROR();                        \
-        goto label;                             \
-    }
+    do {                                        \
+        if (!pointer) {                         \
+            LXW_MEM_ERROR();                    \
+            goto label;                         \
+        }                                       \
+    } while (0)
 
 #define RETURN_ON_MEM_ERROR(pointer, error)     \
-    if (!pointer) {                             \
-        LXW_MEM_ERROR();                        \
-        return error;                           \
-    }
+    do {                                        \
+        if (!pointer) {                         \
+            LXW_MEM_ERROR();                    \
+            return error;                       \
+        }                                       \
+    } while (0)
 
 #define RETURN_VOID_ON_MEM_ERROR(pointer)       \
-    if (!pointer) {                             \
-        LXW_MEM_ERROR();                        \
-        return;                                 \
-    }
+    do {                                        \
+        if (!pointer) {                         \
+            LXW_MEM_ERROR();                    \
+            return;                             \
+        }                                       \
+    } while (0)
 
 #define RETURN_ON_ERROR(error)                  \
-    if (error)                                  \
-        return error;
+    do {                                        \
+        if (error)                              \
+            return error;                       \
+    } while (0)
 
 #define RETURN_AND_ZIPCLOSE_ON_ERROR(error)     \
-    if (error) {                                \
-        zipClose(self->zipfile, NULL);          \
-        return error;                           \
-}
+        do {                                    \
+            if (error) {                        \
+                zipClose(self->zipfile, NULL);  \
+                return error;                   \
+            }                                   \
+        } while (0)
 
 #define LXW_WARN(message)                       \
     LXW_PRINTF(LXW_STDERR "[WARNING]: " message "\n")
@@ -279,52 +293,67 @@ enum lxw_custom_property_types {
 #define LXW_WARN_FORMAT2(message, var1, var2)    \
     LXW_PRINTF(LXW_STDERR "[WARNING]: " message "\n", var1, var2)
 
+#define LXW_WARN_FORMAT3(message, var1, var2, var3) \
+    LXW_PRINTF(LXW_STDERR "[WARNING]: " message "\n", var1, var2, var3)
+
 /* Chart axis type checks. */
 #define LXW_WARN_CAT_AXIS_ONLY(function)                                   \
-    if (!axis->is_category) {                                              \
-        LXW_PRINTF(LXW_STDERR "[WARNING]: "                                \
-                function "() is only valid for category axes\n");          \
-       return;                                                             \
-    }
+    do {                                                                   \
+        if (!axis->is_category) {                                          \
+            LXW_PRINTF(LXW_STDERR "[WARNING]: "                            \
+                    function "() is only valid for category axes\n");      \
+           return;                                                         \
+        }                                                                  \
+    } while (0)
 
 #define LXW_WARN_VALUE_AXIS_ONLY(function)                                 \
-    if (!axis->is_value) {                                                 \
-        LXW_PRINTF(LXW_STDERR "[WARNING]: "                                \
+    do {                                                                   \
+        if (!axis->is_value) {                                             \
+            LXW_PRINTF(LXW_STDERR "[WARNING]: "                            \
                 function "() is only valid for value axes\n");             \
-       return;                                                             \
-    }
+                return;                                                    \
+        }                                                                  \
+    } while (0)
 
 #define LXW_WARN_DATE_AXIS_ONLY(function)                                  \
-    if (!axis->is_date) {                                                  \
-        LXW_PRINTF(LXW_STDERR "[WARNING]: "                                \
-                function "() is only valid for date axes\n");              \
-       return;                                                             \
-    }
+    do {                                                                   \
+        if (!axis->is_date) {                                              \
+            LXW_PRINTF(LXW_STDERR "[WARNING]: "                            \
+                    function "() is only valid for date axes\n");          \
+           return;                                                         \
+        }                                                                  \
+    } while (0)
 
 #define LXW_WARN_CAT_AND_DATE_AXIS_ONLY(function)                          \
-    if (!axis->is_category && !axis->is_date) {                            \
-        LXW_PRINTF(LXW_STDERR "[WARNING]: "                                \
+    do {                                                                   \
+        if (!axis->is_category && !axis->is_date) {                        \
+            LXW_PRINTF(LXW_STDERR "[WARNING]: "                            \
                 function "() is only valid for category and date axes\n"); \
-       return;                                                             \
-    }
+           return;                                                         \
+        }                                                                  \
+    } while (0)
 
 #define LXW_WARN_VALUE_AND_DATE_AXIS_ONLY(function)                        \
-    if (!axis->is_value && !axis->is_date) {                               \
-        LXW_PRINTF(LXW_STDERR "[WARNING]: "                                \
+    do {                                                                   \
+        if (!axis->is_value && !axis->is_date) {                           \
+            LXW_PRINTF(LXW_STDERR "[WARNING]: "                            \
                 function "() is only valid for value and date axes\n");    \
-       return;                                                             \
-    }
+            return;                                                        \
+        }                                                                  \
+    } while (0)
 
 #ifndef LXW_BIG_ENDIAN
+#define LXW_UINT16_HOST(n)    (n)
+#define LXW_UINT32_HOST(n)    (n)
+#define LXW_UINT16_NETWORK(n) ((((n) & 0x00FF) << 8) | (((n) & 0xFF00) >> 8))
 #define LXW_UINT32_NETWORK(n) ((((n) & 0xFF)       << 24) | \
                                (((n) & 0xFF00)     <<  8) | \
                                (((n) & 0xFF0000)   >>  8) | \
                                (((n) & 0xFF000000) >> 24))
-#define LXW_UINT16_NETWORK(n) ((((n) & 0x00FF) << 8) | (((n) & 0xFF00) >> 8))
-#define LXW_UINT32_HOST(n)    (n)
 #else
-#define LXW_UINT32_NETWORK(n) (n)
 #define LXW_UINT16_NETWORK(n) (n)
+#define LXW_UINT32_NETWORK(n) (n)
+#define LXW_UINT16_HOST(n)    ((((n) & 0x00FF) << 8) | (((n) & 0xFF00) >> 8))
 #define LXW_UINT32_HOST(n)    ((((n) & 0xFF)       << 24) | \
                                (((n) & 0xFF00)     <<  8) | \
                                (((n) & 0xFF0000)   >>  8) | \
