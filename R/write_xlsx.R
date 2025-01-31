@@ -61,7 +61,7 @@ normalize_df <- function(df){
     df[[i]] <- as.POSIXct(df[[i]])
   }
   for(i in which(vapply(df, inherits, logical(1), "integer64"))){
-    warning(sprintf("Coercing columnn %s from int64 to double", names(df)[i]), call. = FALSE)
+    warning(sprintf("Coercing column %s from int64 to double", names(df)[i]), call. = FALSE)
     df[[i]] <- bit64::as.double.integer64(df[[i]])
   }
   df
