@@ -10,7 +10,13 @@ write_xlsx(
   path = tempfile(fileext = ".xlsx"),
   col_names = TRUE,
   format_headers = TRUE,
-  use_zip64 = FALSE
+  use_zip64 = FALSE,
+  freeze_rows = 1L,
+  freeze_cols = 0L,
+  autofilter = TRUE,
+  header_bg_color = "lightgray",
+  col_widths = "guess_from_header",
+  guessed_column_width_padding = 3
 )
 }
 \arguments{
@@ -20,10 +26,38 @@ write_xlsx(
 
 \item{col_names}{write column names at the top of the file?}
 
-\item{format_headers}{make the \code{col_names} in the xlsx centered and bold}
+\item{format_headers}{make the \code{col_names} in the xlsx centred, bold
+and apply the header colour.}
 
 \item{use_zip64}{use \href{https://en.wikipedia.org/wiki/Zip_(file_format)#ZIP64}{zip64}
 to enable support for 4GB+ xlsx files. Not all platforms can read this.}
+
+\item{freeze_rows}{number of rows to freeze at the top of the sheet
+(default: 0 i.e. no freeze)}
+
+\item{freeze_cols}{number of columns to freeze at the left of the sheet
+(default: 0 i.e. no freeze)}
+
+\item{autofilter}{add auto filter to columns (default: FALSE)}
+
+\item{header_bg_color}{background colour for header row cells (default: NA
+meaning no color) other values could include any R colours like
+ "lightgray", "green", "lightblue" etc.}
+
+\item{col_widths}{A list of numeric vectors with column widths to use
+(in inches). A length one vector is recycled. NA gives the default
+behaviour. You can have the function guess the column width from the number
+of characters in a row for this use one string value per data frame.
+The possible string values include:
+ \itemize{
+   \item "guess_from_header": The widths are guessed from the character
+    count of the header.
+   \item "guess_from_row_2": The widths are guessed from the character
+    count of the 2nd row. You can use any row number here.
+ }}
+
+\item{guessed_column_width_padding}{numeric, inches to add to guessed
+column widths (default:3)}
 }
 \description{
 Writes a data frame to an xlsx file. To create an xlsx with (multiple) named

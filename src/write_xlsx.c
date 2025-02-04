@@ -65,11 +65,25 @@ SEXP C_set_tempdir(SEXP dir){
   return Rf_mkString(TEMPDIR);
 }
 
-SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP format_headers, SEXP use_zip64){
+SEXP C_write_data_frame_list(SEXP df_list,
+                             SEXP file,
+                             SEXP col_names,
+                             SEXP format_headers,
+                             SEXP use_zip64,
+                             SEXP freeze_rows,
+                             SEXP freeze_cols,
+                             SEXP header_bg_color,
+                             SEXP autofilter,
+                             SEXP col_widths){
   assert_that(Rf_isVectorList(df_list), "Object is not a list");
   assert_that(Rf_isString(file) && Rf_length(file), "Invalid file path");
   assert_that(Rf_isLogical(col_names), "col_names must be logical");
   assert_that(Rf_isLogical(format_headers), "format_headers must be logical");
+  assert_that(Rf_isInteger(freeze_rows), "freeze_rows must be integer");
+  assert_that(Rf_isInteger(freeze_cols), "freeze_cols must be integer");
+  assert_that(Rf_isInteger(header_bg_color), "header_bg_color must be integer");
+  assert_that(Rf_isLogical(autofilter), "autofilter must be logical");
+  assert_that(Rf_isVectorList(col_widths), "col_widths must be a list of vectors");
 
   //create workbook
   lxw_workbook_options options = {
@@ -88,10 +102,18 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP forma
   lxw_format * datetime = workbook_add_format(workbook);
   format_set_num_format(datetime, "yyyy-mm-dd HH:mm:ss UTC");
 
-  //how to format headers (bold + center)
+  //how to format headers (bold + left + background color)
   lxw_format * title = workbook_add_format(workbook);
   format_set_bold(title);
-  format_set_align(title, LXW_ALIGN_CENTER);
+  format_set_align(title, LXW_ALIGN_LEFT); // works better with filter
+
+  //set bg color
+  if(Rf_asInteger(header_bg_color) > -1){
+    format_set_bg_color(title, Rf_asInteger(header_bg_color));
+  }
+
+
+
 
   //how to format hyperlinks (underline + blue)
   lxw_format * hyperlink = workbook_add_format(workbook);
@@ -117,9 +139,12 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP forma
     if(Rf_asLogical(col_names)){
       SEXP names = PROTECT(Rf_getAttrib(df, R_NamesSymbol));
       for(size_t i = 0; i < Rf_length(names); i++)
-        worksheet_write_string(sheet, cursor, i, Rf_translateCharUTF8(STRING_ELT(names, i)), NULL);
-      if(Rf_asLogical(format_headers))
-        assert_lxw(worksheet_set_row(sheet, cursor, 15, title));
+        //format the headers
+        if(Rf_asLogical(format_headers))
+          worksheet_write_string(sheet, cursor, i, Rf_translateCharUTF8(STRING_ELT(names, i)), title);
+        else
+          worksheet_write_string(sheet, cursor, i, Rf_translateCharUTF8(STRING_ELT(names, i)), NULL);
+
       UNPROTECT(1);
       cursor++;
     }
@@ -128,17 +153,36 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP forma
     size_t cols = Rf_length(df);
     size_t rows = 0;
 
-    // determinte how to format each column
+    // set column widths and determine format
+    SEXP sheet_col_widths = VECTOR_ELT(col_widths, s);
+    size_t len_widths = Rf_length(sheet_col_widths);
+    double *widths_value;
+    int widths_type = TYPEOF(sheet_col_widths);
+    if (widths_type == REALSXP) {
+      widths_value = REAL(sheet_col_widths);
+    } else {
+      widths_value = (double *)malloc(len_widths * sizeof(double));
+      for(size_t i = 0; i < len_widths; i++){
+        widths_value[i] = LXW_DEF_COL_WIDTH;
+      }
+    }
+
     R_COL_TYPE coltypes[cols];
     for(size_t i = 0; i < cols; i++){
+      // set column width keep date and datetime widhts
+      double width;
+      width = ISNA(widths_value[i]) ? LXW_DEF_COL_WIDTH : widths_value[i];
+      worksheet_set_column(sheet, i, i, width, NULL);
+
+      // determine format
       SEXP COL = VECTOR_ELT(df, i);
       coltypes[i] = get_type(COL);
       if(!Rf_isMatrix(COL) && !Rf_inherits(COL, "data.frame"))
         rows = max(rows, Rf_length(COL));
       if(coltypes[i] == COL_DATE)
-        assert_lxw(worksheet_set_column(sheet, i, i, 20, date));
+        assert_lxw(worksheet_set_column(sheet, i, i, 11, date));
       if(coltypes[i] == COL_POSIXCT)
-        assert_lxw(worksheet_set_column(sheet, i, i, 20, datetime));
+        assert_lxw(worksheet_set_column(sheet, i, i, 21, datetime));
     }
 
     // Need to iterate by row first for performance
@@ -201,7 +245,18 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP forma
       }
       cursor++;
     }
+    //freeze rows
+    if((Rf_asInteger(freeze_rows) + Rf_asInteger(freeze_cols)) > 0){
+      worksheet_freeze_panes(sheet, Rf_asInteger(freeze_rows), Rf_asInteger(freeze_cols));
+    }
+
+    if(Rf_asLogical(autofilter)){
+         worksheet_autofilter(sheet, 0, 0, rows, cols-1);
+    }
+
   }
+
+
 
   //this both writes the xlsx file and frees the memory
   assert_lxw(workbook_close(workbook));
@@ -216,7 +271,7 @@ SEXP C_lxw_version(void){
 static const R_CallMethodDef CallEntries[] = {
   {"C_lxw_version",           (DL_FUNC) &C_lxw_version,           0},
   {"C_set_tempdir",           (DL_FUNC) &C_set_tempdir,           1},
-  {"C_write_data_frame_list", (DL_FUNC) &C_write_data_frame_list, 5},
+  {"C_write_data_frame_list", (DL_FUNC) &C_write_data_frame_list, 10},
   {NULL, NULL, 0}
 };
 
