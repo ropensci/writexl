@@ -1,3 +1,6 @@
+1.5.2
+  - Fix parallel make; cleanup after build
+
 1.5.0
   - Update libxlsxwriter from b0c76b33
 

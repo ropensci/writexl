@@ -8,14 +8,18 @@ LIBXLSXWRITER	= \
   libxlsxwriter/chartsheet.o minizip/ioapi.o minizip/zip.o libxlsxwriter/metadata.o \
   libxlsxwriter/comment.o libxlsxwriter/vml.o md5/md5.o libxlsxwriter/table.o \
 
+STATLIB = libxlsxwriter/libstatxlsxwriter.a
 
-STATICLIB=libxlsxwriter/libstatxlsxwriter.a
+all: $(SHLIB) cleanup
+
+$(SHLIB): $(STATLIB)
 
 PKG_CFLAGS=$(C_VISIBILITY)
 PKG_CPPFLAGS=-Iinclude -DUSE_R_LANG
 PKG_LIBS=-Llibxlsxwriter -lstatxlsxwriter -lz
 
-$(SHLIB): $(STATICLIB)
+$(STATLIB): $(LIBXLSXWRITER)
+	$(AR) rcs $(STATLIB) $(LIBXLSXWRITER)
 
-$(STATICLIB): $(LIBXLSXWRITER)
-	$(AR) rcs $(STATICLIB) $(LIBXLSXWRITER)
+cleanup: $(SHLIB)
+	rm -f $(LIBXLSXWRITER) $(STATLIB)
