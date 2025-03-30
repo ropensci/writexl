@@ -1,9 +1,13 @@
 # writexl
 
+<!-- badges: start -->
+[![R-CMD-check](https://github.com/ropensci/writexl/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/ropensci/writexl/actions/workflows/R-CMD-check.yaml)
 [![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](http://www.repostatus.org/badges/latest/active.svg)](http://www.repostatus.org/#active)
 [![CRAN_Status_Badge](http://www.r-pkg.org/badges/version/writexl)](http://cran.r-project.org/package=writexl)
 [![CRAN RStudio mirror downloads](http://cranlogs.r-pkg.org/badges/writexl)](http://cran.r-project.org/web/packages/writexl/index.html)
 [![badge](https://ropensci.r-universe.dev/badges/writexl)](https://ropensci.r-universe.dev)
+[![Codecov test coverage](https://codecov.io/gh/ropensci/writexl/graph/badge.svg)](https://app.codecov.io/gh/ropensci/writexl)
+<!-- badges: end -->
 
 > Portable, light-weight data frame to xlsx exporter based on libxlsxwriter.  No Java or Excel required.
 
