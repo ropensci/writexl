@@ -31,3 +31,12 @@ test_that("Writing formulas", {
   # currently readxl does not support formulas so inspect manually
   expect_true(file.exists(write_xlsx(df)))
 })
+
+test_that("Unsupported classes raise an error", {
+  df <- data.frame(raw = as.raw(1))
+  expect_error(
+    write_xlsx(x = df),
+    regexp = "Unsupported class for the following column:\ncolumn name 'raw' (column number 1); class: raw",
+    fixed = TRUE
+  )
+})

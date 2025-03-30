@@ -30,8 +30,8 @@ Writes a data frame to an xlsx file. To create an xlsx with (multiple) named
 sheets, simply set \code{x} to a named list of data frames.
 }
 \details{
-Currently supports strings, numbers, booleans and dates. Formatting options
-may be added in future versions.
+Currently supports writing strings, numbers, booleans, dates, xl_object, and
+xl_objectcolumn. Formatting options may be added in future versions.
 
 \if{html}{
 \out{

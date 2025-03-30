@@ -3,8 +3,8 @@
 #' Writes a data frame to an xlsx file. To create an xlsx with (multiple) named
 #' sheets, simply set \code{x} to a named list of data frames.
 #'
-#' Currently supports strings, numbers, booleans and dates. Formatting options
-#' may be added in future versions.
+#' Currently supports writing strings, numbers, booleans, dates, xl_object, and
+#' xl_objectcolumn. Formatting options may be added in future versions.
 #'
 #' \if{html}{
 #' \out{
@@ -64,6 +64,36 @@ normalize_df <- function(df){
     warning(sprintf("Coercing column %s from int64 to double", names(df)[i]), call. = FALSE)
     getNamespace("bit64")
     df[[i]] <- as.double(df[[i]])
+  }
+  # Find any unsupported column classes
+  class_unsupported_idx <-
+    which(
+      !vapply(
+        df,
+        FUN = inherits,
+        FUN.VALUE = logical(1),
+        what = c("character", "numeric", "integer", "logical", "POSIXct", "Date", "xl_objectcolumn", "xl_object")
+      )
+    )
+  if (length(class_unsupported_idx) > 0) {
+    msg <- character()
+    for (col_idx in class_unsupported_idx) {
+      col_name <- names(df)[col_idx]
+      col_info <- sprintf("column name '%s' (column number %g)", col_name, col_idx)
+      msg <-
+        c(
+          msg,
+          sprintf(
+            "%s; class: %s", col_info,
+            paste(class(df[[col_idx]]), collapse = ", ")
+          )
+      )
+    }
+    stop(
+      "Unsupported class for the following ",
+      ngettext(length(msg), "column:\n", "columns:\n"),
+      paste(msg, sep = "\n")
+    )
   }
   df
 }
