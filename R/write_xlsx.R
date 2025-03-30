@@ -65,5 +65,35 @@ normalize_df <- function(df){
     getNamespace("bit64")
     df[[i]] <- as.double(df[[i]])
   }
+  # Find any unsupported column classes
+  class_unsupported_idx <-
+    which(
+      !vapply(
+        df,
+        FUN = inherits,
+        FUN.VALUE = logical(1),
+        what = c("character", "numeric", "logical", "POSIXct", "Date")
+      )
+    )
+  if (length(class_unsupported_idx) > 0) {
+    msg <- character()
+    for (col_idx in class_unsupported_idx) {
+      col_name <- names(df)[col_idx]
+      col_info <- sprintf("column name '%s' (column number %g)", col_name, col_idx)
+      msg <-
+        c(
+          msg,
+          sprintf(
+            "%s; class: %s", col_info,
+            paste(class(df[[col_idx]]), collapse = ", ")
+          )
+      )
+    }
+    stop(
+      "Unsupported class for the following ",
+      ngettext(length(msg), "column:\n", "columns:\n"),
+      paste(msg, sep = "\n")
+    )
+  }
   df
 }
