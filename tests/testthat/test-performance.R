@@ -1,6 +1,5 @@
-context("Performance")
-
 test_that("Performance is OK", {
+  skip_if_not_installed("nycflights13")
   tmp <- writexl::write_xlsx(nycflights13::flights)
   out <- readxl::read_xlsx(tmp)
   unlink(tmp)
