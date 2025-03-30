@@ -3,8 +3,8 @@
 #' Writes a data frame to an xlsx file. To create an xlsx with (multiple) named
 #' sheets, simply set \code{x} to a named list of data frames.
 #'
-#' Currently supports strings, numbers, booleans and dates. Formatting options
-#' may be added in future versions.
+#' Currently supports writing strings, numbers, booleans, dates, xl_object, and
+#' xl_objectcolumn. Formatting options may be added in future versions.
 #'
 #' \if{html}{
 #' \out{
@@ -72,7 +72,7 @@ normalize_df <- function(df){
         df,
         FUN = inherits,
         FUN.VALUE = logical(1),
-        what = c("character", "numeric", "logical", "POSIXct", "Date")
+        what = c("character", "numeric", "integer", "logical", "POSIXct", "Date", "xl_objectcolumn", "xl_object")
       )
     )
   if (length(class_unsupported_idx) > 0) {
