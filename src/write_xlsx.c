@@ -146,6 +146,7 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP forma
     for (size_t i = 0; i < rows; i++) {
       for(size_t j = 0; j < cols; j++){
         SEXP col = VECTOR_ELT(df, j);
+        if(Rf_length(col) <= i) continue;
         switch(coltypes[j]){
         case COL_DATE:{
           double val = Rf_isReal(col) ? REAL(col)[i] : INTEGER(col)[i];
