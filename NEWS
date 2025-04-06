@@ -1,3 +1,7 @@
+1.5.3
+  - write_xlsx() now gives a warning if a column is of unsupported type
+  - Fix crash in write_xlsx() for corrupted data frames
+
 1.5.2
   - Fix parallel make; cleanup after build
 

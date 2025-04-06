@@ -23,6 +23,6 @@ $(STATLIB): $(LIBXLSXWRITER)
 cleanup: $(SHLIB)
 	@rm -f $(LIBXLSXWRITER) $(STATLIB)
 
-# Base R already has this rule on Windows but not Unix
+# Base R already has this rule on Windows (but not Unix)
 %.a:
-	@$(AR) crs $@ $^ && $(STRIP_STATIC_LIB) $@
+	@$(AR) crs $@ $^ && $(STRIP_STATIC_LIB) $@ || true
