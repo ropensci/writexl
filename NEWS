@@ -1,3 +1,6 @@
+1.5.4
+  - Fix LTO build for bundled libxlsxwriter
+
 1.5.3
   - write_xlsx() now gives a warning if a column is of unsupported type
   - Fix crash in write_xlsx() for corrupted data frames
