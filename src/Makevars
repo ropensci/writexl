@@ -20,6 +20,8 @@ PKG_LIBS=-Llibxlsxwriter -lstatxlsxwriter -lz
 
 $(STATLIB): $(LIBXLSXWRITER)
 
+$(LIBXLSXWRITER): LTO_OPT += -ffat-lto-objects
+
 cleanup: $(SHLIB)
 	@rm -f $(LIBXLSXWRITER) $(STATLIB)
 
