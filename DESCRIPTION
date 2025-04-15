@@ -22,4 +22,4 @@ Suggests:
     testthat,
     bit64
 Language: en-US
-SystemRequirements: GNU make, zlib
+SystemRequirements: zlib
