@@ -19,7 +19,8 @@ Suggests:
     spelling,
     readxl,
     nycflights13,
-    testthat,
+    testthat (>= 3.0.0),
     bit64
 Language: en-US
 SystemRequirements: zlib
+Config/testthat/edition: 3

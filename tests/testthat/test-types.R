@@ -1,5 +1,3 @@
-context("Types")
-
 roundtrip <- function(df){
   readxl::read_xlsx(writexl::write_xlsx(df))
 }
