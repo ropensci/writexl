@@ -112,7 +112,7 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP forma
     size_t cursor = 0;
     SEXP df = VECTOR_ELT(df_list, s);
     assert_that(Rf_inherits(df, "data.frame"), "object is not a data frame");
-    SEXP names = Rf_getAttrib(df, R_NamesSymbol);
+    SEXP names = PROTECT(Rf_getAttrib(df, R_NamesSymbol));
 
     //create header row
     if(Rf_asLogical(col_names)){
@@ -141,6 +141,7 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP forma
       if(coltypes[i] == COL_UNKNOWN)
         Rf_warning("Column '%s' has unrecognized data type.", CHAR(STRING_ELT(names, i)));
     }
+    UNPROTECT(1); //names
 
     // Need to iterate by row first for performance
     for (size_t i = 0; i < rows; i++) {
