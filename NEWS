@@ -1,3 +1,6 @@
+1.5.5
+  - New `freeze_panes` argument automatically freezes the first row of sheets
+
 1.5.4
   - Fix LTO build for bundled libxlsxwriter
 
