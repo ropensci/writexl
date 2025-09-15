@@ -95,7 +95,7 @@ as.data.frame.xl_object <- function(x, ..., stringsAsFactors = FALSE){
 #'   necessary
 #' @export
 dubquote <- function(x){
-  if (any(nchar(x) > 32767)) {
+  if (any(!is.na(x) & nchar(x) > 32767)) {
     # Based on
     # https://support.microsoft.com/en-us/office/excel-specifications-and-limits-1672b34d-7043-467e-8e27-269d656771c3,
     # downloaded on 2025-09-15
