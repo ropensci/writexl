@@ -1,7 +1,7 @@
 Package: writexl
 Type: Package
 Title: Export Data Frames to Excel 'xlsx' Format
-Version: 1.5.4
+Version: 1.5.4.9000
 Authors@R: c(
     person("Jeroen", "Ooms", ,"jeroenooms@gmail.com", role = c("aut", "cre"),
       comment = c(ORCID = "0000-0002-4035-0289")),
@@ -22,4 +22,6 @@ Suggests:
     testthat,
     bit64
 Language: en-US
-SystemRequirements: zlib
+SystemRequirements:
+    GNU make,
+    zlib
