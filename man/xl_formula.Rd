@@ -17,7 +17,9 @@ xl_hyperlink(url, name = NULL)
 \item{name}{character vector of friendly names}
 }
 \description{
-Create special column types to write to a spreadsheet
+Create special column types to write to a spreadsheet. See `dubquote()` if
+you need to escape quoted strings in the formula for potential double quotes
+that may be included.
 }
 \examples{
 df <- data.frame(
@@ -30,5 +32,8 @@ write_xlsx(df, 'universities.xlsx')
 
 # cleanup
 unlink('universities.xlsx')
+}
+\seealso{
+[dubquote()]
 }
 \concept{writexl}

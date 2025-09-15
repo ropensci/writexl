@@ -1,11 +1,14 @@
 #' Excel Types
 #'
-#' Create special column types to write to a spreadsheet
+#' Create special column types to write to a spreadsheet. See `dubquote()` if
+#' you need to escape quoted strings in the formula for potential double quotes
+#' that may be included.
 #'
 #' @family writexl
 #' @param x character vector to be interpreted as formula
 #' @export
 #' @rdname xl_formula
+#' @seealso [dubquote()]
 #' @examples
 #' df <- data.frame(
 #'   name = c("UCLA", "Berkeley", "Jeroen"),
@@ -76,6 +79,22 @@ as.data.frame.xl_object <- function(x, ..., stringsAsFactors = FALSE){
   as.data.frame.character(x, ..., stringsAsFactors = FALSE)
 }
 
+#' Double-quote values with required escaping
+#'
+#' Excel requires double quotes (`"`) within formula to be escaped by doubling
+#' them (`""`). This will automatically detect when that is required and do the escaping for you.
+#'
+#' @param x A character string (or vector of character strings) to enclose in
+#'   double quotes and escape if necessary
+#' @returns `x` with double quotes around it and with double quotes escaped, if
+#'   necessary
+#' @export
 dubquote <- function(x){
-  paste0('"', x, '"')
+  # If there are double-quotes, escape the double-quotes
+  paste0('"', escape_dubquote(x), '"')
+}
+
+# Escape double-quotes to ensure that excel files load correctly (#89)
+escape_dubquote <- function(x) {
+  gsub(x = x, pattern = '"', replacement = '""')
 }

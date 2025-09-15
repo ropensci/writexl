@@ -31,3 +31,13 @@ test_that("Writing formulas", {
   # currently readxl does not support formulas so inspect manually
   expect_true(file.exists(write_xlsx(df)))
 })
+
+test_that("Hyperlinks automatically escape (#89)", {
+  skip("Manually test hyperlink escapes-- try opening the files with Excel")
+  df <- data.frame(website = xl_hyperlink("http://www.berkeley.edu", 'Berkeley "homepage'))
+  file_hyperlink_test_text <- write_xlsx(df)
+  message("Try opening this file in Excel to verify the hyperlink text works with double quotes: ", file_hyperlink_test_text)
+  df <- data.frame(website = xl_hyperlink("http://www.berkeley.edu/\"", 'Berkeley ""homepage'))
+  file_hyperlink_test_url <- write_xlsx(df)
+  message("Try opening this file in Excel to verify the hyperlink url works with double quotes: ", file_hyperlink_test_url)
+})
