@@ -1,3 +1,7 @@
+1.5.5
+  - Escape double-quotes in hyperlinks and export `dubquote()` to allow users to
+    manually escape other double-quoted strings, typically in formula (#89)
+
 1.5.4
   - Fix LTO build for bundled libxlsxwriter
 
