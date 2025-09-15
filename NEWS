@@ -1,3 +1,10 @@
+1.5.5
+  - Escape double-quotes in hyperlinks and export `dubquote()` to allow users to
+    manually escape other double-quoted strings, typically in formula (#89).
+    Also, `dubquote()` will automatically use the excel function `CONCATENATE()`
+    on long character strings, greater than the 255-character limit that Excel
+    has (#91).
+
 1.5.4
   - Fix LTO build for bundled libxlsxwriter
 
