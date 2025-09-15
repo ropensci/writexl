@@ -41,3 +41,7 @@ test_that("Hyperlinks automatically escape (#89)", {
   file_hyperlink_test_url <- write_xlsx(df)
   message("Try opening this file in Excel to verify the hyperlink url works with double quotes: ", file_hyperlink_test_url)
 })
+
+test_that("dubquote escapes double quoting (#89)", {
+  expect_equal(dubquote('a"a'), '"a""a"')
+})
