@@ -2,7 +2,7 @@
 % Please edit documentation in R/excel_types.R
 \name{dubquote}
 \alias{dubquote}
-\title{Double-quote values with required escaping}
+\title{Double-quote and split values for formula with required escaping}
 \usage{
 dubquote(x)
 }
@@ -16,5 +16,11 @@ double quotes and escape if necessary}
 }
 \description{
 Excel requires double quotes (`"`) within formula to be escaped by doubling
-them (`""`). This will automatically detect when that is required and do the escaping for you.
+them (`""`). This will automatically detect when that is required and do the
+escaping for you.
+}
+\details{
+Additionally, Excel allows a maximum of 255 characters in a formula string.
+This will break to a maximum of 255 characters (accounting for double quotes,
+too).
 }
