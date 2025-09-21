@@ -3,11 +3,14 @@
 \name{xl_formula}
 \alias{xl_formula}
 \alias{xl_hyperlink}
+\alias{xl_hyperlink_cell}
 \title{Excel Types}
 \usage{
 xl_formula(x)
 
 xl_hyperlink(url, name = NULL)
+
+xl_hyperlink_cell(url, name = NULL)
 }
 \arguments{
 \item{x}{character vector to be interpreted as formula}
@@ -19,6 +22,12 @@ xl_hyperlink(url, name = NULL)
 \description{
 Create special column types to write to a spreadsheet
 }
+\section{Functions}{
+\itemize{
+\item \code{xl_hyperlink_cell()}: Create a hyperlink cell which links the value in the
+entire cell rather than using a formula
+
+}}
 \examples{
 df <- data.frame(
   name = c("UCLA", "Berkeley", "Jeroen"),

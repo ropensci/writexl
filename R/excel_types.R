@@ -43,6 +43,29 @@ xl_hyperlink <- function(url, name = NULL){
   structure(out, class = c('xl_hyperlink', 'xl_formula', 'xl_object'))
 }
 
+#' @describeIn xl_formula Create a hyperlink cell which links the value in the
+#'   entire cell rather than using a formula
+#' @export
+xl_hyperlink_cell <- function(url, name = NULL) {
+  if (is.factor(url)) {
+    url <- as.character(url)
+  }
+  stopifnot(is.character(url))
+  if (!is.null(name)) {
+    stopifnot(length(name) %in% c(1, length(url)))
+    if (length(name) == 1) {
+      name <- rep(name, length(url))
+    }
+  } else {
+    name <- url
+  }
+  out <- list()
+  for (idx in seq_along(url)) {
+    out[[idx]] <- list(url = url[idx], name = name[idx])
+  }
+  structure(out, class = c('xl_hyperlink_cell', 'xl_object'))
+}
+
 #' @export
 print.xl_formula <- function(x, max = 10, ...){
   cat(sprintf(" [:%s:]\n", class(x)[1]))

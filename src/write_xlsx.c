@@ -14,6 +14,7 @@ typedef enum {
   COL_DATE,
   COL_POSIXCT,
   COL_HYPERLINK,
+  COL_HYPERLINK_CELL,
   COL_FORMULA,
   COL_BLANK,
   COL_UNKNOWN
@@ -40,6 +41,8 @@ static R_COL_TYPE get_type(SEXP col){
     return COL_POSIXCT;
   if(Rf_inherits(col, "xl_hyperlink"))
     return COL_HYPERLINK;
+  if(Rf_inherits(col, "xl_hyperlink_cell"))
+    return COL_HYPERLINK_CELL;
   if(Rf_isString(col) && Rf_inherits(col, "xl_formula"))
     return COL_FORMULA;
   switch(TYPEOF(col)){
@@ -178,6 +181,21 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP forma
           SEXP val = STRING_ELT(col, i);
           if(val != NA_STRING && Rf_length(val))
             assert_lxw(worksheet_write_formula(sheet, cursor, j, Rf_translateCharUTF8(val), hyperlink));
+        }; continue;
+        case COL_HYPERLINK_CELL:{
+          SEXP val_both = VECTOR_ELT(col, i);
+          // Extract the parts from the list
+          SEXP url = STRING_ELT(VECTOR_ELT(val_both, 0), 0);
+          SEXP val;
+          if(Rf_length(val_both) == 2) {
+            val = STRING_ELT(VECTOR_ELT(val_both, 1), 0);
+          } else {
+            val = url;
+          }
+          if(url != NA_STRING && Rf_length(url)) {
+            assert_lxw(worksheet_write_url(sheet, cursor, j, Rf_translateCharUTF8(url), hyperlink));
+            assert_lxw(worksheet_write_string(sheet, cursor, j, Rf_translateCharUTF8(val), hyperlink));
+          };
         }; continue;
         case COL_REAL:{
           double val = REAL(col)[i];
