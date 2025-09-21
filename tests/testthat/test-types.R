@@ -54,4 +54,15 @@ test_that("xl_hyperlink_cell", {
   df <- data.frame(null_col = null_cell)
   file_url_cell <- write_xlsx(df)
   expect_true(file.exists(file_url_cell))
+
+  # Numeric URL
+  num_url <- xl_hyperlink_cell(url = c("http://www.ucla.edu", "http://www.berkeley.edu"), name = c("A", "B"))
+  num_url[[1]]$url <- 5
+  df <- data.frame(num_url = num_url)
+  expect_error(
+    file_url_cell <- write_xlsx(df),
+    regexp = "STRING_ELT() can only be applied to a 'character vector', not a 'double'",
+    fixed = TRUE
+  )
+  expect_true(file.exists(file_url_cell))
 })
