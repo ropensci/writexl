@@ -33,18 +33,25 @@ test_that("Writing formulas", {
 })
 
 test_that("xl_hyperlink_cell", {
-  df <-
-    df <- data.frame(
-      name = c("UCLA", "Berkeley", "other"),
-      founded = c(1919, 1868, 1),
-      # Test NA in the URL
-      website_naurl = xl_hyperlink_cell(url = c("http://www.ucla.edu", "http://www.berkeley.edu", NA), "website"),
-      # Test NA in the name
-      website_naname = xl_hyperlink_cell(url = c("http://www.ucla.edu", "http://www.berkeley.edu", NA), c("website", NA, NA)),
-      # Test no name given
-      website_noname = xl_hyperlink_cell(url = c("http://www.ucla.edu", "http://www.berkeley.edu", NA))
-    )
+  df <- data.frame(
+    name = c("UCLA", "Berkeley", "other"),
+    founded = c(1919, 1868, 1),
+    # Test NA in the URL
+    website_naurl = xl_hyperlink_cell(url = c("http://www.ucla.edu", "http://www.berkeley.edu", NA), "website"),
+    # Test NA in the name
+    website_naname = xl_hyperlink_cell(url = c("http://www.ucla.edu", "http://www.berkeley.edu", NA), c("website", NA, NA)),
+    # Test no name given
+    website_noname = xl_hyperlink_cell(url = c("http://www.ucla.edu", "http://www.berkeley.edu", NA))
+  )
   # currently readxl does not support URLs so inspect manually
+  file_url_cell <- write_xlsx(df)
+  expect_true(file.exists(file_url_cell))
+
+  # Ensure that we cannot crash R with intentionally-malformed objects
+  # NULL name
+  null_cell <- xl_hyperlink_cell(url = c("http://www.ucla.edu", "http://www.berkeley.edu"), name = c("A", "B"))
+  null_cell[[1]]$name <- NULL
+  df <- data.frame(null_col = null_cell)
   file_url_cell <- write_xlsx(df)
   expect_true(file.exists(file_url_cell))
 })

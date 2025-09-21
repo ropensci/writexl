@@ -186,7 +186,12 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP forma
           SEXP val_both = VECTOR_ELT(col, i);
           // Extract the parts from the list
           SEXP url = STRING_ELT(VECTOR_ELT(val_both, 0), 0);
-          SEXP name = STRING_ELT(VECTOR_ELT(val_both, 1), 0);
+          SEXP name;
+          if(Rf_length(val_both) == 2) {
+            name = STRING_ELT(VECTOR_ELT(val_both, 1), 0);
+          } else {
+            name = url;
+          }
           if(url != NA_STRING && Rf_length(url)) {
             assert_lxw(worksheet_write_url(sheet, cursor, j, Rf_translateCharUTF8(url), hyperlink));
             assert_lxw(worksheet_write_string(sheet, cursor, j, Rf_translateCharUTF8(name), hyperlink));
