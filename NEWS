@@ -1,3 +1,8 @@
+1.5.5
+  - Add `xl_hyperlink_cell()` which creates hyperlinked cells where the cell
+    value is provided and the url is applied to the entire cell (contrast with
+    `xl_hyperlink()` which creates a formula)
+
 1.5.4
   - Fix LTO build for bundled libxlsxwriter
 
