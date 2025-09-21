@@ -47,6 +47,21 @@ test_that("xl_hyperlink_cell", {
   file_url_cell <- write_xlsx(df)
   expect_true(file.exists(file_url_cell))
 
+  # Write numbers for the name does not work (without crashing R)
+  file_url_cell <- NULL
+  df <- data.frame(
+    name = c("UCLA", "Berkeley", "other"),
+    founded = c(1919, 1868, 1),
+    # double name
+    website_naurl = xl_hyperlink_cell(url = c("http://www.ucla.edu", "http://www.berkeley.edu", NA), 1)
+  )
+  expect_error(
+    file_url_cell <- write_xlsx(df),
+    regexp = "STRING_ELT() can only be applied to a 'character vector', not a 'double'",
+    fixed = TRUE
+  )
+  expect_null(file_url_cell)
+
   # Ensure that we cannot crash R with intentionally-malformed objects
   # NULL name
   null_cell <- xl_hyperlink_cell(url = c("http://www.ucla.edu", "http://www.berkeley.edu"), name = c("A", "B"))
