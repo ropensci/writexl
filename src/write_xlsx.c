@@ -117,7 +117,7 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP forma
     //create header row
     if(Rf_asLogical(col_names)){
       for(size_t i = 0; i < Rf_length(names); i++)
-        worksheet_write_string(sheet, cursor, i, Rf_translateCharUTF8(STRING_ELT(names, i)), NULL);
+        assert_lxw(worksheet_write_string(sheet, cursor, i, Rf_translateCharUTF8(STRING_ELT(names, i)), NULL));
       if(Rf_asLogical(format_headers))
         assert_lxw(worksheet_set_row(sheet, cursor, 15, title));
       cursor++;
