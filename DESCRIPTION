@@ -19,9 +19,10 @@ Suggests:
     spelling,
     readxl,
     nycflights13,
-    testthat,
+    testthat (>= 3.0.0),
     bit64
 Language: en-US
 SystemRequirements:
     GNU make,
     zlib
+Config/testthat/edition: 3
