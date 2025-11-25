@@ -7,6 +7,8 @@ LIBXLSXWRITER	= \
   libxlsxwriter/drawing.o libxlsxwriter/styles.o tmpfileplus/tmpfileplus.o \
   libxlsxwriter/chartsheet.o minizip/ioapi.o minizip/zip.o libxlsxwriter/metadata.o \
   libxlsxwriter/comment.o libxlsxwriter/vml.o md5/md5.o libxlsxwriter/table.o \
+  libxlsxwriter/rich_value.o libxlsxwriter/rich_value_rel.o libxlsxwriter/rich_value_structure.o \
+  libxlsxwriter/rich_value_types.o \
 
 STATLIB = libxlsxwriter/libstatxlsxwriter.a
 

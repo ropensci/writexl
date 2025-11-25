@@ -2,8 +2,7 @@
 ^\.Rproj\.user$
 ^src/.*\.a$
 ^src/.*\.o$
-^appveyor\.yml$
-^.travis.yml$
 ^README.md$
 ^\.github$
+^cran-comments\\.md$
 ^codecov\.yml$
