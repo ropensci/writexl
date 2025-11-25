@@ -2,6 +2,7 @@
 # Need help debugging build failures? Start at https://github.com/r-lib/actions#where-to-find-help
 on:
   push:
+    branches: [main, master]
   pull_request:
 
 name: R-CMD-check.yaml
@@ -52,3 +53,6 @@ jobs:
       - uses: r-lib/actions/check-r-package@v2
         env:
           MAKEFLAGS: -j4
+        with:
+          upload-snapshots: true
+          build_args: 'c("--no-manual","--compact-vignettes=gs+qpdf")'
