@@ -65,11 +65,12 @@ SEXP C_set_tempdir(SEXP dir){
   return Rf_mkString(TEMPDIR);
 }
 
-SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP format_headers, SEXP use_zip64){
+SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP format_headers, SEXP use_zip64, SEXP freeze_panes){
   assert_that(Rf_isVectorList(df_list), "Object is not a list");
   assert_that(Rf_isString(file) && Rf_length(file), "Invalid file path");
   assert_that(Rf_isLogical(col_names), "col_names must be logical");
   assert_that(Rf_isLogical(format_headers), "format_headers must be logical");
+  assert_that(Rf_isLogical(freeze_panes), "freeze_panes must be logical");
 
   //create workbook
   lxw_workbook_options options = {
@@ -120,6 +121,8 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP forma
         worksheet_write_string(sheet, cursor, i, Rf_translateCharUTF8(STRING_ELT(names, i)), NULL);
       if(Rf_asLogical(format_headers))
         assert_lxw(worksheet_set_row(sheet, cursor, 15, title));
+      if (Rf_asLogical(freeze_panes))
+        worksheet_freeze_panes(sheet, 1, 0);
       cursor++;
     }
 
@@ -219,7 +222,7 @@ SEXP C_lxw_version(void){
 static const R_CallMethodDef CallEntries[] = {
   {"C_lxw_version",           (DL_FUNC) &C_lxw_version,           0},
   {"C_set_tempdir",           (DL_FUNC) &C_set_tempdir,           1},
-  {"C_write_data_frame_list", (DL_FUNC) &C_write_data_frame_list, 5},
+  {"C_write_data_frame_list", (DL_FUNC) &C_write_data_frame_list, 6},
   {NULL, NULL, 0}
 };
 
