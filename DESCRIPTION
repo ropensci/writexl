@@ -5,6 +5,7 @@ Version: 1.5.4.9000
 Authors@R: c(
     person("Jeroen", "Ooms", ,"jeroenooms@gmail.com", role = c("aut", "cre"),
       comment = c(ORCID = "0000-0002-4035-0289")),
+    person("Bill", "Denney", role = "aut", comment = c(ORCID="0000-0002-5759-428X")),
     person("John McNamara", role = "cph",
       comment = "Author of libxlsxwriter (see AUTHORS and COPYRIGHT files for details)"))
 Description: Zero-dependency data frame to xlsx exporter based on 'libxlsxwriter'
