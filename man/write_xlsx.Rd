@@ -10,7 +10,8 @@ write_xlsx(
   path = tempfile(fileext = ".xlsx"),
   col_names = TRUE,
   format_headers = TRUE,
-  use_zip64 = FALSE
+  use_zip64 = FALSE,
+  freeze_panes = format_headers
 )
 }
 \arguments{
@@ -24,6 +25,8 @@ write_xlsx(
 
 \item{use_zip64}{use \href{https://en.wikipedia.org/wiki/Zip_(file_format)#ZIP64}{zip64}
 to enable support for 4GB+ xlsx files. Not all platforms can read this.}
+
+\item{freeze_panes}{Should headers be frozen?}
 }
 \description{
 Writes a data frame to an xlsx file. To create an xlsx with (multiple) named
