@@ -61,7 +61,10 @@ static char TEMPDIR[2048] = {0};
 
 //set to R tempdir when pkg is loaded
 SEXP C_set_tempdir(SEXP dir){
-  strcpy(TEMPDIR, Rf_translateChar(STRING_ELT(dir, 0)));
+  const char *src = Rf_translateChar(STRING_ELT(dir, 0));
+  if(strlen(src) >= sizeof(TEMPDIR))
+    Rf_errorcall(R_NilValue, "Error in writexl: tempdir path too long (max %zu bytes)", sizeof(TEMPDIR) - 1);
+  strncpy(TEMPDIR, src, sizeof(TEMPDIR) - 1);
   return Rf_mkString(TEMPDIR);
 }
 
