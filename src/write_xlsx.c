@@ -112,7 +112,7 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP forma
     assert_that(sheet, "failed to create workbook");
 
     //get data frame
-    size_t cursor = 0;
+    lxw_row_t cursor = 0;
     SEXP df = VECTOR_ELT(df_list, s);
     assert_that(Rf_inherits(df, "data.frame"), "object is not a data frame");
     SEXP names = PROTECT(Rf_getAttrib(df, R_NamesSymbol));
@@ -132,15 +132,17 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP forma
     }
 
     // number of records
-    size_t rows = 0;
+    lxw_row_t rows = 0;
 
     // determinte how to format each column
     R_COL_TYPE coltypes[cols];
     for(lxw_col_t i = 0; i < cols; i++){
       SEXP COL = VECTOR_ELT(df, i);
       coltypes[i] = get_type(COL);
-      if(!Rf_isMatrix(COL) && !Rf_inherits(COL, "data.frame"))
-        rows = max(rows, Rf_length(COL));
+      if(!Rf_isMatrix(COL) && !Rf_inherits(COL, "data.frame")){
+        lxw_row_t col_rows = (lxw_row_t) Rf_length(COL);
+        if(col_rows > rows) rows = col_rows;
+      }
       if(coltypes[i] == COL_DATE)
         assert_lxw(worksheet_set_column(sheet, i, i, 20, date));
       if(coltypes[i] == COL_POSIXCT)
@@ -150,8 +152,12 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP forma
     }
     UNPROTECT(1); //names
 
+    // validate row count against xlsx limit
+    lxw_row_t max_rows = (lxw_row_t)(LXW_ROW_MAX - (Rf_asLogical(col_names) ? 1 : 0));
+    bail_if(rows > max_rows, "data frame has too many rows for xlsx (max 1048576)");
+
     // Need to iterate by row first for performance
-    for (size_t i = 0; i < rows; i++) {
+    for (lxw_row_t i = 0; i < rows; i++) {
       for(lxw_col_t j = 0; j < cols; j++){
         SEXP col = VECTOR_ELT(df, j);
         if(Rf_length(col) <= i) continue;
