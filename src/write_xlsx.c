@@ -103,7 +103,8 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP forma
 
   //iterate over sheets
   SEXP df_names = PROTECT(Rf_getAttrib(df_list, R_NamesSymbol));
-  for(size_t s = 0; s < Rf_length(df_list); s++){
+  R_xlen_t nsheets = Rf_length(df_list);
+  for(R_xlen_t s = 0; s < nsheets; s++){
 
     //create sheet
     const char * sheet_name = Rf_length(df_names) > s && Rf_length(STRING_ELT(df_names, s)) ? \
@@ -160,7 +161,7 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP forma
     for (lxw_row_t i = 0; i < rows; i++) {
       for(lxw_col_t j = 0; j < cols; j++){
         SEXP col = VECTOR_ELT(df, j);
-        if(Rf_length(col) <= i) continue;
+        if(Rf_length(col) <= (R_xlen_t) i) continue;
         switch(coltypes[j]){
         case COL_DATE:{
           double val = Rf_isReal(col) ? REAL(col)[i] : INTEGER(col)[i];
