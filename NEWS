@@ -1,5 +1,8 @@
 1.5.5
   - Update to libxlsxwriter version 1.2.3
+  - Fix strcpy buffer overflow in internal C_set_tempdir (tempdir path >= 2048 bytes now errors informatively)
+  - write_xlsx() now errors informatively when data frame exceeds xlsx column limit (16384) or row limit (1048576)
+  - Fix signed/unsigned integer type mismatches in C code (lxw_row_t, lxw_col_t, R_xlen_t)
 
 1.5.4
   - Fix LTO build for bundled libxlsxwriter
