@@ -117,9 +117,14 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP forma
     assert_that(Rf_inherits(df, "data.frame"), "object is not a data frame");
     SEXP names = PROTECT(Rf_getAttrib(df, R_NamesSymbol));
 
+    // validate and get column count
+    R_xlen_t ncols_r = Rf_length(df);
+    bail_if(ncols_r > LXW_COL_MAX, "data frame has too many columns for xlsx (max 16384)");
+    lxw_col_t cols = (lxw_col_t) ncols_r;
+
     //create header row
     if(Rf_asLogical(col_names)){
-      for(size_t i = 0; i < Rf_length(names); i++)
+      for(lxw_col_t i = 0; i < cols; i++)
         assert_lxw(worksheet_write_string(sheet, cursor, i, Rf_translateCharUTF8(STRING_ELT(names, i)), NULL));
       if(Rf_asLogical(format_headers))
         assert_lxw(worksheet_set_row(sheet, cursor, 15, title));
@@ -127,12 +132,11 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP forma
     }
 
     // number of records
-    size_t cols = Rf_length(df);
     size_t rows = 0;
 
     // determinte how to format each column
     R_COL_TYPE coltypes[cols];
-    for(size_t i = 0; i < cols; i++){
+    for(lxw_col_t i = 0; i < cols; i++){
       SEXP COL = VECTOR_ELT(df, i);
       coltypes[i] = get_type(COL);
       if(!Rf_isMatrix(COL) && !Rf_inherits(COL, "data.frame"))
@@ -148,7 +152,7 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP forma
 
     // Need to iterate by row first for performance
     for (size_t i = 0; i < rows; i++) {
-      for(size_t j = 0; j < cols; j++){
+      for(lxw_col_t j = 0; j < cols; j++){
         SEXP col = VECTOR_ELT(df, j);
         if(Rf_length(col) <= i) continue;
         switch(coltypes[j]){
