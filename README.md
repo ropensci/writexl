@@ -22,7 +22,7 @@ install.packages("writexl")
 
 ## Getting started
 
-Currently the package only has `write_xlsx()` to export a data frame to xlsx. 
+Currently the package only has `write_xlsx()` to export a data frame to xlsx.
 
 ```r
 library(writexl)
@@ -56,32 +56,32 @@ all.equal(out, flights)
 ## TRUE
 ```
 
-Performance is a bit better than `openxlsx` implementation:
+File writing time is faster than the `openxlsx2` implementation:
 
 ```r
 library(microbenchmark)
 library(nycflights13)
 microbenchmark(
   writexl = writexl::write_xlsx(flights, tempfile()),
-  openxlsx = openxlsx::write.xlsx(flights, tempfile()),
+  openxlsx2 = openxlsx2::write_xlsx(flights, tempfile()),
   times = 5
 )
-## Unit: seconds
-##      expr       min        lq      mean    median        uq       max neval
-##   writexl  8.884712  8.904431  9.103419  8.965643  9.041565  9.720743     5
-##  openxlsx 17.166818 18.072527 19.171003 18.669805 18.756661 23.189206     5
+# Unit: seconds
+#      expr       min       lq     mean   median       uq      max neval
+#   writexl  8.297612 11.38129 12.19547 13.13240 13.92596 14.24009     5
+# openxlsx2 31.840446 33.25751 50.86460 52.04899 64.36513 72.81091     5
 ```
 
-Also the output xlsx files are smaller:
+The output xlsx files are similarly sized:
 
 ```r
 writexl::write_xlsx(flights, tmp1 <- tempfile())
 file.info(tmp1)$size
-## 29157282
+# 29139353
 ```
 
 ```r
-openxlsx::write.xlsx(flights, tmp2 <- tempfile())
+openxlsx2::write_xlsx(flights, tmp2 <- tempfile())
 file.info(tmp2)$size
-## 35962067
+# 29296990
 ```
