@@ -1,4 +1,5 @@
-1.5.5
+1.5.4.9000
+  - Internal refactor: cell writing extracted into per-type static C functions dispatched via write_cell() (no functional change; prepares for xl_cell_general support)
   - Update to libxlsxwriter version 1.2.3
   - Fix strcpy buffer overflow in internal C_set_tempdir (tempdir path >= 2048 bytes now errors informatively)
   - write_xlsx() now errors informatively when data frame exceeds xlsx column limit (16384) or row limit (1048576)

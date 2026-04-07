@@ -68,6 +68,119 @@ SEXP C_set_tempdir(SEXP dir){
   return Rf_mkString(TEMPDIR);
 }
 
+/* Context struct shared across all cell-writing functions */
+typedef struct {
+  lxw_workbook  *workbook;      /* reserved for future use in cell-format support */
+  lxw_worksheet *sheet;
+  lxw_format    *date_fmt;
+  lxw_format    *datetime_fmt;
+  lxw_format    *hyperlink_fmt;
+} cell_write_ctx;
+
+/* --- Individual per-type cell writers ------------------------------------ */
+
+static void write_cell_date(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                             SEXP col_data, lxw_row_t i){
+  double val = Rf_isReal(col_data) ? REAL(col_data)[i] : INTEGER(col_data)[i];
+  if(Rf_isReal(col_data) ? R_FINITE(val) : val != NA_INTEGER)
+    assert_lxw(worksheet_write_number(ctx->sheet, row, col, 25569 + val, NULL));
+}
+
+static void write_cell_posixct(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                                SEXP col_data, lxw_row_t i){
+  double val = REAL(col_data)[i];
+  if(R_FINITE(val)){
+    val = 25568.0 + val / (24*60*60);
+    if(val >= 60.0)
+      val = val + 1.0;
+    assert_lxw(worksheet_write_number(ctx->sheet, row, col, val, NULL));
+  }
+}
+
+static void write_cell_string(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                               SEXP col_data, lxw_row_t i){
+  SEXP val = STRING_ELT(col_data, i);
+  // NB: xlsx does distinguish between empty string and NA
+  if(val != NA_STRING && Rf_length(val))
+    assert_lxw(worksheet_write_string(ctx->sheet, row, col, Rf_translateCharUTF8(val), NULL));
+}
+
+static void write_cell_formula(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                                SEXP col_data, lxw_row_t i){
+  SEXP val = STRING_ELT(col_data, i);
+  if(val != NA_STRING && Rf_length(val))
+    assert_lxw(worksheet_write_formula(ctx->sheet, row, col, Rf_translateCharUTF8(val), NULL));
+}
+
+static void write_cell_hyperlink(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                                  SEXP col_data, lxw_row_t i){
+  SEXP val = STRING_ELT(col_data, i);
+  if(val != NA_STRING && Rf_length(val))
+    assert_lxw(worksheet_write_formula(ctx->sheet, row, col, Rf_translateCharUTF8(val),
+                                        ctx->hyperlink_fmt));
+}
+
+static void write_cell_real(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                             SEXP col_data, lxw_row_t i){
+  double val = REAL(col_data)[i];
+  if(val == R_PosInf)
+    assert_lxw(worksheet_write_string(ctx->sheet, row, col, "Inf", NULL));
+  else if(val == R_NegInf)
+    assert_lxw(worksheet_write_string(ctx->sheet, row, col, "-Inf", NULL));
+  else if(R_FINITE(val)) // skips NA and NAN
+    assert_lxw(worksheet_write_number(ctx->sheet, row, col, val, NULL));
+}
+
+static void write_cell_integer(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                                SEXP col_data, lxw_row_t i){
+  int val = INTEGER(col_data)[i];
+  if(val != NA_INTEGER)
+    assert_lxw(worksheet_write_number(ctx->sheet, row, col, val, NULL));
+}
+
+static void write_cell_logical(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                                SEXP col_data, lxw_row_t i){
+  int val = LOGICAL(col_data)[i];
+  if(val != NA_LOGICAL)
+    assert_lxw(worksheet_write_boolean(ctx->sheet, row, col, val, NULL));
+}
+
+/* --- General cell dispatcher --------------------------------------------- */
+
+static void write_cell(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                        SEXP col_data, R_COL_TYPE type, lxw_row_t i){
+  switch(type){
+  case COL_DATE:
+    write_cell_date(ctx, row, col, col_data, i);
+    break;
+  case COL_POSIXCT:
+    write_cell_posixct(ctx, row, col, col_data, i);
+    break;
+  case COL_STRING:
+    write_cell_string(ctx, row, col, col_data, i);
+    break;
+  case COL_FORMULA:
+    write_cell_formula(ctx, row, col, col_data, i);
+    break;
+  case COL_HYPERLINK:
+    write_cell_hyperlink(ctx, row, col, col_data, i);
+    break;
+  case COL_REAL:
+    write_cell_real(ctx, row, col, col_data, i);
+    break;
+  case COL_INTEGER:
+    write_cell_integer(ctx, row, col, col_data, i);
+    break;
+  case COL_LOGICAL:
+    write_cell_logical(ctx, row, col, col_data, i);
+    break;
+  default:
+    break;
+  }
+}
+
+/* --- Main entry point ---------------------------------------------------- */
+
 SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP format_headers, SEXP use_zip64){
   assert_that(Rf_isVectorList(df_list), "Object is not a list");
   assert_that(Rf_isString(file) && Rf_length(file), "Invalid file path");
@@ -157,64 +270,15 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP forma
     lxw_row_t max_rows = (lxw_row_t)(LXW_ROW_MAX - (Rf_asLogical(col_names) ? 1 : 0));
     bail_if(rows > max_rows, "data frame has too many rows for xlsx (max 1048576)");
 
+    // Build context for cell writers
+    cell_write_ctx ctx = {workbook, sheet, date, datetime, hyperlink};
+
     // Need to iterate by row first for performance
     for (lxw_row_t i = 0; i < rows; i++) {
       for(lxw_col_t j = 0; j < cols; j++){
         SEXP col = VECTOR_ELT(df, j);
         if(Rf_length(col) <= (R_xlen_t) i) continue;
-        switch(coltypes[j]){
-        case COL_DATE:{
-          double val = Rf_isReal(col) ? REAL(col)[i] : INTEGER(col)[i];
-          if(Rf_isReal(col) ? R_FINITE(val) : val != NA_INTEGER)
-            assert_lxw(worksheet_write_number(sheet, cursor, j, 25569 + val, NULL));
-        }; continue;
-        case COL_POSIXCT: {
-          double val = REAL(col)[i];
-          if(R_FINITE(val)){
-            val = 25568.0 + val / (24*60*60);
-            if(val >= 60.0)
-              val = val + 1.0;
-            assert_lxw(worksheet_write_number(sheet, cursor, j, val , NULL));
-          }
-        }; continue;
-        case COL_STRING:{
-          SEXP val = STRING_ELT(col, i);
-          // NB: xlsx does distinguish between empty string and NA
-          if(val != NA_STRING && Rf_length(val))
-            assert_lxw(worksheet_write_string(sheet, cursor, j, Rf_translateCharUTF8(val), NULL));
-        }; continue;
-        case COL_FORMULA:{
-          SEXP val = STRING_ELT(col, i);
-          if(val != NA_STRING && Rf_length(val))
-            assert_lxw(worksheet_write_formula(sheet, cursor, j, Rf_translateCharUTF8(val), NULL));
-        }; continue;
-        case COL_HYPERLINK:{
-          SEXP val = STRING_ELT(col, i);
-          if(val != NA_STRING && Rf_length(val))
-            assert_lxw(worksheet_write_formula(sheet, cursor, j, Rf_translateCharUTF8(val), hyperlink));
-        }; continue;
-        case COL_REAL:{
-          double val = REAL(col)[i];
-          if(val == R_PosInf)
-            assert_lxw(worksheet_write_string(sheet, cursor, j, "Inf", NULL));
-          else if(val == R_NegInf)
-            assert_lxw(worksheet_write_string(sheet, cursor, j, "-Inf", NULL));
-          else if(R_FINITE(val)) // skips NA and NAN
-            assert_lxw(worksheet_write_number(sheet, cursor, j, val, NULL));
-        }; continue;
-        case COL_INTEGER:{
-          int val = INTEGER(col)[i];
-          if(val != NA_INTEGER)
-            assert_lxw(worksheet_write_number(sheet, cursor, j, val, NULL));
-        }; continue;
-        case COL_LOGICAL:{
-          int val = LOGICAL(col)[i];
-          if(val != NA_LOGICAL)
-            assert_lxw(worksheet_write_boolean(sheet, cursor, j, val, NULL));
-          }; continue;
-        default:
-          continue;
-        };
+        write_cell(&ctx, cursor, j, col, coltypes[j], i);
       }
       cursor++;
     }
