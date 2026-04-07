@@ -15,13 +15,16 @@ Encoding: UTF-8
 URL: https://ropensci.r-universe.dev/writexl
     https://docs.ropensci.org/writexl/
 BugReports: https://github.com/ropensci/writexl/issues
-RoxygenNote: 7.0.2
+RoxygenNote: 7.3.3
 Suggests:
     spelling,
     readxl,
     nycflights13,
     testthat (>= 3.0.0),
-    bit64
+    bit64,
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
 Language: en-US
 SystemRequirements:
     GNU make,

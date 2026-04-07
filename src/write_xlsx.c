@@ -16,6 +16,7 @@ typedef enum {
   COL_HYPERLINK,
   COL_FORMULA,
   COL_BLANK,
+  COL_CELL_GENERAL,
   COL_UNKNOWN
 } R_COL_TYPE;
 
@@ -34,6 +35,8 @@ static void assert_lxw(lxw_error err){
 }
 
 static R_COL_TYPE get_type(SEXP col){
+  if(Rf_inherits(col, "xl_cell_general"))
+    return COL_CELL_GENERAL;
   if(Rf_inherits(col, "Date"))
     return COL_DATE;
   if(Rf_inherits(col, "POSIXct"))
@@ -145,6 +148,140 @@ static void write_cell_logical(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col
     assert_lxw(worksheet_write_boolean(ctx->sheet, row, col, val, NULL));
 }
 
+/* --- xl_cell_general support --------------------------------------------- */
+
+/* Return the element named 'name' from a named R list, or R_NilValue */
+static SEXP list_get(SEXP lst, const char *name){
+  SEXP names = Rf_getAttrib(lst, R_NamesSymbol);
+  if(names == R_NilValue) return R_NilValue;
+  int n = Rf_length(names);
+  for(int k = 0; k < n; k++){
+    if(strcmp(CHAR(STRING_ELT(names, k)), name) == 0)
+      return VECTOR_ELT(lst, k);
+  }
+  return R_NilValue;
+}
+
+/*
+ * write_cell_general: write the i-th cell of an xl_cell_general column.
+ * col is the full xl_cell_general list-column; VECTOR_ELT(col, i) is one
+ * per-cell named list with elements: value, formula, hyperlink.
+ */
+static void write_cell_general(cell_write_ctx *ctx,
+                                lxw_row_t row, lxw_col_t col_idx,
+                                SEXP col, lxw_row_t i){
+  SEXP cell      = VECTOR_ELT(col, (R_xlen_t) i);
+  SEXP value     = list_get(cell, "value");
+  SEXP formula   = list_get(cell, "formula");
+  SEXP hyperlink = list_get(cell, "hyperlink");
+
+  /* --- hyperlink takes priority ------------------------------------------ */
+  int has_hyperlink = 0;
+  if(hyperlink != R_NilValue && !Rf_isNull(hyperlink)){
+    /* NA sentinel stored as logical NA or character NA */
+    if(TYPEOF(hyperlink) == LGLSXP && INTEGER(hyperlink)[0] == NA_INTEGER){
+      has_hyperlink = 0;
+    } else if(TYPEOF(hyperlink) == STRSXP &&
+              STRING_ELT(hyperlink, 0) != NA_STRING){
+      has_hyperlink = 1;
+      const char *url = Rf_translateCharUTF8(STRING_ELT(hyperlink, 0));
+      assert_lxw(worksheet_write_url_opt(ctx->sheet, row, col_idx, url,
+                                          ctx->hyperlink_fmt, NULL, NULL));
+    } else if(TYPEOF(hyperlink) == VECSXP){
+      SEXP url_s = list_get(hyperlink, "url");
+      SEXP str_s = list_get(hyperlink, "string");
+      SEXP tip_s = list_get(hyperlink, "tooltip");
+      if(url_s != R_NilValue && TYPEOF(url_s) == STRSXP &&
+         STRING_ELT(url_s, 0) != NA_STRING){
+        has_hyperlink = 1;
+        const char *url     = Rf_translateCharUTF8(STRING_ELT(url_s, 0));
+        const char *string  = (str_s != R_NilValue && TYPEOF(str_s) == STRSXP &&
+                                STRING_ELT(str_s, 0) != NA_STRING)
+                               ? Rf_translateCharUTF8(STRING_ELT(str_s, 0)) : NULL;
+        const char *tooltip = (tip_s != R_NilValue && TYPEOF(tip_s) == STRSXP &&
+                                STRING_ELT(tip_s, 0) != NA_STRING)
+                               ? Rf_translateCharUTF8(STRING_ELT(tip_s, 0)) : NULL;
+        assert_lxw(worksheet_write_url_opt(ctx->sheet, row, col_idx, url,
+                                            ctx->hyperlink_fmt, string, tooltip));
+      }
+    }
+  }
+  if(has_hyperlink) return;
+
+  /* --- formula (with optional pre-calculated value) ----------------------- */
+  if(formula != R_NilValue && TYPEOF(formula) == STRSXP &&
+     STRING_ELT(formula, 0) != NA_STRING && Rf_length(formula) > 0){
+    const char *fstr = Rf_translateCharUTF8(STRING_ELT(formula, 0));
+    if(value != R_NilValue && TYPEOF(value) == REALSXP &&
+       Rf_length(value) > 0 && R_FINITE(REAL(value)[0])){
+      assert_lxw(worksheet_write_formula_num(ctx->sheet, row, col_idx,
+                                              fstr, NULL, REAL(value)[0]));
+    } else if(value != R_NilValue && TYPEOF(value) == STRSXP &&
+              Rf_length(value) > 0 && STRING_ELT(value, 0) != NA_STRING){
+      assert_lxw(worksheet_write_formula_str(ctx->sheet, row, col_idx, fstr, NULL,
+                   Rf_translateCharUTF8(STRING_ELT(value, 0))));
+    } else {
+      assert_lxw(worksheet_write_formula(ctx->sheet, row, col_idx, fstr, NULL));
+    }
+    return;
+  }
+
+  /* --- value only --------------------------------------------------------- */
+  if(value == R_NilValue || Rf_isNull(value) || Rf_length(value) == 0) return;
+
+  /* LGLSXP NA sentinel for "no value" */
+  if(TYPEOF(value) == LGLSXP && Rf_length(value) == 1 &&
+     LOGICAL(value)[0] == NA_LOGICAL) return;
+
+  if(Rf_inherits(value, "Date")){
+    double val = Rf_isReal(value) ? REAL(value)[0] : (double) INTEGER(value)[0];
+    if(Rf_isReal(value) ? R_FINITE(val) : (int) val != NA_INTEGER)
+      assert_lxw(worksheet_write_number(ctx->sheet, row, col_idx,
+                                         25569.0 + val, NULL));
+  } else if(Rf_inherits(value, "POSIXct")){
+    double val = REAL(value)[0];
+    if(R_FINITE(val)){
+      val = 25568.0 + val / (24.0 * 60.0 * 60.0);
+      if(val >= 60.0) val += 1.0;
+      assert_lxw(worksheet_write_number(ctx->sheet, row, col_idx, val, NULL));
+    }
+  } else {
+    switch(TYPEOF(value)){
+    case REALSXP: {
+      double val = REAL(value)[0];
+      if(val == R_PosInf)
+        assert_lxw(worksheet_write_string(ctx->sheet, row, col_idx, "Inf", NULL));
+      else if(val == R_NegInf)
+        assert_lxw(worksheet_write_string(ctx->sheet, row, col_idx, "-Inf", NULL));
+      else if(R_FINITE(val))
+        assert_lxw(worksheet_write_number(ctx->sheet, row, col_idx, val, NULL));
+      break;
+    }
+    case INTSXP: {
+      int val = INTEGER(value)[0];
+      if(val != NA_INTEGER)
+        assert_lxw(worksheet_write_number(ctx->sheet, row, col_idx,
+                                           (double) val, NULL));
+      break;
+    }
+    case LGLSXP: {
+      int val = LOGICAL(value)[0];
+      if(val != NA_LOGICAL)
+        assert_lxw(worksheet_write_boolean(ctx->sheet, row, col_idx, val, NULL));
+      break;
+    }
+    case STRSXP: {
+      SEXP val = STRING_ELT(value, 0);
+      if(val != NA_STRING && Rf_length(val) > 0)
+        assert_lxw(worksheet_write_string(ctx->sheet, row, col_idx,
+                     Rf_translateCharUTF8(val), NULL));
+      break;
+    }
+    default: break;
+    }
+  }
+}
+
 /* --- General cell dispatcher --------------------------------------------- */
 
 static void write_cell(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
@@ -173,6 +310,9 @@ static void write_cell(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
     break;
   case COL_LOGICAL:
     write_cell_logical(ctx, row, col, col_data, i);
+    break;
+  case COL_CELL_GENERAL:
+    write_cell_general(ctx, row, col, col_data, i);
     break;
   default:
     break;

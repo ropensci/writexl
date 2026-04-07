@@ -1,0 +1,150 @@
+---
+title: "Writing Special Cell Types with writexl"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Writing Special Cell Types with writexl}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "#>"
+)
+library(writexl)
+```
+
+The `writexl` package exports plain data frame values (numbers, strings,
+booleans, dates) automatically. For anything more specialised — formulas,
+hyperlinks, or mixed-type columns — the package provides the `xl_cell_general`
+family of helpers.
+
+## 1. Formulas
+
+Use `xl_formula()` to mark character strings as Excel formulas. Each formula
+**must** start with `"="`. A length-1 formula is automatically recycled to fill
+the whole column.
+
+```{r formulas}
+df <- data.frame(
+  name    = c("UCLA", "Berkeley", "Caltech"),
+  founded = c(1919, 1868, 1891)
+)
+df$age <- xl_formula('=(YEAR(TODAY()) - INDIRECT("B" & ROW()))')
+```
+
+You can also supply a **pre-calculated result** so that xlsx readers that do
+not recalculate on open still show a sensible value:
+
+```{r formula-precalc}
+cells <- c(
+  xl_cell_general(value = 55.0, formula = "=SUM(B2:B4)"),
+  xl_cell_general(value = 10.5, formula = "=AVERAGE(B2:B4)")
+)
+df2 <- data.frame(label = c("Sum", "Mean"))
+df2$result <- cells
+```
+
+When `value` is numeric the package uses `worksheet_write_formula_num()` so
+the stored value is visible even without recalculation. When `value` is a
+character string, `worksheet_write_formula_str()` is used instead.
+
+## 2. Hyperlinks
+
+Use `xl_hyperlink()` for clickable URLs. Optionally supply a `name` vector
+for the display text shown in the cell:
+
+```{r hyperlinks}
+df3 <- data.frame(
+  name = c("UCLA", "Berkeley"),
+  url  = xl_hyperlink(
+    c("http://www.ucla.edu", "http://www.berkeley.edu"),
+    name = "homepage"
+  )
+)
+```
+
+For more control — including a tooltip — use `xl_cell_general()` directly with
+a named-list hyperlink specification:
+
+```{r hyperlink-detailed}
+df4 <- data.frame(x = 1:2)
+df4$link <- c(
+  xl_cell_general(
+    hyperlink = list(
+      url     = "http://www.ucla.edu",
+      string  = "UCLA website",
+      tooltip = "Opens UCLA homepage"
+    )
+  ),
+  xl_cell_general(hyperlink = "http://www.berkeley.edu")
+)
+```
+
+`NA` URLs produce blank cells with no hyperlink:
+
+```{r hyperlink-na}
+urls <- c("http://www.ucla.edu", NA, "http://www.caltech.edu")
+df5 <- data.frame(name = c("UCLA", "???", "Caltech"))
+df5$url <- xl_hyperlink(urls)
+```
+
+## 3. Value-only cells
+
+`xl_cell_general()` with only a `value` argument writes a plain cell of
+whatever R type is provided. This is useful when a column contains a single
+scalar that should be recycled:
+
+```{r value-only}
+df6 <- data.frame(x = 1:4)
+df6$constant <- xl_cell_general(value = 99L)  # integer 99 in every row
+```
+
+Supported value types include `numeric`, `integer`, `logical`, `character`,
+`Date`, and `POSIXct`.
+
+## 4. Mixed-type columns
+
+Because each element of an `xl_cell_general` object represents one cell, you
+can combine different types in a single column by concatenating individual
+cells with `c()`:
+
+```{r mixed-type}
+mixed <- c(
+  xl_cell_general(value = 1.5),                  # numeric
+  xl_cell_general(value = "see note"),            # string
+  xl_cell_general(formula = "=A1+A2"),            # formula
+  xl_cell_general(hyperlink = "https://cran.r-project.org")  # hyperlink
+)
+
+df7 <- data.frame(row = 1:4)
+df7$mixed_col <- mixed
+```
+
+A list passed to `value` allows different R types per cell in one call:
+
+```{r mixed-value-list}
+df8 <- data.frame(x = 1:3)
+df8$v <- xl_cell_general(value = list(42L, "hello", TRUE))
+```
+
+## 5. Backward compatibility
+
+All existing `xl_formula()` and `xl_hyperlink()` call sites continue to work
+unchanged. Both functions now return an `xl_cell_general` object instead of a
+plain character vector, but the writing behaviour is identical:
+
+```{r compat}
+# These calls are identical to writexl < 1.5.5
+df9 <- data.frame(
+  name    = c("UCLA", "Berkeley"),
+  founded = c(1919, 1868),
+  website = xl_hyperlink(c("http://www.ucla.edu", "http://www.berkeley.edu"),
+                          "homepage")
+)
+df9$age <- xl_formula('=(YEAR(TODAY()) - INDIRECT("B" & ROW()))')
+
+path <- write_xlsx(df9)
+file.exists(path)
+```

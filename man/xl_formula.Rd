@@ -31,4 +31,8 @@ write_xlsx(df, 'universities.xlsx')
 # cleanup
 unlink('universities.xlsx')
 }
+\seealso{
+Other writexl: 
+\code{\link{xl_cell_general}()}
+}
 \concept{writexl}
