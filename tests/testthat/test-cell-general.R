@@ -113,22 +113,20 @@ test_that("xl_cell_general: hyperlink as named list with url only", {
   expect_equal(x[[1L]][["hyperlink"]][["url"]], "https://example.com")
 })
 
-test_that("xl_cell_general: hyperlink as named list with url and string", {
+test_that("xl_cell_general: hyperlink as named list with url and tooltip", {
   x <- xl_cell_general(hyperlink = list(url = "https://example.com",
-                                         string = "Visit"))
-  h <- x[[1L]][["hyperlink"]]
-  expect_equal(h[["url"]], "https://example.com")
-  expect_equal(h[["string"]], "Visit")
-})
-
-test_that("xl_cell_general: hyperlink as named list with url, string, tooltip", {
-  x <- xl_cell_general(hyperlink = list(url     = "https://example.com",
-                                         string  = "Visit",
                                          tooltip = "Go to example.com"))
   h <- x[[1L]][["hyperlink"]]
   expect_equal(h[["url"]],     "https://example.com")
-  expect_equal(h[["string"]],  "Visit")
   expect_equal(h[["tooltip"]], "Go to example.com")
+})
+
+test_that("xl_cell_general: value provides display text for hyperlink cell", {
+  x <- xl_cell_general(value    = "Visit",
+                        hyperlink = list(url     = "https://example.com",
+                                          tooltip = "Go to example.com"))
+  expect_equal(x[[1L]][["value"]], "Visit")
+  expect_equal(x[[1L]][["hyperlink"]][["url"]], "https://example.com")
 })
 
 test_that("xl_cell_general: NA hyperlink -> no hyperlink written", {
@@ -151,7 +149,7 @@ test_that("xl_cell_general: invalid hyperlink format errors", {
 
 test_that("xl_cell_general: hyperlink list missing url errors", {
   expect_error(
-    xl_cell_general(hyperlink = list(list(string = "text"))),
+    xl_cell_general(hyperlink = list(list(tooltip = "hover"))),
     "hyperlink"
   )
 })
@@ -300,11 +298,11 @@ test_that("formula with character pre-calc value writes successfully", {
   expect_true(file.exists(write_xlsx(df)))
 })
 
-test_that("hyperlink with display string and tooltip writes successfully", {
+test_that("hyperlink with value display text and tooltip writes successfully", {
   df <- data.frame(x = 1:2)
   df$h <- c(
-    xl_cell_general(hyperlink = list(url     = "https://example.com",
-                                      string  = "Visit",
+    xl_cell_general(value    = "Visit",
+                    hyperlink = list(url     = "https://example.com",
                                       tooltip = "tooltip text")),
     xl_cell_general(hyperlink = "https://other.com")
   )
@@ -349,11 +347,13 @@ test_that("xl_hyperlink() returns xl_cell_general with correct class", {
   expect_s3_class(x, "xl_cell_general")
 })
 
-test_that("xl_hyperlink() with name uses list hyperlink format", {
+test_that("xl_hyperlink() with name stores name as value (display text)", {
   x <- xl_hyperlink(c("https://a.com", "https://b.com"), c("Site A", "Site B"))
   expect_equal(length(x), 2L)
-  expect_equal(x[[1L]][["hyperlink"]][["url"]], "https://a.com")
-  expect_equal(x[[1L]][["hyperlink"]][["string"]], "Site A")
+  expect_equal(x[[1L]][["value"]],     "Site A")
+  expect_equal(x[[1L]][["hyperlink"]], "https://a.com")
+  expect_equal(x[[2L]][["value"]],     "Site B")
+  expect_equal(x[[2L]][["hyperlink"]], "https://b.com")
 })
 
 test_that("xl_hyperlink() with NA url produces NA hyperlink", {

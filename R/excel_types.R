@@ -37,11 +37,8 @@ xl_hyperlink <- function(url, name = NULL){
   if(is.null(name)){
     xl_cell_general(hyperlink = url)
   } else {
-    hlinks <- mapply(
-      function(u, n) if(is.na(u)) NA else list(url = u, string = n),
-      url, name,
-      SIMPLIFY = FALSE
-    )
-    xl_cell_general(hyperlink = hlinks)
+    # name becomes the cell display text (value); NA urls stay blank
+    value_arg <- ifelse(is.na(url), NA_character_, name)
+    xl_cell_general(value = value_arg, hyperlink = url)
   }
 }

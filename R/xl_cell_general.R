@@ -16,6 +16,9 @@
 #'   means no value is written for that cell. A list enables mixed types
 #'   across cells in the same column (e.g., `list(1.5, "text", TRUE)`). Date
 #'   and POSIXct scalars are supported and formatted as in [write_xlsx()].
+#'   When `hyperlink` is also set for the same cell, a **character** `value`
+#'   is used as the display text shown in the cell instead of the raw URL;
+#'   all other types are ignored for hyperlink cells.
 #' @param formula A character vector of Excel formulas (each must start with
 #'   `"="`), or `NA` for cells with no formula.  When both `value` and
 #'   `formula` are supplied for the same cell, `value` is used as a
@@ -28,12 +31,11 @@
 #'   is `NA`, a single character URL, or a named list with elements:
 #'   \describe{
 #'     \item{`url`}{(required) The target URL.}
-#'     \item{`string`}{(optional) Display text shown in the cell instead of
-#'       the raw URL.}
 #'     \item{`tooltip`}{(optional) Tooltip text shown on hover.}
 #'   }
-#'   Hyperlinks take priority over formulas when both are set for the same
-#'   cell (the hyperlink is written; the formula is ignored).
+#'   Supply a character `value` alongside `hyperlink` to show custom display
+#'   text in the cell instead of the raw URL.  The hyperlink is written via
+#'   `worksheet_write_url_opt()`.
 #'
 #' @return An object of class `c("xl_cell_general", "xl_cell")`, which is a
 #'   list of length `n` where each element is a named list with fields
@@ -49,13 +51,10 @@
 #' # Formula with a pre-calculated numeric result (static export)
 #' xl_cell_general(value = 42.0, formula = "=SUM(A1:A10)")
 #'
-#' # Hyperlink with display text and tooltip
+#' # Hyperlink with display text (value) and tooltip
 #' xl_cell_general(
-#'   hyperlink = list(
-#'     url     = "https://example.com",
-#'     string  = "Visit",
-#'     tooltip = "Go to example.com"
-#'   )
+#'   value    = "Visit",
+#'   hyperlink = list(url = "https://example.com", tooltip = "Go to example.com")
 #' )
 #'
 #' # Vector of cells: value and formula cells in one column

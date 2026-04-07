@@ -65,18 +65,16 @@ df3 <- data.frame(
 )
 ```
 
-For more control — including a tooltip — use `xl_cell_general()` directly with
-a named-list hyperlink specification:
+For more control — including a tooltip — use `xl_cell_general()` directly.
+Supply a character `value` for the display text and a named-list `hyperlink`
+for the URL and tooltip:
 
 ```{r hyperlink-detailed}
 df4 <- data.frame(x = 1:2)
 df4$link <- c(
   xl_cell_general(
-    hyperlink = list(
-      url     = "http://www.ucla.edu",
-      string  = "UCLA website",
-      tooltip = "Opens UCLA homepage"
-    )
+    value     = "UCLA website",
+    hyperlink = list(url = "http://www.ucla.edu", tooltip = "Opens UCLA homepage")
   ),
   xl_cell_general(hyperlink = "http://www.berkeley.edu")
 )

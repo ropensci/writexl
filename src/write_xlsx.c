@@ -175,10 +175,16 @@ static void write_cell_general(cell_write_ctx *ctx,
   SEXP formula   = list_get(cell, "formula");
   SEXP hyperlink = list_get(cell, "hyperlink");
 
-  /* --- hyperlink takes priority ------------------------------------------ */
+  /* --- hyperlink (value provides the optional display string) ------------ */
+  /* Extract display string from value (character only) */
+  const char *display = NULL;
+  if(value != R_NilValue && TYPEOF(value) == STRSXP &&
+     Rf_length(value) > 0 && STRING_ELT(value, 0) != NA_STRING)
+    display = Rf_translateCharUTF8(STRING_ELT(value, 0));
+
   int has_hyperlink = 0;
   if(hyperlink != R_NilValue && !Rf_isNull(hyperlink)){
-    /* NA sentinel stored as logical NA or character NA */
+    /* NA sentinel stored as logical NA */
     if(TYPEOF(hyperlink) == LGLSXP && INTEGER(hyperlink)[0] == NA_INTEGER){
       has_hyperlink = 0;
     } else if(TYPEOF(hyperlink) == STRSXP &&
@@ -186,23 +192,19 @@ static void write_cell_general(cell_write_ctx *ctx,
       has_hyperlink = 1;
       const char *url = Rf_translateCharUTF8(STRING_ELT(hyperlink, 0));
       assert_lxw(worksheet_write_url_opt(ctx->sheet, row, col_idx, url,
-                                          ctx->hyperlink_fmt, NULL, NULL));
+                                          ctx->hyperlink_fmt, display, NULL));
     } else if(TYPEOF(hyperlink) == VECSXP){
       SEXP url_s = list_get(hyperlink, "url");
-      SEXP str_s = list_get(hyperlink, "string");
       SEXP tip_s = list_get(hyperlink, "tooltip");
       if(url_s != R_NilValue && TYPEOF(url_s) == STRSXP &&
          STRING_ELT(url_s, 0) != NA_STRING){
         has_hyperlink = 1;
         const char *url     = Rf_translateCharUTF8(STRING_ELT(url_s, 0));
-        const char *string  = (str_s != R_NilValue && TYPEOF(str_s) == STRSXP &&
-                                STRING_ELT(str_s, 0) != NA_STRING)
-                               ? Rf_translateCharUTF8(STRING_ELT(str_s, 0)) : NULL;
         const char *tooltip = (tip_s != R_NilValue && TYPEOF(tip_s) == STRSXP &&
                                 STRING_ELT(tip_s, 0) != NA_STRING)
                                ? Rf_translateCharUTF8(STRING_ELT(tip_s, 0)) : NULL;
         assert_lxw(worksheet_write_url_opt(ctx->sheet, row, col_idx, url,
-                                            ctx->hyperlink_fmt, string, tooltip));
+                                            ctx->hyperlink_fmt, display, tooltip));
       }
     }
   }
