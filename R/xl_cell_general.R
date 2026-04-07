@@ -12,13 +12,13 @@
 #' `[`, `c()`, and `rep()`, and recycles automatically when assigned to a
 #' data frame column of a different length (just like [xl_formula()]).
 #'
-#' @param value An atomic vector or a list of scalars, one per cell. `NA`
-#'   means no value is written for that cell. A list enables mixed types
-#'   across cells in the same column (e.g., `list(1.5, "text", TRUE)`). Date
-#'   and POSIXct scalars are supported and formatted as in [write_xlsx()].
-#'   When `hyperlink` is also set for the same cell, a **character** `value`
-#'   is used as the display text shown in the cell instead of the raw URL;
-#'   all other types are ignored for hyperlink cells.
+#' @param value An atomic vector or a list of scalars, one per cell. Use `NA`
+#'   to write an explicit empty cell. A list enables mixed types across cells
+#'   in the same column (e.g., `list(1.5, "text", TRUE)`). Date and POSIXct
+#'   scalars are supported and formatted as in [write_xlsx()].  When
+#'   `hyperlink` is also set for the same cell, a **character** `value` is
+#'   used as the display text shown in the cell instead of the raw URL; all
+#'   other types are ignored for hyperlink cells.
 #' @param formula A character vector of Excel formulas (each must start with
 #'   `"="`), or `NA` for cells with no formula.  When both `value` and
 #'   `formula` are supplied for the same cell, `value` is used as a
@@ -71,8 +71,13 @@
 #' df$cell_col    <- xl_cell_general(value = 99L)  # all rows get 99
 xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL) {
 
-  # 0. Pre-normalise hyperlink: a named list with 'url' is a single hyperlink
-  #    spec, not a list of multiple hyperlinks.  Wrap it so length() = 1.
+  # 0a. Require at least one argument ---------------------------------------
+  if (is.null(value) && is.null(formula) && is.null(hyperlink))
+    stop("At least one of 'value', 'formula', or 'hyperlink' must be provided. ",
+         "Use value = NA for an explicit empty cell.", call. = FALSE)
+
+  # 0b. Pre-normalise hyperlink: a named list with 'url' is a single hyperlink
+  #     spec, not a list of multiple hyperlinks.  Wrap it so length() = 1.
   if (is.list(hyperlink) && !is.null(hyperlink[["url"]])) {
     hyperlink <- list(hyperlink)
   }
@@ -81,8 +86,7 @@ xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL) {
   n <- max(c(
     if (!is.null(value))     length(value)     else 0L,
     if (!is.null(formula))   length(formula)   else 0L,
-    if (!is.null(hyperlink)) length(hyperlink) else 0L,
-    1L
+    if (!is.null(hyperlink)) length(hyperlink) else 0L
   ))
 
   # 2. Normalise value to a list of length n --------------------------------

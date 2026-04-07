@@ -53,10 +53,14 @@ test_that("xl_cell_general: NA value produces blank cell", {
   expect_true(is.na(x[[1L]][["value"]]))
 })
 
-test_that("xl_cell_general: NULL value produces blank cell", {
-  x <- xl_cell_general()
+test_that("xl_cell_general: no arguments errors with informative message", {
+  expect_error(xl_cell_general(), "At least one")
+})
+
+test_that("xl_cell_general: value = NA produces explicit empty cell", {
+  x <- xl_cell_general(value = NA)
   expect_equal(length(x), 1L)
-  expect_identical(x[[1L]][["value"]], NA)
+  expect_true(is.na(x[[1L]][["value"]]))
 })
 
 # ── Construction: formula ──────────────────────────────────────────────────────
@@ -164,12 +168,8 @@ test_that("xl_cell_general: length determined from longest input", {
   expect_equal(x[[3L]][["formula"]], "=A1")
 })
 
-test_that("xl_cell_general: all NULL inputs gives length-1 empty cell", {
-  x <- xl_cell_general()
-  expect_equal(length(x), 1L)
-  expect_identical(x[[1L]][["value"]], NA)
-  expect_true(is.na(x[[1L]][["formula"]]))
-  expect_identical(x[[1L]][["hyperlink"]], NA)
+test_that("xl_cell_general: all NULL inputs errors", {
+  expect_error(xl_cell_general(), "At least one")
 })
 
 test_that("xl_cell_general: length() returns number of cells", {
@@ -238,8 +238,8 @@ test_that("print.xl_cell_general truncates at max and shows count", {
   expect_output(print(x, max = 5L), "more")
 })
 
-test_that("print.xl_cell_general shows <empty> for blank cell", {
-  x <- xl_cell_general()
+test_that("print.xl_cell_general shows <empty> for explicit NA cell", {
+  x <- xl_cell_general(value = NA)
   expect_output(print(x), "empty")
 })
 
