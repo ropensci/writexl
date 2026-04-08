@@ -13,8 +13,6 @@ typedef enum {
   COL_STRING,
   COL_DATE,
   COL_POSIXCT,
-  COL_HYPERLINK,
-  COL_FORMULA,
   COL_BLANK,
   COL_CELL_GENERAL,
   COL_UNKNOWN
@@ -41,10 +39,6 @@ static R_COL_TYPE get_type(SEXP col){
     return COL_DATE;
   if(Rf_inherits(col, "POSIXct"))
     return COL_POSIXCT;
-  if(Rf_inherits(col, "xl_hyperlink"))
-    return COL_HYPERLINK;
-  if(Rf_isString(col) && Rf_inherits(col, "xl_formula"))
-    return COL_FORMULA;
   switch(TYPEOF(col)){
   case STRSXP:
     return COL_STRING;
@@ -108,21 +102,6 @@ static void write_cell_string(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
     assert_lxw(worksheet_write_string(ctx->sheet, row, col, Rf_translateCharUTF8(val), NULL));
 }
 
-static void write_cell_formula(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
-                                SEXP col_data, lxw_row_t i){
-  SEXP val = STRING_ELT(col_data, i);
-  if(val != NA_STRING && Rf_length(val))
-    assert_lxw(worksheet_write_formula(ctx->sheet, row, col, Rf_translateCharUTF8(val), NULL));
-}
-
-static void write_cell_hyperlink(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
-                                  SEXP col_data, lxw_row_t i){
-  SEXP val = STRING_ELT(col_data, i);
-  if(val != NA_STRING && Rf_length(val))
-    assert_lxw(worksheet_write_formula(ctx->sheet, row, col, Rf_translateCharUTF8(val),
-                                        ctx->hyperlink_fmt));
-}
-
 static void write_cell_real(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
                              SEXP col_data, lxw_row_t i){
   double val = REAL(col_data)[i];
@@ -179,12 +158,6 @@ static void write_cell(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
     break;
   case COL_STRING:
     write_cell_string(ctx, row, col, col_data, i);
-    break;
-  case COL_FORMULA:
-    write_cell_formula(ctx, row, col, col_data, i);
-    break;
-  case COL_HYPERLINK:
-    write_cell_hyperlink(ctx, row, col, col_data, i);
     break;
   case COL_REAL:
     write_cell_real(ctx, row, col, col_data, i);

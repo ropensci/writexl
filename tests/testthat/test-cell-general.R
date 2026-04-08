@@ -349,19 +349,30 @@ test_that("xl_hyperlink() returns xl_cell_general with correct class", {
   expect_s3_class(x, "xl_cell_general")
 })
 
-test_that("xl_hyperlink() with name stores name as value (display text)", {
-  x <- xl_hyperlink(c("https://a.com", "https://b.com"), c("Site A", "Site B"))
+test_that("xl_hyperlink() with no name stores HYPERLINK formula", {
+  x <- xl_hyperlink(c("https://a.com", "https://b.com"))
   expect_equal(length(x), 2L)
-  expect_equal(x[[1L]][["value"]],     "Site A")
-  expect_equal(x[[1L]][["hyperlink"]], "https://a.com")
-  expect_equal(x[[2L]][["value"]],     "Site B")
-  expect_equal(x[[2L]][["hyperlink"]], "https://b.com")
+  expect_equal(x[[1L]][["formula"]], '=HYPERLINK("https://a.com")')
+  expect_equal(x[[2L]][["formula"]], '=HYPERLINK("https://b.com")')
 })
 
-test_that("xl_hyperlink() with NA url produces NA hyperlink", {
+test_that("xl_hyperlink() with name stores HYPERLINK formula with display text", {
+  x <- xl_hyperlink(c("https://a.com", "https://b.com"), c("Site A", "Site B"))
+  expect_equal(length(x), 2L)
+  expect_equal(x[[1L]][["formula"]], '=HYPERLINK("https://a.com","Site A")')
+  expect_equal(x[[2L]][["formula"]], '=HYPERLINK("https://b.com","Site B")')
+})
+
+test_that("xl_hyperlink() with NA url produces NA formula (blank cell)", {
   x <- xl_hyperlink(c("https://a.com", NA))
   expect_equal(length(x), 2L)
-  expect_identical(x[[2L]][["hyperlink"]], NA)
+  expect_true(is.na(x[[2L]][["formula"]]))
+})
+
+test_that("xl_hyperlink() escapes internal double quotes in url and name", {
+  x <- xl_hyperlink('http://example.com/q?a="1"', name = 'Say "hello"')
+  expect_equal(x[[1L]][["formula"]],
+               '=HYPERLINK("http://example.com/q?a=""1""","Say ""hello""")')
 })
 
 test_that("xl_hyperlink() writes valid xlsx", {
@@ -371,9 +382,64 @@ test_that("xl_hyperlink() writes valid xlsx", {
   expect_true(file.exists(write_xlsx(df)))
 })
 
-test_that("xl_hyperlink() with NA name value writes valid xlsx", {
+test_that("xl_hyperlink() with NA url writes valid xlsx", {
   df <- data.frame(x = c("a", "b"))
   df$link <- xl_hyperlink(c("http://a.com", NA))
+  expect_true(file.exists(write_xlsx(df)))
+})
+
+# ── xl_hyperlink_cell() ───────────────────────────────────────────────────────
+
+test_that("xl_hyperlink_cell() returns xl_cell_general with correct class", {
+  x <- xl_hyperlink_cell("https://example.com")
+  expect_s3_class(x, "xl_cell_general")
+})
+
+test_that("xl_hyperlink_cell() with no value stores URL as hyperlink field", {
+  x <- xl_hyperlink_cell(c("https://a.com", "https://b.com"))
+  expect_equal(length(x), 2L)
+  expect_equal(x[[1L]][["hyperlink"]], "https://a.com")
+  expect_equal(x[[2L]][["hyperlink"]], "https://b.com")
+})
+
+test_that("xl_hyperlink_cell() with value stores display text and hyperlink", {
+  x <- xl_hyperlink_cell(c("https://a.com", "https://b.com"), value = c("A", "B"))
+  expect_equal(x[[1L]][["value"]],     "A")
+  expect_equal(x[[1L]][["hyperlink"]], "https://a.com")
+  expect_equal(x[[2L]][["value"]],     "B")
+  expect_equal(x[[2L]][["hyperlink"]], "https://b.com")
+})
+
+test_that("xl_hyperlink_cell() recycles value to url length", {
+  x <- xl_hyperlink_cell(c("https://a.com", "https://b.com"), value = "Link")
+  expect_equal(x[[1L]][["value"]], "Link")
+  expect_equal(x[[2L]][["value"]], "Link")
+})
+
+test_that("xl_hyperlink_cell() with NA url produces blank cell", {
+  x <- xl_hyperlink_cell(c("https://a.com", NA))
+  expect_equal(length(x), 2L)
+  expect_identical(x[[2L]][["hyperlink"]], NA)
+})
+
+test_that("xl_hyperlink_cell() with NA url and value: NA url clears value", {
+  x <- xl_hyperlink_cell(c("https://a.com", NA), value = "Link")
+  expect_equal(x[[1L]][["value"]], "Link")
+  expect_true(is.na(x[[2L]][["value"]]))
+})
+
+test_that("xl_hyperlink_cell() writes valid xlsx", {
+  df <- data.frame(name = c("UCLA", "Berkeley"))
+  df$website <- xl_hyperlink_cell(
+    c("http://www.ucla.edu", "http://www.berkeley.edu"),
+    value = "homepage"
+  )
+  expect_true(file.exists(write_xlsx(df)))
+})
+
+test_that("xl_hyperlink_cell() with NA url writes valid xlsx", {
+  df <- data.frame(x = c("a", "b"))
+  df$link <- xl_hyperlink_cell(c("http://a.com", NA))
   expect_true(file.exists(write_xlsx(df)))
 })
 

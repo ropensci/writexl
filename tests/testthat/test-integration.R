@@ -53,24 +53,32 @@ test_that("comprehensive xlsx output exercises all package functionality", {
   formulas$result <- xl_formula(c("=A2*2", "=A3*2", NA))
 
   # ── Sheet 3: hyperlinks ───────────────────────────────────────────────────
-  # Col A: expected   — description
-  # Col B: plain_link — raw URL shown in cell, clickable; NA = blank
-  # Col C: named_link — display text shown instead of URL; NA = blank
+  # Col A: expected        — description
+  # Col B: formula_link    — =HYPERLINK() formula; readable by readxl; NA = blank
+  # Col C: named_link      — =HYPERLINK() formula with display text; NA = blank
+  # Col D: cell_link       — native cell-level hyperlink via xl_hyperlink_cell();
+  #                          NOT readable by readxl (reads as NA)
   links <- data.frame(
     expected = c(
-      "plain hyperlink  ->  raw URL 'https://www.r-project.org' shown, clickable",
-      "named hyperlink  ->  display text 'CRAN' shown, clickable",
-      "blank (NA URL, no name)",
-      "blank (NA URL, name ignored)"
+      "formula hyperlink  ->  =HYPERLINK() formula, URL shown, clickable",
+      "named formula hyperlink  ->  =HYPERLINK() formula, display text 'CRAN' shown",
+      "blank (NA URL)",
+      "cell-level hyperlink  ->  native URL metadata, display text 'R Project'"
     ),
     stringsAsFactors = FALSE
   )
-  links$plain_link <- xl_hyperlink(
-    c("https://www.r-project.org", "https://cran.r-project.org", NA, NA)
+  links$formula_link <- xl_hyperlink(
+    c("https://www.r-project.org", "https://cran.r-project.org", NA,
+      "https://www.r-project.org")
   )
   links$named_link <- xl_hyperlink(
-    c("https://www.r-project.org", "https://cran.r-project.org", NA, NA),
-    name = c("R Project", "CRAN", "none", "none")
+    c("https://www.r-project.org", "https://cran.r-project.org", NA,
+      "https://www.r-project.org"),
+    name = c("R Project", "CRAN", "none", "R Project")
+  )
+  links$cell_link <- xl_hyperlink_cell(
+    c(NA, NA, NA, "https://www.r-project.org"),
+    value = c(NA_character_, NA_character_, NA_character_, "R Project")
   )
 
   # ── Sheet 4: cell_general ─────────────────────────────────────────────────
@@ -193,7 +201,7 @@ test_that("comprehensive xlsx output exercises all package functionality", {
   expect_equal(names(rt_f), c("x", "expected", "result"))
 
   rt_l <- readxl::read_xlsx(path, sheet = "hyperlinks")
-  expect_equal(names(rt_l), c("expected", "plain_link", "named_link"))
+  expect_equal(names(rt_l), c("expected", "formula_link", "named_link", "cell_link"))
 
   expect_true(rt$logical_col[1L])             # readxl returns logical TRUE/FALSE
   expect_false(rt$logical_col[3L])
