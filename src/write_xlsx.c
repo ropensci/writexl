@@ -141,14 +141,12 @@ static SEXP list_get(SEXP lst, const char *name){
   return R_NilValue;
 }
 
-/* --- General cell dispatcher --------------------------------------------- */
+/* --- Atomic value dispatcher (all non-xl_cell_general types) ------------- */
 
-/* Forward declaration: write_cell_general calls write_cell for value dispatch */
-static void write_cell_general(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col_idx,
-                                SEXP col, lxw_row_t i);
-
-static void write_cell(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
-                        SEXP col_data, R_COL_TYPE type, lxw_row_t i){
+/* Called by both write_cell() and write_cell_general() to write a single
+   atomic value.  No forward declaration needed: defined before both callers. */
+static void write_atomic_value(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                                SEXP col_data, R_COL_TYPE type, lxw_row_t i){
   switch(type){
   case COL_DATE:
     write_cell_date(ctx, row, col, col_data, i);
@@ -168,9 +166,6 @@ static void write_cell(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
   case COL_LOGICAL:
     write_cell_logical(ctx, row, col, col_data, i);
     break;
-  case COL_CELL_GENERAL:
-    write_cell_general(ctx, row, col, col_data, i);
-    break;
   default:
     break;
   }
@@ -184,7 +179,7 @@ static void write_cell(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
  * Priority: hyperlink > formula > value.
  * For hyperlinks, a character value provides the optional display string.
  * For formulas, a numeric or character value is stored as a pre-calculated
- * result.  Plain values are dispatched through write_cell() at index 0.
+ * result.  Plain values are dispatched through write_atomic_value().
  */
 static void write_cell_general(cell_write_ctx *ctx,
                                 lxw_row_t row, lxw_col_t col_idx,
@@ -241,9 +236,19 @@ static void write_cell_general(cell_write_ctx *ctx,
     return;
   }
 
-  /* --- value only: delegate to the existing per-type writers -------------- */
+  /* --- value only: dispatch through the atomic writer --------------------- */
   if(value == R_NilValue || Rf_isNull(value) || Rf_length(value) == 0) return;
-  write_cell(ctx, row, col_idx, value, get_type(value), 0);
+  write_atomic_value(ctx, row, col_idx, value, get_type(value), 0);
+}
+
+/* --- Top-level cell dispatcher ------------------------------------------- */
+
+static void write_cell(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                        SEXP col_data, R_COL_TYPE type, lxw_row_t i){
+  if(type == COL_CELL_GENERAL)
+    write_cell_general(ctx, row, col, col_data, i);
+  else
+    write_atomic_value(ctx, row, col, col_data, type, i);
 }
 
 /* --- Main entry point ---------------------------------------------------- */
