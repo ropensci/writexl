@@ -15,3 +15,11 @@ src/libxlsxwriter/**/Makefile*
 # compiled or used by the R package; only its header is vendored via
 # src/libxlsxwriter/include/xlsxwriter/third_party/emyg_dtoa.h.
 src/libxlsxwriter/third_party/dtoa/
+
+# Only the four minizip files used by writexl are tracked; ignore the rest so
+# that updating from upstream cannot accidentally re-add them.
+src/libxlsxwriter/third_party/minizip/*
+!src/libxlsxwriter/third_party/minizip/ioapi.c
+!src/libxlsxwriter/third_party/minizip/ioapi.h
+!src/libxlsxwriter/third_party/minizip/zip.c
+!src/libxlsxwriter/third_party/minizip/zip.h
