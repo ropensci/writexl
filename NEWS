@@ -1,4 +1,8 @@
 1.5.4.9000
+  - New xl_cell_general() function for writing cells with value, formula, and/or hyperlink fields; supports mixed-type columns and data frame recycling
+  - xl_formula() and xl_hyperlink() now return xl_cell_general objects (backward-compatible)
+  - xl_hyperlink() now uses worksheet_write_url_opt() for proper URL hyperlinks, enabling display text and tooltip via xl_cell_general(hyperlink=list(url=, string=, tooltip=))
+  - New vignette: "Writing Special Cell Types with writexl"
   - Fix installation on systems without GNU make by replacing GNU-specific pattern rule in src/Makevars with a portable static library build recipe; remove "GNU make" from SystemRequirements (#97)
   - Internal refactor: cell writing extracted into per-type static C functions dispatched via write_cell() (no functional change; prepares for xl_cell_general support)
   - Update to libxlsxwriter version 1.2.4; restructure vendored source to mirror upstream directory layout (src/libxlsxwriter/{src,include,third_party}) for simpler future updates

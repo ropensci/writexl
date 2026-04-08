@@ -1,5 +1,13 @@
-AppVeyor
-libxlsxwriter
-roundtrip
+CMD
+Codecov
+POSIXct
 RStudio
+behaviour
+libxlsxwriter
+num
+pre
+roundtrip
+specialised
+str
+xl
 xlsx

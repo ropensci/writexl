@@ -13,9 +13,8 @@ typedef enum {
   COL_STRING,
   COL_DATE,
   COL_POSIXCT,
-  COL_HYPERLINK,
-  COL_FORMULA,
   COL_BLANK,
+  COL_CELL_GENERAL,
   COL_UNKNOWN
 } R_COL_TYPE;
 
@@ -34,14 +33,12 @@ static void assert_lxw(lxw_error err){
 }
 
 static R_COL_TYPE get_type(SEXP col){
+  if(Rf_inherits(col, "xl_cell_general"))
+    return COL_CELL_GENERAL;
   if(Rf_inherits(col, "Date"))
     return COL_DATE;
   if(Rf_inherits(col, "POSIXct"))
     return COL_POSIXCT;
-  if(Rf_inherits(col, "xl_hyperlink"))
-    return COL_HYPERLINK;
-  if(Rf_isString(col) && Rf_inherits(col, "xl_formula"))
-    return COL_FORMULA;
   switch(TYPEOF(col)){
   case STRSXP:
     return COL_STRING;
@@ -105,21 +102,6 @@ static void write_cell_string(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
     assert_lxw(worksheet_write_string(ctx->sheet, row, col, Rf_translateCharUTF8(val), NULL));
 }
 
-static void write_cell_formula(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
-                                SEXP col_data, lxw_row_t i){
-  SEXP val = STRING_ELT(col_data, i);
-  if(val != NA_STRING && Rf_length(val))
-    assert_lxw(worksheet_write_formula(ctx->sheet, row, col, Rf_translateCharUTF8(val), NULL));
-}
-
-static void write_cell_hyperlink(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
-                                  SEXP col_data, lxw_row_t i){
-  SEXP val = STRING_ELT(col_data, i);
-  if(val != NA_STRING && Rf_length(val))
-    assert_lxw(worksheet_write_formula(ctx->sheet, row, col, Rf_translateCharUTF8(val),
-                                        ctx->hyperlink_fmt));
-}
-
 static void write_cell_real(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
                              SEXP col_data, lxw_row_t i){
   double val = REAL(col_data)[i];
@@ -145,10 +127,26 @@ static void write_cell_logical(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col
     assert_lxw(worksheet_write_boolean(ctx->sheet, row, col, val, NULL));
 }
 
-/* --- General cell dispatcher --------------------------------------------- */
+/* --- xl_cell_general support --------------------------------------------- */
 
-static void write_cell(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
-                        SEXP col_data, R_COL_TYPE type, lxw_row_t i){
+/* Return the element named 'name' from a named R list, or R_NilValue */
+static SEXP list_get(SEXP lst, const char *name){
+  SEXP names = Rf_getAttrib(lst, R_NamesSymbol);
+  if(names == R_NilValue) return R_NilValue;
+  int n = Rf_length(names);
+  for(int k = 0; k < n; k++){
+    if(strcmp(CHAR(STRING_ELT(names, k)), name) == 0)
+      return VECTOR_ELT(lst, k);
+  }
+  return R_NilValue;
+}
+
+/* --- Atomic value dispatcher (all non-xl_cell_general types) ------------- */
+
+/* Called by both write_cell() and write_cell_general() to write a single
+   atomic value.  No forward declaration needed: defined before both callers. */
+static void write_atomic_value(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                                SEXP col_data, R_COL_TYPE type, lxw_row_t i){
   switch(type){
   case COL_DATE:
     write_cell_date(ctx, row, col, col_data, i);
@@ -158,12 +156,6 @@ static void write_cell(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
     break;
   case COL_STRING:
     write_cell_string(ctx, row, col, col_data, i);
-    break;
-  case COL_FORMULA:
-    write_cell_formula(ctx, row, col, col_data, i);
-    break;
-  case COL_HYPERLINK:
-    write_cell_hyperlink(ctx, row, col, col_data, i);
     break;
   case COL_REAL:
     write_cell_real(ctx, row, col, col_data, i);
@@ -177,6 +169,86 @@ static void write_cell(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
   default:
     break;
   }
+}
+
+/*
+ * write_cell_general: write the i-th cell of an xl_cell_general column.
+ * col is the full xl_cell_general list-column; VECTOR_ELT(col, i) is one
+ * per-cell named list with elements: value, formula, hyperlink.
+ *
+ * Priority: hyperlink > formula > value.
+ * For hyperlinks, a character value provides the optional display string.
+ * For formulas, a numeric or character value is stored as a pre-calculated
+ * result.  Plain values are dispatched through write_atomic_value().
+ */
+static void write_cell_general(cell_write_ctx *ctx,
+                                lxw_row_t row, lxw_col_t col_idx,
+                                SEXP col, lxw_row_t i){
+  SEXP cell      = VECTOR_ELT(col, (R_xlen_t) i);
+  SEXP value     = list_get(cell, "value");
+  SEXP formula   = list_get(cell, "formula");
+  SEXP hyperlink = list_get(cell, "hyperlink");
+
+  /* --- hyperlink (character value provides the optional display string) --- */
+  const char *display = NULL;
+  if(value != R_NilValue && TYPEOF(value) == STRSXP &&
+     Rf_length(value) > 0 && STRING_ELT(value, 0) != NA_STRING)
+    display = Rf_translateCharUTF8(STRING_ELT(value, 0));
+
+  if(hyperlink != R_NilValue && !Rf_isNull(hyperlink)){
+    if(TYPEOF(hyperlink) == STRSXP && STRING_ELT(hyperlink, 0) != NA_STRING){
+      assert_lxw(worksheet_write_url_opt(ctx->sheet, row, col_idx,
+                   Rf_translateCharUTF8(STRING_ELT(hyperlink, 0)),
+                   ctx->hyperlink_fmt, display, NULL));
+      return;
+    } else if(TYPEOF(hyperlink) == VECSXP){
+      SEXP url_s = list_get(hyperlink, "url");
+      SEXP tip_s = list_get(hyperlink, "tooltip");
+      if(url_s != R_NilValue && TYPEOF(url_s) == STRSXP &&
+         STRING_ELT(url_s, 0) != NA_STRING){
+        const char *tooltip = (tip_s != R_NilValue && TYPEOF(tip_s) == STRSXP &&
+                                STRING_ELT(tip_s, 0) != NA_STRING)
+                               ? Rf_translateCharUTF8(STRING_ELT(tip_s, 0)) : NULL;
+        assert_lxw(worksheet_write_url_opt(ctx->sheet, row, col_idx,
+                     Rf_translateCharUTF8(STRING_ELT(url_s, 0)),
+                     ctx->hyperlink_fmt, display, tooltip));
+        return;
+      }
+    }
+    /* hyperlink is NA or invalid — fall through to formula / value */
+  }
+
+  /* --- formula (with optional pre-calculated value) ----------------------- */
+  if(formula != R_NilValue && TYPEOF(formula) == STRSXP &&
+     STRING_ELT(formula, 0) != NA_STRING && Rf_length(formula) > 0){
+    const char *fstr = Rf_translateCharUTF8(STRING_ELT(formula, 0));
+    if(value != R_NilValue && TYPEOF(value) == REALSXP &&
+       Rf_length(value) > 0 && R_FINITE(REAL(value)[0])){
+      assert_lxw(worksheet_write_formula_num(ctx->sheet, row, col_idx,
+                                              fstr, NULL, REAL(value)[0]));
+    } else if(value != R_NilValue && TYPEOF(value) == STRSXP &&
+              Rf_length(value) > 0 && STRING_ELT(value, 0) != NA_STRING){
+      assert_lxw(worksheet_write_formula_str(ctx->sheet, row, col_idx, fstr, NULL,
+                   Rf_translateCharUTF8(STRING_ELT(value, 0))));
+    } else {
+      assert_lxw(worksheet_write_formula(ctx->sheet, row, col_idx, fstr, NULL));
+    }
+    return;
+  }
+
+  /* --- value only: dispatch through the atomic writer --------------------- */
+  if(value == R_NilValue || Rf_isNull(value) || Rf_length(value) == 0) return;
+  write_atomic_value(ctx, row, col_idx, value, get_type(value), 0);
+}
+
+/* --- Top-level cell dispatcher ------------------------------------------- */
+
+static void write_cell(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                        SEXP col_data, R_COL_TYPE type, lxw_row_t i){
+  if(type == COL_CELL_GENERAL)
+    write_cell_general(ctx, row, col, col_data, i);
+  else
+    write_atomic_value(ctx, row, col, col_data, type, i);
 }
 
 /* --- Main entry point ---------------------------------------------------- */
