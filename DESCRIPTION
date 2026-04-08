@@ -27,6 +27,5 @@ Suggests:
 VignetteBuilder: knitr
 Language: en-US
 SystemRequirements:
-    GNU make,
     zlib
 Config/testthat/edition: 3

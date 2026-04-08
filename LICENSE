@@ -1,2 +1,5 @@
 YEAR: 2017
 COPYRIGHT HOLDER: Jeroen Ooms
+
+For the licenses of libxlsxwriter and other third-party code included
+with this package, see inst/COPYRIGHT.

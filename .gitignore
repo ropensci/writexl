@@ -5,3 +5,13 @@
 *.o
 *.a
 *.dll
+
+# Upstream libxlsxwriter Makefiles are not used by the R package build
+# (src/Makevars drives all compilation) and trigger R CMD check warnings
+# about GNU extensions; exclude them from the repository.
+src/libxlsxwriter/**/Makefile*
+
+# dtoa is part of the upstream libxlsxwriter third_party directory but is not
+# compiled or used by the R package; only its header is vendored via
+# src/libxlsxwriter/include/xlsxwriter/third_party/emyg_dtoa.h.
+src/libxlsxwriter/third_party/dtoa/
