@@ -206,19 +206,21 @@ test_that("rep.xl_cell_general repeats correctly", {
   expect_equal(r[[3L]][["value"]], 42)
 })
 
+test_that("as.data.frame.xl_cell_general: data.frame() uses the argument name", {
+  x <- xl_cell_general(value = 1:3)
+  # names(as.data.frame(x)) is NULL so data.frame() keeps the argument name
+  expect_null(names(as.data.frame(x)))
+  df <- data.frame(a = 1:3, my_col = x)
+  expect_equal(names(df), c("a", "my_col"))
+  expect_true(is.list(df$my_col))
+})
+
 test_that("rep.xl_cell_general with length.out", {
   x <- xl_cell_general(value = c(1, 2))
   r <- rep(x, length.out = 5L)
   expect_equal(length(r), 5L)
 })
 
-test_that("as.data.frame.xl_cell_general produces a list column", {
-  x <- xl_cell_general(value = 1:3)
-  df <- as.data.frame(x)
-  expect_s3_class(df, "data.frame")
-  expect_equal(nrow(df), 3L)
-  expect_true(is.list(df[[1L]]))
-})
 
 test_that("print.xl_cell_general runs without error for length-1 cell", {
   x <- xl_cell_general(value = 99)

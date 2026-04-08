@@ -165,13 +165,15 @@ rep.xl_cell_general <- function(x, ...) {
 }
 
 #' @export
-as.data.frame.xl_cell_general <- function(x, ...) {
-  # Store the xl_cell_general object as a single list column
+as.data.frame.xl_cell_general <- function(x, row.names = NULL, optional = FALSE, ...) {
+  # Omit names so that data.frame() uses the caller's argument name rather
+  # than an arbitrary inner name.  This mirrors how I(list(...)) behaves:
+  # names(xi) == NULL causes data.frame() to leave vnames[[i]] as the
+  # argument name instead of overriding it.
   structure(
     list(x),
-    names     = "x",
     class     = "data.frame",
-    row.names = seq_len(length(x))
+    row.names = if (is.null(row.names)) seq_len(length(x)) else row.names
   )
 }
 
