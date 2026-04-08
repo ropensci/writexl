@@ -7,13 +7,13 @@
 xl_cell_general(value = NULL, formula = NULL, hyperlink = NULL)
 }
 \arguments{
-\item{value}{An atomic vector or a list of scalars, one per cell. `NA`
-means no value is written for that cell. A list enables mixed types
-across cells in the same column (e.g., `list(1.5, "text", TRUE)`). Date
-and POSIXct scalars are supported and formatted as in [write_xlsx()].
-When `hyperlink` is also set for the same cell, a **character** `value`
-is used as the display text shown in the cell instead of the raw URL;
-all other types are ignored for hyperlink cells.}
+\item{value}{An atomic vector or a list of scalars, one per cell. Use `NA`
+to write an explicit empty cell. A list enables mixed types across cells
+in the same column (e.g., `list(1.5, "text", TRUE)`). Date and POSIXct
+scalars are supported and formatted as in [write_xlsx()].  When
+`hyperlink` is also set for the same cell, a **character** `value` is
+used as the display text shown in the cell instead of the raw URL; all
+other types are ignored for hyperlink cells.}
 
 \item{formula}{A character vector of Excel formulas (each must start with
 `"="`), or `NA` for cells with no formula.  When both `value` and

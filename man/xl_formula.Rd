@@ -3,21 +3,52 @@
 \name{xl_formula}
 \alias{xl_formula}
 \alias{xl_hyperlink}
+\alias{xl_hyperlink_cell}
 \title{Excel Types}
 \usage{
 xl_formula(x)
 
 xl_hyperlink(url, name = NULL)
+
+xl_hyperlink_cell(url, value = NULL)
 }
 \arguments{
 \item{x}{character vector to be interpreted as formula}
 
-\item{url}{character vector of URLs}
+\item{url}{character vector of URLs.  Use `NA` to produce a blank cell.}
 
-\item{name}{character vector of friendly names}
+\item{name}{character vector of friendly display names shown in the cell
+instead of the raw URL.  When `NULL`, the URL is shown.  Ignored for
+`NA` URLs.}
+
+\item{value}{character vector (or `NULL`) of display text shown in the
+cell.  For `xl_hyperlink_cell()`, when `NULL` the raw URL is shown.
+Recycled to the length of `url`.  Automatically set to `NA` for cells
+whose URL is `NA`.}
 }
 \description{
-Create special column types to write to a spreadsheet
+* `xl_formula(x)` — wraps a character vector of Excel formulas (each must
+  start with `"="`). The formulas are written to the xlsx file as-is and
+  are recalculated by Excel on open.
+
+* `xl_hyperlink(url, name)` — convenience wrapper that builds an Excel
+  `=HYPERLINK(url, name)` **formula** for each element.  Because the
+  hyperlink is stored as a formula, it is readable by
+  [readxl::read_xlsx()], which returns the formula text.  Display text is
+  controlled by the `name` argument.
+
+* `xl_hyperlink_cell(url, value)` — creates a **native cell-level
+  hyperlink** using `worksheet_write_url_opt()` from libxlsxwriter.  The
+  URL is stored as metadata attached to the cell, not in the formula bar.
+  An optional `value` argument provides the display text shown in the cell.
+  A tooltip and further options can be set by passing a named list to
+  `xl_cell_general()` directly.
+  **Note:** [readxl::read_xlsx()] cannot read cell-level hyperlinks and
+  returns `NA` for those cells.  Use `xl_hyperlink()` instead when
+  round-tripping through readxl is required.
+}
+\details{
+Create special column types to write to a spreadsheet.
 }
 \examples{
 df <- data.frame(
@@ -28,8 +59,17 @@ df <- data.frame(
 df$age <- xl_formula('=(YEAR(TODAY()) - INDIRECT("B" & ROW()))')
 write_xlsx(df, 'universities.xlsx')
 
+# xl_hyperlink_cell() stores the URL as native cell metadata.
+# readxl cannot read these cells, but they display cleanly in Excel.
+df2 <- data.frame(
+  name = c("UCLA", "Berkeley"),
+  website = xl_hyperlink_cell(c("http://www.ucla.edu", "http://www.berkeley.edu"),
+                               value = "homepage")
+)
+write_xlsx(df2, 'universities2.xlsx')
+
 # cleanup
-unlink('universities.xlsx')
+unlink(c('universities.xlsx', 'universities2.xlsx'))
 }
 \seealso{
 Other writexl: 
