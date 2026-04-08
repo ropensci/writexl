@@ -1,24 +1,24 @@
 LIBXLSXWRITER	= \
-  libxlsxwriter/app.o libxlsxwriter/format.o libxlsxwriter/theme.o \
-  libxlsxwriter/chart.o libxlsxwriter/hash_table.o libxlsxwriter/utility.o \
-  libxlsxwriter/content_types.o libxlsxwriter/packager.o libxlsxwriter/workbook.o \
-  libxlsxwriter/core.o libxlsxwriter/relationships.o libxlsxwriter/worksheet.o \
-  libxlsxwriter/custom.o libxlsxwriter/shared_strings.o libxlsxwriter/xmlwriter.o \
-  libxlsxwriter/drawing.o libxlsxwriter/styles.o tmpfileplus/tmpfileplus.o \
-  libxlsxwriter/chartsheet.o minizip/ioapi.o minizip/zip.o libxlsxwriter/metadata.o \
-  libxlsxwriter/comment.o libxlsxwriter/vml.o md5/md5.o libxlsxwriter/table.o \
-  libxlsxwriter/rich_value.o libxlsxwriter/rich_value_rel.o libxlsxwriter/rich_value_structure.o \
-  libxlsxwriter/rich_value_types.o \
+  libxlsxwriter/src/app.o libxlsxwriter/src/format.o libxlsxwriter/src/theme.o \
+  libxlsxwriter/src/chart.o libxlsxwriter/src/hash_table.o libxlsxwriter/src/utility.o \
+  libxlsxwriter/src/content_types.o libxlsxwriter/src/packager.o libxlsxwriter/src/workbook.o \
+  libxlsxwriter/src/core.o libxlsxwriter/src/relationships.o libxlsxwriter/src/worksheet.o \
+  libxlsxwriter/src/custom.o libxlsxwriter/src/shared_strings.o libxlsxwriter/src/xmlwriter.o \
+  libxlsxwriter/src/drawing.o libxlsxwriter/src/styles.o libxlsxwriter/third_party/tmpfileplus/tmpfileplus.o \
+  libxlsxwriter/src/chartsheet.o libxlsxwriter/third_party/minizip/ioapi.o libxlsxwriter/third_party/minizip/zip.o libxlsxwriter/src/metadata.o \
+  libxlsxwriter/src/comment.o libxlsxwriter/src/vml.o libxlsxwriter/third_party/md5/md5.o libxlsxwriter/src/table.o \
+  libxlsxwriter/src/rich_value.o libxlsxwriter/src/rich_value_rel.o libxlsxwriter/src/rich_value_structure.o \
+  libxlsxwriter/src/rich_value_types.o \
 
-STATLIB = libxlsxwriter/libstatxlsxwriter.a
+STATLIB = libxlsxwriter/src/libstatxlsxwriter.a
 
 all: $(SHLIB) cleanup
 
 $(SHLIB): $(STATLIB)
 
 PKG_CFLAGS = $(C_VISIBILITY)
-PKG_CPPFLAGS = -Iinclude -DUSE_R_LANG
-PKG_LIBS = -Llibxlsxwriter -lstatxlsxwriter -lz
+PKG_CPPFLAGS = -Ilibxlsxwriter/include -DUSE_R_LANG
+PKG_LIBS = -Llibxlsxwriter/src -lstatxlsxwriter -lz
 
 $(STATLIB): $(LIBXLSXWRITER)
 	@rm -f $@
