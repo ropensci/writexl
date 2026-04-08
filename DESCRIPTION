@@ -24,6 +24,5 @@ Suggests:
     bit64
 Language: en-US
 SystemRequirements:
-    GNU make,
     zlib
 Config/testthat/edition: 3

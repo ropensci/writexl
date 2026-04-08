@@ -21,10 +21,9 @@ PKG_CPPFLAGS = -Iinclude -DUSE_R_LANG
 PKG_LIBS = -Llibxlsxwriter -lstatxlsxwriter -lz
 
 $(STATLIB): $(LIBXLSXWRITER)
+	@rm -f $@
+	$(AR) -cr $@ $(LIBXLSXWRITER)
+	$(RANLIB) $@
 
 cleanup: $(SHLIB)
 	@rm -f $(LIBXLSXWRITER) $(STATLIB)
-
-# Base R already has this rule on Windows (but not Unix)
-%.a:
-	@$(AR) crs $@ $^
