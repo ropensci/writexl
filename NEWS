@@ -1,4 +1,5 @@
 1.5.4.9000
+  - Fix installation on systems without GNU make by replacing GNU-specific pattern rule in src/Makevars with a portable static library build recipe; remove "GNU make" from SystemRequirements (#97)
   - Internal refactor: cell writing extracted into per-type static C functions dispatched via write_cell() (no functional change; prepares for xl_cell_general support)
   - Update to libxlsxwriter version 1.2.3
   - Fix strcpy buffer overflow in internal C_set_tempdir (tempdir path >= 2048 bytes now errors informatively)
