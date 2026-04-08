@@ -5,3 +5,8 @@
 *.o
 *.a
 *.dll
+
+# Upstream libxlsxwriter Makefiles are not used by the R package build
+# (src/Makevars drives all compilation) and trigger R CMD check warnings
+# about GNU extensions; exclude them from the repository.
+src/libxlsxwriter/**/Makefile*
