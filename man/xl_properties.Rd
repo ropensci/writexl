@@ -23,7 +23,10 @@ xl_properties(
   header_format = xl_font(bold = TRUE) + xl_align(horizontal = "center"),
   hyperlink_format = xl_font(color = "blue", underline = "single"),
   date_format = xl_num_format("yyyy-mm-dd"),
-  datetime_format = xl_num_format("yyyy-mm-dd HH:mm:ss UTC")
+  datetime_format = xl_num_format("yyyy-mm-dd HH:mm:ss UTC"),
+  date_col_width = 20,
+  datetime_col_width = 20,
+  header_row_height = 15
 )
 }
 \arguments{
@@ -51,6 +54,11 @@ underlined).}
 
 \item{date_format, datetime_format}{[xl_format] number formats applied to
 `Date` / `POSIXct` values.}
+
+\item{date_col_width, datetime_col_width}{Default column width for `Date` /
+`POSIXct` columns.}
+
+\item{header_row_height}{Height (in points) of the header row.}
 }
 \value{
 An `xl_properties` object.

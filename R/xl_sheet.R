@@ -223,9 +223,11 @@ print.xl_sheet <- function(x, ...) {
   for (i in seq_len(ncols)) {
     base <- props$default_format
     if (inherits(df[[i]], "POSIXct")) {
-      base <- merge_xl_format(base, props$datetime_format); col_width[i] <- 20
+      base <- merge_xl_format(base, props$datetime_format)
+      col_width[i] <- props$datetime_col_width
     } else if (inherits(df[[i]], "Date")) {
-      base <- merge_xl_format(base, props$date_format);     col_width[i] <- 20
+      base <- merge_xl_format(base, props$date_format)
+      col_width[i] <- props$date_col_width
     }
     col_fmt[[i]] <- base
   }

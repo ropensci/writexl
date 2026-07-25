@@ -101,6 +101,27 @@ test_that("date_format can be overridden at the workbook level", {
   expect_match(styles_string(wb), "dd/mm/yyyy", fixed = TRUE)
 })
 
+test_that("date column width and header row height are configurable", {
+  wb <- xl_workbook(data.frame(d = as.Date("2020-01-01")),
+                    properties = xl_properties(date_col_width = 30,
+                                               header_row_height = 40))
+  tmp <- write_tmp(wb)
+  w <- xlsx_part(tmp, "xl/worksheets/sheet1.xml", raw = TRUE)
+  expect_match(w, 'width="30')     # date column widened (Excel pads the value)
+  expect_match(w, 'ht="40"')       # header row height
+  # datetime width too
+  wb2 <- xl_workbook(data.frame(t = as.POSIXct("2020-01-01 00:00", tz = "UTC")),
+                     properties = xl_properties(datetime_col_width = 28))
+  w2 <- xlsx_part(write_tmp(wb2), "xl/worksheets/sheet1.xml", raw = TRUE)
+  expect_match(w2, 'width="28')
+})
+
+test_that("layout dimensions are validated", {
+  expect_error(xl_properties(date_col_width = -1), "non-negative")
+  expect_error(xl_properties(header_row_height = "tall"), "non-negative")
+  expect_error(xl_properties(datetime_col_width = c(1, 2)), "single")
+})
+
 test_that("workbook col_names / format_headers override write_xlsx args", {
   wb <- xl_workbook(data.frame(a = 1:2), col_names = FALSE)
   tmp <- write_tmp(wb, col_names = TRUE)   # workbook wins -> no header

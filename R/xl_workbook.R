@@ -34,6 +34,9 @@
 #'   underlined).
 #' @param date_format,datetime_format [xl_format] number formats applied to
 #'   `Date` / `POSIXct` values.
+#' @param date_col_width,datetime_col_width Default column width for `Date` /
+#'   `POSIXct` columns.
+#' @param header_row_height Height (in points) of the header row.
 #' @return An `xl_properties` object.
 #' @family writexl
 #' @seealso [xl_workbook], [write_xlsx]
@@ -53,13 +56,20 @@ xl_properties <- function(title = NA, subject = NA, author = NA, manager = NA,
                           hyperlink_format = xl_font(color = "blue",
                                                      underline = "single"),
                           date_format      = xl_num_format("yyyy-mm-dd"),
-                          datetime_format  = xl_num_format("yyyy-mm-dd HH:mm:ss UTC")) {
+                          datetime_format  = xl_num_format("yyyy-mm-dd HH:mm:ss UTC"),
+                          date_col_width = 20, datetime_col_width = 20,
+                          header_row_height = 15) {
   fmts <- list(default_format = default_format, header_format = header_format,
                hyperlink_format = hyperlink_format, date_format = date_format,
                datetime_format = datetime_format)
   for (nm in names(fmts))
     if (!is_xl_format(fmts[[nm]]))
       stop(sprintf("`%s` must be an xl_format object", nm), call. = FALSE)
+  for (nm in c("date_col_width", "datetime_col_width", "header_row_height")) {
+    v <- get(nm)
+    if (!is.numeric(v) || length(v) != 1L || is.na(v) || v < 0)
+      stop(sprintf("`%s` must be a single non-negative number", nm), call. = FALSE)
+  }
   if (!is.null(custom) && (is.null(base::names(custom)) || any(base::names(custom) == "")))
     stop("`custom` must be a named list", call. = FALSE)
   if (!is.null(window_size) && length(window_size) != 2L)
@@ -74,7 +84,9 @@ xl_properties <- function(title = NA, subject = NA, author = NA, manager = NA,
          names = names,
          default_format = default_format, header_format = header_format,
          hyperlink_format = hyperlink_format, date_format = date_format,
-         datetime_format = datetime_format),
+         datetime_format = datetime_format, date_col_width = date_col_width,
+         datetime_col_width = datetime_col_width,
+         header_row_height = header_row_height),
     class = "xl_properties"
   )
 }
@@ -160,6 +172,7 @@ print.xl_workbook <- function(x, ...) {
     })
   }
   out$read_only <- as.integer(isTRUE(props$read_only))
+  out$header_row_height <- as.numeric(props$header_row_height)
   if (!is.null(props$window_size))
     out$window_size <- as.integer(props$window_size)
   if (!is.null(props$names) && length(props$names))

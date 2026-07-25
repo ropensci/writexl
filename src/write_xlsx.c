@@ -523,8 +523,9 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
   for(int k = 0; k < nfmts; k++)
     fmts[k + 1] = build_lxw_format(workbook, VECTOR_ELT(formats, k));
 
-  //header row format id (0 = none), resolved on the R side
+  //header row format id (0 = none) and height, resolved on the R side
   int hdr_id = (header_id == R_NilValue) ? 0 : Rf_asInteger(header_id);
+  double hdr_height = opt_scalar_dbl(properties, "header_row_height", LXW_DEF_ROW_HEIGHT);
 
   //workbook document properties
   apply_properties(workbook, properties);
@@ -560,7 +561,7 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
       for(lxw_col_t i = 0; i < cols; i++)
         assert_lxw(worksheet_write_string(sheet, cursor, i, Rf_translateCharUTF8(STRING_ELT(names, i)), NULL));
       if(Rf_asLogical(format_headers))
-        assert_lxw(worksheet_set_row(sheet, cursor, 15, hdr_fmt));
+        assert_lxw(worksheet_set_row(sheet, cursor, hdr_height, hdr_fmt));
       cursor++;
     }
 
