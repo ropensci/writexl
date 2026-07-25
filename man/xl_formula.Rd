@@ -6,14 +6,17 @@
 \alias{xl_hyperlink_cell}
 \title{Excel Types}
 \usage{
-xl_formula(x)
+xl_formula(x, format = NULL)
 
-xl_hyperlink(url, name = NULL)
+xl_hyperlink(url, name = NULL, format = NULL)
 
-xl_hyperlink_cell(url, value = NULL)
+xl_hyperlink_cell(url, value = NULL, format = NULL)
 }
 \arguments{
 \item{x}{character vector to be interpreted as formula}
+
+\item{format}{An optional [xl_format] (or list of `xl_format`, one per
+element) applied to the cells.  See [xl_format].}
 
 \item{url}{character vector of URLs.  Use `NA` to produce a blank cell.}
 

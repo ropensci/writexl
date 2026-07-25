@@ -62,75 +62,13 @@ SEXP C_set_tempdir(SEXP dir){
   if(strlen(src) >= sizeof(TEMPDIR))
     Rf_errorcall(R_NilValue, "Error in writexl: tempdir path too long (max %zu bytes)", sizeof(TEMPDIR) - 1);
   strncpy(TEMPDIR, src, sizeof(TEMPDIR) - 1);
+  TEMPDIR[sizeof(TEMPDIR) - 1] = '\0';
   return Rf_mkString(TEMPDIR);
 }
 
-/* Context struct shared across all cell-writing functions */
-typedef struct {
-  lxw_workbook  *workbook;      /* reserved for future use in cell-format support */
-  lxw_worksheet *sheet;
-  lxw_format    *date_fmt;
-  lxw_format    *datetime_fmt;
-  lxw_format    *hyperlink_fmt;
-} cell_write_ctx;
-
-/* --- Individual per-type cell writers ------------------------------------ */
-
-static void write_cell_date(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
-                             SEXP col_data, lxw_row_t i){
-  double val = Rf_isReal(col_data) ? REAL(col_data)[i] : INTEGER(col_data)[i];
-  if(Rf_isReal(col_data) ? R_FINITE(val) : val != NA_INTEGER)
-    assert_lxw(worksheet_write_number(ctx->sheet, row, col, 25569 + val, NULL));
-}
-
-static void write_cell_posixct(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
-                                SEXP col_data, lxw_row_t i){
-  double val = REAL(col_data)[i];
-  if(R_FINITE(val)){
-    val = 25568.0 + val / (24*60*60);
-    if(val >= 60.0)
-      val = val + 1.0;
-    assert_lxw(worksheet_write_number(ctx->sheet, row, col, val, NULL));
-  }
-}
-
-static void write_cell_string(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
-                               SEXP col_data, lxw_row_t i){
-  SEXP val = STRING_ELT(col_data, i);
-  // NB: xlsx does distinguish between empty string and NA
-  if(val != NA_STRING && Rf_length(val))
-    assert_lxw(worksheet_write_string(ctx->sheet, row, col, Rf_translateCharUTF8(val), NULL));
-}
-
-static void write_cell_real(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
-                             SEXP col_data, lxw_row_t i){
-  double val = REAL(col_data)[i];
-  if(val == R_PosInf)
-    assert_lxw(worksheet_write_string(ctx->sheet, row, col, "Inf", NULL));
-  else if(val == R_NegInf)
-    assert_lxw(worksheet_write_string(ctx->sheet, row, col, "-Inf", NULL));
-  else if(R_FINITE(val)) // skips NA and NAN
-    assert_lxw(worksheet_write_number(ctx->sheet, row, col, val, NULL));
-}
-
-static void write_cell_integer(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
-                                SEXP col_data, lxw_row_t i){
-  int val = INTEGER(col_data)[i];
-  if(val != NA_INTEGER)
-    assert_lxw(worksheet_write_number(ctx->sheet, row, col, val, NULL));
-}
-
-static void write_cell_logical(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
-                                SEXP col_data, lxw_row_t i){
-  int val = LOGICAL(col_data)[i];
-  if(val != NA_LOGICAL)
-    assert_lxw(worksheet_write_boolean(ctx->sheet, row, col, val, NULL));
-}
-
-/* --- xl_cell_general support --------------------------------------------- */
-
 /* Return the element named 'name' from a named R list, or R_NilValue */
 static SEXP list_get(SEXP lst, const char *name){
+  if(lst == R_NilValue || !Rf_isVectorList(lst)) return R_NilValue;
   SEXP names = Rf_getAttrib(lst, R_NamesSymbol);
   if(names == R_NilValue) return R_NilValue;
   int n = Rf_length(names);
@@ -141,30 +79,188 @@ static SEXP list_get(SEXP lst, const char *name){
   return R_NilValue;
 }
 
+/* --- format payload accessors -------------------------------------------- */
+
+static int payload_has(SEXP p, const char *key){
+  return list_get(p, key) != R_NilValue;
+}
+static int payload_int(SEXP p, const char *key){
+  SEXP v = list_get(p, key);
+  return v == R_NilValue ? 0 : Rf_asInteger(v);
+}
+static double payload_dbl(SEXP p, const char *key){
+  SEXP v = list_get(p, key);
+  return v == R_NilValue ? 0.0 : Rf_asReal(v);
+}
+static const char *payload_str(SEXP p, const char *key){
+  SEXP v = list_get(p, key);
+  if(v == R_NilValue || TYPEOF(v) != STRSXP || Rf_length(v) < 1) return NULL;
+  return Rf_translateCharUTF8(STRING_ELT(v, 0));
+}
+
+/*
+ * Build a libxlsxwriter format object from a payload (a named R list produced
+ * by .xl_format_payload() in R).  Each recognized key maps 1:1 to a
+ * format_set_* call.  All enum/color translation is done in R, so this is a
+ * faithful applier only.
+ */
+static lxw_format *build_lxw_format(lxw_workbook *wb, SEXP p){
+  lxw_format *f = workbook_add_format(wb);
+  const char *s;
+
+  /* font */
+  if((s = payload_str(p, "font_name")))   format_set_font_name(f, s);
+  if(payload_has(p, "font_size"))         format_set_font_size(f, payload_dbl(p, "font_size"));
+  if(payload_has(p, "font_color"))        format_set_font_color(f, (lxw_color_t) payload_int(p, "font_color"));
+  if(payload_has(p, "bold"))              format_set_bold(f);
+  if(payload_has(p, "italic"))            format_set_italic(f);
+  if(payload_has(p, "underline"))         format_set_underline(f, (uint8_t) payload_int(p, "underline"));
+  if(payload_has(p, "strikeout"))         format_set_font_strikeout(f);
+  if(payload_has(p, "script"))            format_set_font_script(f, (uint8_t) payload_int(p, "script"));
+  if(payload_has(p, "font_family"))       format_set_font_family(f, (uint8_t) payload_int(p, "font_family"));
+  if(payload_has(p, "font_charset"))      format_set_font_charset(f, (uint8_t) payload_int(p, "font_charset"));
+  if(payload_has(p, "font_outline"))      format_set_font_outline(f);
+  if(payload_has(p, "font_shadow"))       format_set_font_shadow(f);
+  if(payload_has(p, "font_condense"))     format_set_font_condense(f);
+  if(payload_has(p, "font_extend"))       format_set_font_extend(f);
+  if((s = payload_str(p, "font_scheme"))) format_set_font_scheme(f, s);
+  if(payload_has(p, "theme"))             format_set_theme(f, (uint8_t) payload_int(p, "theme"));
+  if(payload_has(p, "color_indexed"))     format_set_color_indexed(f, (uint8_t) payload_int(p, "color_indexed"));
+  if(payload_has(p, "font_only"))         format_set_font_only(f);
+
+  /* fill */
+  if(payload_has(p, "bg_color"))          format_set_bg_color(f, (lxw_color_t) payload_int(p, "bg_color"));
+  if(payload_has(p, "fg_color"))          format_set_fg_color(f, (lxw_color_t) payload_int(p, "fg_color"));
+  if(payload_has(p, "pattern"))           format_set_pattern(f, (uint8_t) payload_int(p, "pattern"));
+
+  /* border */
+  if(payload_has(p, "border_left"))       format_set_left(f, (uint8_t) payload_int(p, "border_left"));
+  if(payload_has(p, "border_right"))      format_set_right(f, (uint8_t) payload_int(p, "border_right"));
+  if(payload_has(p, "border_top"))        format_set_top(f, (uint8_t) payload_int(p, "border_top"));
+  if(payload_has(p, "border_bottom"))     format_set_bottom(f, (uint8_t) payload_int(p, "border_bottom"));
+  if(payload_has(p, "left_color"))        format_set_left_color(f, (lxw_color_t) payload_int(p, "left_color"));
+  if(payload_has(p, "right_color"))       format_set_right_color(f, (lxw_color_t) payload_int(p, "right_color"));
+  if(payload_has(p, "top_color"))         format_set_top_color(f, (lxw_color_t) payload_int(p, "top_color"));
+  if(payload_has(p, "bottom_color"))      format_set_bottom_color(f, (lxw_color_t) payload_int(p, "bottom_color"));
+  if(payload_has(p, "diag_type"))         format_set_diag_type(f, (uint8_t) payload_int(p, "diag_type"));
+  if(payload_has(p, "diag_border"))       format_set_diag_border(f, (uint8_t) payload_int(p, "diag_border"));
+  if(payload_has(p, "diag_color"))        format_set_diag_color(f, (lxw_color_t) payload_int(p, "diag_color"));
+
+  /* alignment */
+  if(payload_has(p, "align_h"))           format_set_align(f, (uint8_t) payload_int(p, "align_h"));
+  if(payload_has(p, "align_v"))           format_set_align(f, (uint8_t) payload_int(p, "align_v"));
+  if(payload_has(p, "text_wrap"))         format_set_text_wrap(f);
+  if(payload_has(p, "rotation"))          format_set_rotation(f, (int16_t) payload_int(p, "rotation"));
+  if(payload_has(p, "indent"))            format_set_indent(f, (uint8_t) payload_int(p, "indent"));
+  if(payload_has(p, "shrink"))            format_set_shrink(f);
+  if(payload_has(p, "reading_order"))     format_set_reading_order(f, (uint8_t) payload_int(p, "reading_order"));
+
+  /* number format */
+  if((s = payload_str(p, "num_format")))  format_set_num_format(f, s);
+  if(payload_has(p, "num_format_index"))  format_set_num_format_index(f, (uint8_t) payload_int(p, "num_format_index"));
+
+  /* protection & misc */
+  if(payload_has(p, "unlocked"))          format_set_unlocked(f);
+  if(payload_has(p, "hidden"))            format_set_hidden(f);
+  if(payload_has(p, "quote_prefix"))      format_set_quote_prefix(f);
+  if(payload_has(p, "set_hyperlink"))     format_set_hyperlink(f);
+
+  return f;
+}
+
+/* Context struct shared across all cell-writing functions */
+typedef struct {
+  lxw_workbook  *workbook;
+  lxw_worksheet *sheet;
+  lxw_format    *date_fmt;
+  lxw_format    *datetime_fmt;
+  lxw_format    *hyperlink_fmt;
+  lxw_format   **fmts;   /* 1-based table of user formats; fmts[0] == NULL   */
+  int            nfmts;  /* number of entries in fmts (excluding slot 0)     */
+} cell_write_ctx;
+
+/* Resolve a 1-based format id to a format pointer (0 or out-of-range -> NULL) */
+static lxw_format *ctx_format(cell_write_ctx *ctx, int id){
+  if(id <= 0 || id > ctx->nfmts) return NULL;
+  return ctx->fmts[id];
+}
+
+/* --- Individual per-type cell writers ------------------------------------ */
+
+static void write_cell_date(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                             SEXP col_data, lxw_row_t i, lxw_format *fmt){
+  double val = Rf_isReal(col_data) ? REAL(col_data)[i] : INTEGER(col_data)[i];
+  if(Rf_isReal(col_data) ? R_FINITE(val) : val != NA_INTEGER)
+    assert_lxw(worksheet_write_number(ctx->sheet, row, col, 25569 + val, fmt));
+}
+
+static void write_cell_posixct(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                                SEXP col_data, lxw_row_t i, lxw_format *fmt){
+  double val = REAL(col_data)[i];
+  if(R_FINITE(val)){
+    val = 25568.0 + val / (24*60*60);
+    if(val >= 60.0)
+      val = val + 1.0;
+    assert_lxw(worksheet_write_number(ctx->sheet, row, col, val, fmt));
+  }
+}
+
+static void write_cell_string(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                               SEXP col_data, lxw_row_t i, lxw_format *fmt){
+  SEXP val = STRING_ELT(col_data, i);
+  // NB: xlsx does distinguish between empty string and NA
+  if(val != NA_STRING && Rf_length(val))
+    assert_lxw(worksheet_write_string(ctx->sheet, row, col, Rf_translateCharUTF8(val), fmt));
+}
+
+static void write_cell_real(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                             SEXP col_data, lxw_row_t i, lxw_format *fmt){
+  double val = REAL(col_data)[i];
+  if(val == R_PosInf)
+    assert_lxw(worksheet_write_string(ctx->sheet, row, col, "Inf", fmt));
+  else if(val == R_NegInf)
+    assert_lxw(worksheet_write_string(ctx->sheet, row, col, "-Inf", fmt));
+  else if(R_FINITE(val)) // skips NA and NAN
+    assert_lxw(worksheet_write_number(ctx->sheet, row, col, val, fmt));
+}
+
+static void write_cell_integer(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                                SEXP col_data, lxw_row_t i, lxw_format *fmt){
+  int val = INTEGER(col_data)[i];
+  if(val != NA_INTEGER)
+    assert_lxw(worksheet_write_number(ctx->sheet, row, col, val, fmt));
+}
+
+static void write_cell_logical(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                                SEXP col_data, lxw_row_t i, lxw_format *fmt){
+  int val = LOGICAL(col_data)[i];
+  if(val != NA_LOGICAL)
+    assert_lxw(worksheet_write_boolean(ctx->sheet, row, col, val, fmt));
+}
+
 /* --- Atomic value dispatcher (all non-xl_cell_general types) ------------- */
 
-/* Called by both write_cell() and write_cell_general() to write a single
-   atomic value.  No forward declaration needed: defined before both callers. */
 static void write_atomic_value(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
-                                SEXP col_data, R_COL_TYPE type, lxw_row_t i){
+                                SEXP col_data, R_COL_TYPE type, lxw_row_t i,
+                                lxw_format *fmt){
   switch(type){
   case COL_DATE:
-    write_cell_date(ctx, row, col, col_data, i);
+    write_cell_date(ctx, row, col, col_data, i, fmt);
     break;
   case COL_POSIXCT:
-    write_cell_posixct(ctx, row, col, col_data, i);
+    write_cell_posixct(ctx, row, col, col_data, i, fmt);
     break;
   case COL_STRING:
-    write_cell_string(ctx, row, col, col_data, i);
+    write_cell_string(ctx, row, col, col_data, i, fmt);
     break;
   case COL_REAL:
-    write_cell_real(ctx, row, col, col_data, i);
+    write_cell_real(ctx, row, col, col_data, i, fmt);
     break;
   case COL_INTEGER:
-    write_cell_integer(ctx, row, col, col_data, i);
+    write_cell_integer(ctx, row, col, col_data, i, fmt);
     break;
   case COL_LOGICAL:
-    write_cell_logical(ctx, row, col, col_data, i);
+    write_cell_logical(ctx, row, col, col_data, i, fmt);
     break;
   default:
     break;
@@ -174,12 +270,11 @@ static void write_atomic_value(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col
 /*
  * write_cell_general: write the i-th cell of an xl_cell_general column.
  * col is the full xl_cell_general list-column; VECTOR_ELT(col, i) is one
- * per-cell named list with elements: value, formula, hyperlink.
+ * per-cell named list with elements: value, formula, hyperlink.  The
+ * per-cell effective format id is carried in the integer attribute
+ * "writexl_format_ids" (resolved entirely in R); 0 means no format.
  *
  * Priority: hyperlink > formula > value.
- * For hyperlinks, a character value provides the optional display string.
- * For formulas, a numeric or character value is stored as a pre-calculated
- * result.  Plain values are dispatched through write_atomic_value().
  */
 static void write_cell_general(cell_write_ctx *ctx,
                                 lxw_row_t row, lxw_col_t col_idx,
@@ -189,6 +284,13 @@ static void write_cell_general(cell_write_ctx *ctx,
   SEXP formula   = list_get(cell, "formula");
   SEXP hyperlink = list_get(cell, "hyperlink");
 
+  /* per-cell effective format (resolved in R) */
+  int fid = 0;
+  SEXP ids = Rf_getAttrib(col, Rf_install("writexl_format_ids"));
+  if(ids != R_NilValue && TYPEOF(ids) == INTSXP && Rf_length(ids) > (R_xlen_t) i)
+    fid = INTEGER(ids)[i];
+  lxw_format *fmt = ctx_format(ctx, fid);
+
   /* --- hyperlink (character value provides the optional display string) --- */
   const char *display = NULL;
   if(value != R_NilValue && TYPEOF(value) == STRSXP &&
@@ -196,10 +298,11 @@ static void write_cell_general(cell_write_ctx *ctx,
     display = Rf_translateCharUTF8(STRING_ELT(value, 0));
 
   if(hyperlink != R_NilValue && !Rf_isNull(hyperlink)){
+    lxw_format *url_fmt = fmt ? fmt : ctx->hyperlink_fmt;
     if(TYPEOF(hyperlink) == STRSXP && STRING_ELT(hyperlink, 0) != NA_STRING){
       assert_lxw(worksheet_write_url_opt(ctx->sheet, row, col_idx,
                    Rf_translateCharUTF8(STRING_ELT(hyperlink, 0)),
-                   ctx->hyperlink_fmt, display, NULL));
+                   url_fmt, display, NULL));
       return;
     } else if(TYPEOF(hyperlink) == VECSXP){
       SEXP url_s = list_get(hyperlink, "url");
@@ -211,7 +314,7 @@ static void write_cell_general(cell_write_ctx *ctx,
                                ? Rf_translateCharUTF8(STRING_ELT(tip_s, 0)) : NULL;
         assert_lxw(worksheet_write_url_opt(ctx->sheet, row, col_idx,
                      Rf_translateCharUTF8(STRING_ELT(url_s, 0)),
-                     ctx->hyperlink_fmt, display, tooltip));
+                     url_fmt, display, tooltip));
         return;
       }
     }
@@ -225,20 +328,20 @@ static void write_cell_general(cell_write_ctx *ctx,
     if(value != R_NilValue && TYPEOF(value) == REALSXP &&
        Rf_length(value) > 0 && R_FINITE(REAL(value)[0])){
       assert_lxw(worksheet_write_formula_num(ctx->sheet, row, col_idx,
-                                              fstr, NULL, REAL(value)[0]));
+                                              fstr, fmt, REAL(value)[0]));
     } else if(value != R_NilValue && TYPEOF(value) == STRSXP &&
               Rf_length(value) > 0 && STRING_ELT(value, 0) != NA_STRING){
-      assert_lxw(worksheet_write_formula_str(ctx->sheet, row, col_idx, fstr, NULL,
+      assert_lxw(worksheet_write_formula_str(ctx->sheet, row, col_idx, fstr, fmt,
                    Rf_translateCharUTF8(STRING_ELT(value, 0))));
     } else {
-      assert_lxw(worksheet_write_formula(ctx->sheet, row, col_idx, fstr, NULL));
+      assert_lxw(worksheet_write_formula(ctx->sheet, row, col_idx, fstr, fmt));
     }
     return;
   }
 
   /* --- value only: dispatch through the atomic writer --------------------- */
   if(value == R_NilValue || Rf_isNull(value) || Rf_length(value) == 0) return;
-  write_atomic_value(ctx, row, col_idx, value, get_type(value), 0);
+  write_atomic_value(ctx, row, col_idx, value, get_type(value), 0, fmt);
 }
 
 /* --- Top-level cell dispatcher ------------------------------------------- */
@@ -248,16 +351,18 @@ static void write_cell(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
   if(type == COL_CELL_GENERAL)
     write_cell_general(ctx, row, col, col_data, i);
   else
-    write_atomic_value(ctx, row, col, col_data, type, i);
+    write_atomic_value(ctx, row, col, col_data, type, i, NULL);
 }
 
 /* --- Main entry point ---------------------------------------------------- */
 
-SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP format_headers, SEXP use_zip64){
+SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
+                             SEXP format_headers, SEXP use_zip64, SEXP formats){
   assert_that(Rf_isVectorList(df_list), "Object is not a list");
   assert_that(Rf_isString(file) && Rf_length(file), "Invalid file path");
   assert_that(Rf_isLogical(col_names), "col_names must be logical");
   assert_that(Rf_isLogical(format_headers), "format_headers must be logical");
+  bail_if(formats != R_NilValue && !Rf_isVectorList(formats), "formats must be a list");
 
   //create workbook
   lxw_workbook_options options = {
@@ -267,6 +372,13 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP forma
   };
   lxw_workbook *workbook = workbook_new_opt(Rf_translateChar(STRING_ELT(file, 0)), &options);
   assert_that(workbook, "failed to create workbook");
+
+  //build the user-format table (1-based; index 0 is the NULL format)
+  int nfmts = (formats == R_NilValue) ? 0 : (int) Rf_length(formats);
+  lxw_format **fmts = (lxw_format **) R_alloc((size_t) nfmts + 1, sizeof(lxw_format *));
+  fmts[0] = NULL;
+  for(int k = 0; k < nfmts; k++)
+    fmts[k + 1] = build_lxw_format(workbook, VECTOR_ELT(formats, k));
 
   //how to format dates
   lxw_format * date = workbook_add_format(workbook);
@@ -343,7 +455,7 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names, SEXP forma
     bail_if(rows > max_rows, "data frame has too many rows for xlsx (max 1048576)");
 
     // Build context for cell writers
-    cell_write_ctx ctx = {workbook, sheet, date, datetime, hyperlink};
+    cell_write_ctx ctx = {workbook, sheet, date, datetime, hyperlink, fmts, nfmts};
 
     // Need to iterate by row first for performance
     for (lxw_row_t i = 0; i < rows; i++) {
@@ -369,7 +481,7 @@ SEXP C_lxw_version(void){
 static const R_CallMethodDef CallEntries[] = {
   {"C_lxw_version",           (DL_FUNC) &C_lxw_version,           0},
   {"C_set_tempdir",           (DL_FUNC) &C_set_tempdir,           1},
-  {"C_write_data_frame_list", (DL_FUNC) &C_write_data_frame_list, 5},
+  {"C_write_data_frame_list", (DL_FUNC) &C_write_data_frame_list, 6},
   {NULL, NULL, 0}
 };
 

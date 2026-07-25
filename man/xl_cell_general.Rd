@@ -4,7 +4,7 @@
 \alias{xl_cell_general}
 \title{General cell objects for Excel writing}
 \usage{
-xl_cell_general(value = NULL, formula = NULL, hyperlink = NULL)
+xl_cell_general(value = NULL, formula = NULL, hyperlink = NULL, format = NULL)
 }
 \arguments{
 \item{value}{An atomic vector or a list of scalars, one per cell. Use `NA`
@@ -33,11 +33,18 @@ is `NA`, a single character URL, or a named list with elements:
 Supply a character `value` alongside `hyperlink` to show custom display
 text in the cell instead of the raw URL.  The hyperlink is written via
 `worksheet_write_url_opt()`.}
+
+\item{format}{An [xl_format] object (applied to every cell), or a list of
+`xl_format` objects (one per cell, recycled), or `NULL` for no formatting.
+Build formats with [xl_font()], [xl_fill()], [xl_border()], [xl_align()],
+[xl_num_format()] and [xl_protection()], combined with [xl_format()] or
+`+`.  When a cell's value is a date/time and its format sets no number
+format, the default date/time number format is applied automatically.}
 }
 \value{
 An object of class `c("xl_cell_general", "xl_cell")`, which is a
   list of length `n` where each element is a named list with fields
-  `value`, `formula`, and `hyperlink`.
+  `value`, `formula`, `hyperlink`, and `format`.
 }
 \description{
 `xl_cell_general` creates a vector of cell objects, each optionally

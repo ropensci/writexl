@@ -42,8 +42,54 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
   }
   stopifnot(is.character(path) && length(path))
   path <- normalizePath(path, mustWork = FALSE)
-  ret <- .Call(C_write_data_frame_list, x, path, col_names, format_headers, use_zip64)
+  # Resolve per-cell formats for xl_cell_general columns into a single
+  # deduplicated workbook format table, attaching integer ids to each column.
+  reg <- .new_format_registry()
+  x <- lapply(x, .resolve_sheet_formats, reg = reg)
+  ret <- .Call(C_write_data_frame_list, x, path, col_names, format_headers,
+               use_zip64, reg$table)
   invisible(ret)
+}
+
+# Default number formats applied to date/time values written through
+# xl_cell_general when the cell's own format sets no number format.  These
+# mirror the column-level defaults used for plain Date/POSIXct columns.
+.writexl_default_date_format     <- function() xl_num_format("yyyy-mm-dd")
+.writexl_default_datetime_format <- function() xl_num_format("yyyy-mm-dd HH:mm:ss UTC")
+
+# Walk a sheet's xl_cell_general columns, register each cell's effective format
+# in the workbook registry, and attach the resulting integer id vector.
+.resolve_sheet_formats <- function(df, reg) {
+  for (j in seq_along(df)) {
+    col <- df[[j]]
+    if (!inherits(col, "xl_cell_general")) next
+    recs <- unclass(col)
+    ids <- vapply(recs, .resolve_cell_format_id, integer(1), reg = reg)
+    attr(col, "writexl_format_ids") <- ids
+    df[[j]] <- col
+  }
+  df
+}
+
+# Resolve one cell record's effective format to a registry id (0 = none).
+.resolve_cell_format_id <- function(rec, reg) {
+  fmt <- rec$format
+  val <- rec$value
+  fm  <- rec$formula
+  hl  <- rec$hyperlink
+  formula_set   <- !(is.null(fm) || (length(fm) == 1L && is.na(fm)))
+  hyperlink_set <- !(is.null(hl) || identical(hl, NA) ||
+                     (is.character(hl) && length(hl) == 1L && is.na(hl)))
+  if (!formula_set && !hyperlink_set && !is.null(val) &&
+      (inherits(val, "Date") || inherits(val, "POSIXct"))) {
+    has_num <- is_xl_format(fmt) && !is.null(unclass(fmt)$num_format)
+    if (!has_num) {
+      base <- if (inherits(val, "POSIXct")) .writexl_default_datetime_format()
+              else .writexl_default_date_format()
+      fmt <- if (is.null(fmt)) base else merge_xl_format(base, fmt)
+    }
+  }
+  .register_format(reg, fmt)
 }
 
 normalize_df <- function(df){
