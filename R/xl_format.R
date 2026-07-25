@@ -20,8 +20,9 @@
 # happens once, at write time, in `.xl_format_payload()`.
 # -----------------------------------------------------------------------------
 
-.XL_FORMAT_GROUPS  <- c("font", "fill", "border", "align", "num_format", "protection")
-.XL_FORMAT_SCALARS <- c("quote_prefix", "hyperlink")
+# An xl_format slot is either a formatting *group* (a named list, e.g. `font`)
+# or a scalar flag (a length-1 logical, e.g. `quote_prefix`).  The two are told
+# apart with is.list(), so new groups/flags need no bookkeeping list.
 
 # Enum string -> libxlsxwriter integer maps.  These MUST match the values in
 # src/libxlsxwriter/include/xlsxwriter/format.h.
@@ -391,15 +392,13 @@ xl_format <- function(..., quote_prefix = NA, hyperlink = NA) {
 merge_xl_format <- function(a, b) {
   if (is.null(a)) return(b)
   if (is.null(b)) return(a)
-  la <- unclass(a)
-  lb <- unclass(b)
-  out <- la
-  for (g in .XL_FORMAT_GROUPS) {
-    if (is.null(lb[[g]])) next
-    out[[g]] <- if (is.null(out[[g]])) lb[[g]] else utils::modifyList(out[[g]], lb[[g]])
+  out <- unclass(a)
+  lb  <- unclass(b)
+  for (slot in names(lb)) {
+    # groups (named lists) merge property-by-property; scalar flags replace
+    out[[slot]] <- if (is.list(lb[[slot]]) && is.list(out[[slot]]))
+      utils::modifyList(out[[slot]], lb[[slot]]) else lb[[slot]]
   }
-  for (s in .XL_FORMAT_SCALARS)
-    if (!is.null(lb[[s]])) out[[s]] <- lb[[s]]
   # subclass extras (geometry/targeting) carried as attributes
   for (at in c("xl_geometry", "xl_target")) {
     av <- attr(a, at, exact = TRUE)
@@ -445,15 +444,16 @@ print.xl_format <- function(x, ...) {
   geo <- attr(x, "xl_geometry", exact = TRUE)
   if (!is.null(tgt)) cat("  target:", .fmt_kv(tgt), "\n")
   if (!is.null(geo)) cat("  geometry:", .fmt_kv(geo), "\n")
-  any_group <- FALSE
-  for (g in c(.XL_FORMAT_GROUPS)) {
-    if (is.null(f[[g]])) next
-    any_group <- TRUE
-    cat(sprintf("  %s: %s\n", g, .fmt_kv(f[[g]])))
+  shown <- FALSE
+  for (slot in names(f)) {
+    v <- f[[slot]]
+    if (is.list(v)) {
+      cat(sprintf("  %s: %s\n", slot, .fmt_kv(v))); shown <- TRUE
+    } else if (isTRUE(v)) {
+      cat(sprintf("  %s: TRUE\n", slot)); shown <- TRUE
+    }
   }
-  for (s in .XL_FORMAT_SCALARS)
-    if (isTRUE(f[[s]])) { cat(sprintf("  %s: TRUE\n", s)); any_group <- TRUE }
-  if (!any_group && is.null(tgt) && is.null(geo))
+  if (!shown && is.null(tgt) && is.null(geo))
     cat("  (empty)\n")
   invisible(x)
 }
