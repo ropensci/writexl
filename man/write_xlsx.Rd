@@ -14,7 +14,8 @@ write_xlsx(
 )
 }
 \arguments{
-\item{x}{data frame or named list of data frames that will be sheets in the xlsx}
+\item{x}{a data frame, an [xl_sheet], an [xl_workbook], or a (named) list of
+data frames / `xl_sheet`s that become the sheets in the xlsx}
 
 \item{path}{a file name to write to}
 
@@ -30,8 +31,12 @@ Writes a data frame to an xlsx file. To create an xlsx with (multiple) named
 sheets, simply set \code{x} to a named list of data frames.
 }
 \details{
-Currently supports strings, numbers, booleans and dates. Formatting options
-may be added in future versions.
+Supports strings, numbers, booleans and dates automatically. For cell
+formatting (fonts, fills, borders, number formats, ...), worksheet layout
+(column widths, frozen panes, ...), and workbook metadata, wrap columns with
+\code{\link{xl_cell_general}}, sheets with \code{\link{xl_sheet}}, and the
+whole workbook with \code{\link{xl_workbook}}. See the "Formatting and
+workbook properties" vignette and \code{\link{xl_format}}.
 
 \if{html}{
 \out{

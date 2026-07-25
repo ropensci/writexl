@@ -1,0 +1,150 @@
+---
+title: "Formatting and workbook properties"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Formatting and workbook properties}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "#>"
+)
+library(writexl)
+```
+
+`writexl` writes plain data frames with sensible defaults, but you can also
+control formatting at three levels that share one vocabulary:
+
+* **cell** formatting, attached to columns with `xl_cell_general()`;
+* **worksheet** layout, attached to a sheet with `xl_sheet()`;
+* **workbook** defaults and metadata, attached with `xl_workbook()` /
+  `xl_properties()`.
+
+All three reuse the same [format engine](#the-format-engine), so once you know
+how to build an `xl_format`, you can apply it anywhere.
+
+## The format engine
+
+A format is built from **group constructors**, each covering one family of
+Excel properties. Every argument defaults to "unset", so you only specify what
+you want to change.
+
+```{r}
+xl_font(bold = TRUE, color = "navy", size = 12)
+xl_fill(background = "#FFF2CC")
+xl_border(all = "thin", color = "gray")
+xl_align(horizontal = "center", vertical = "top", wrap = TRUE)
+xl_num_format("#,##0.00")
+xl_protection(locked = FALSE)
+```
+
+Colors accept R color names (`"navy"`), hex strings (`"#FF0000"`), or integers,
+via `xl_color()`.
+
+Each group constructor already returns a complete `xl_format`, so a single
+group can be used on its own. Combine groups with `+` (or `xl_format()`), which
+merges **property by property** — later values win, but nothing you did not
+touch is lost:
+
+```{r}
+fmt <- xl_font(bold = TRUE) + xl_fill(background = "yellow") + xl_num_format("0.0%")
+fmt
+```
+
+## Cell formatting
+
+Attach a format to a column of values with `xl_cell_general()`. Pass one format
+for the whole column, or a list of formats for individual cells.
+
+```{r}
+df <- data.frame(item = c("Widget", "Gadget", "Gizmo"))
+df$price <- xl_cell_general(
+  value  = c(1234.5, 67.25, 890),
+  format = xl_num_format("$#,##0.00") + xl_font(color = "darkgreen")
+)
+df$flag <- xl_cell_general(
+  value  = c(10, -5, 3),
+  format = list(
+    xl_fill(background = "lightgreen"),
+    xl_fill(background = "salmon"),
+    xl_fill(background = "lightgreen")
+  )
+)
+path <- write_xlsx(df, tempfile(fileext = ".xlsx"))
+```
+
+`xl_formula()` and `xl_hyperlink_cell()` also take a `format` argument. When a
+cell holds a date or time and its format sets no number format, the default
+date/time format is applied automatically.
+
+## Worksheet layout
+
+`xl_sheet()` wraps a data frame with column and row specifications and
+sheet-level options. `xl_col_spec()` and `xl_row_spec()` are themselves
+`xl_format` objects (so they combine with `+`) that additionally carry a target
+and geometry.
+
+```{r}
+sheet <- xl_sheet(
+  data.frame(
+    date    = as.Date("2024-01-01") + 0:2,
+    revenue = c(1000.5, 2000.25, 1500.75)
+  ),
+  cols = list(
+    xl_col_spec("date", width = 12),
+    xl_col_spec("revenue", width = 14,
+                format = xl_num_format("#,##0.00") + xl_font(bold = TRUE))
+  ),
+  rows      = xl_row_spec(1, height = 20),
+  freeze    = "A2",          # freeze the header row
+  tab_color = "steelblue",
+  zoom      = 120
+)
+path <- write_xlsx(list(Sales = sheet), tempfile(fileext = ".xlsx"))
+```
+
+Columns can be targeted by name or position. A plain data frame passed
+alongside an `xl_sheet` behaves exactly as before:
+
+```{r}
+path <- write_xlsx(list(
+  Styled = sheet,
+  Raw    = data.frame(a = 1:3, b = letters[1:3])
+), tempfile(fileext = ".xlsx"))
+```
+
+## Workbook defaults and metadata
+
+`xl_workbook()` binds sheets to `xl_properties()`, which holds document
+metadata plus the formatting defaults that would otherwise be built in. Because
+those defaults are ordinary `xl_format` objects, you can change them — for
+example, restyle the header row or set a workbook-wide default font.
+
+```{r}
+wb <- xl_workbook(
+  list(Report = data.frame(quarter = c("Q1", "Q2"), sales = c(12000, 15000))),
+  properties = xl_properties(
+    title  = "Quarterly Report",
+    author = "Finance Team",
+    company = "Example Corp",
+    custom = list(Project = "Alpha", Reviewed = TRUE),
+    default_format = xl_font(name = "Calibri"),
+    header_format  = xl_font(bold = TRUE, color = "white") +
+                     xl_fill(background = "navy"),
+    read_only = TRUE
+  )
+)
+path <- write_xlsx(wb, tempfile(fileext = ".xlsx"))
+```
+
+Formats cascade from the workbook down: the effective format for a cell is
+`default_format` merged with the column/row/header/hyperlink default, then with
+the cell's own format. Identical resulting formats are written once, so
+applying the same format to thousands of cells stays compact.
+
+Note that a workbook-wide `default_format` is *emulated* (it is applied beneath
+every cell) because the underlying library has no native "Normal style"
+setter; it does not change Excel's built-in Normal style.
