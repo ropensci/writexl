@@ -20,10 +20,6 @@
 # happens once, at write time, in `.xl_format_payload()`.
 # -----------------------------------------------------------------------------
 
-# An xl_format slot is either a formatting *group* (a named list, e.g. `font`)
-# or a scalar flag (a length-1 logical, e.g. `quote_prefix`).  The two are told
-# apart with is.list(), so new groups/flags need no bookkeeping list.
-
 # Enum string -> libxlsxwriter integer maps.  These MUST match the values in
 # src/libxlsxwriter/include/xlsxwriter/format.h.
 .LXW <- list(
