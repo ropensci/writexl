@@ -80,7 +80,11 @@ df$cell_col    <- xl_cell_general(value = 99L)  # all rows get 99
 \seealso{
 [xl_formula()], [xl_hyperlink()], [write_xlsx()]
 
-Other writexl: 
-\code{\link{xl_formula}()}
+Other writexl:
+\code{\link[=is_xl_format]{is_xl_format()}},
+\code{\link[=xl_color]{xl_color()}},
+\code{\link[=xl_format]{xl_format()}},
+\code{\link{xl_format_groups}},
+\code{\link[=xl_formula]{xl_formula()}}
 }
 \concept{writexl}
