@@ -121,6 +121,10 @@ path <- write_xlsx(list(Locked = locked), tempfile(fileext = ".xlsx"))
 Cell locking set with `xl_protection()` only takes effect once the sheet is
 protected.
 
+Set `auto_colwidth = TRUE` to size every column to its contents (a
+character-count estimate, since the xlsx format has no true "AutoFit");
+columns given an explicit width via `xl_col_spec()` are left as-is.
+
 Columns can be targeted by name or position. A plain data frame passed
 alongside an `xl_sheet` behaves exactly as before:
 

@@ -17,9 +17,9 @@
   * `xl_sheet()` wraps a data frame with worksheet options — column and row
     specifications (`xl_col_spec()`, `xl_row_spec()`, which are themselves
     `xl_format` subclasses), frozen panes, gridlines, tab color, zoom, default
-    row height, autofilters, and worksheet protection (with optional password
-    and fine-grained options). Pass it anywhere `write_xlsx()` accepts a data
-    frame.
+    row height, automatic column widths (`auto_colwidth`), autofilters, and
+    worksheet protection (with optional password and fine-grained options).
+    Pass it anywhere `write_xlsx()` accepts a data frame.
 
   * `xl_workbook()` and `xl_properties()` set workbook-level document metadata
     (title, author, custom properties, ...), a few native settings (read-only

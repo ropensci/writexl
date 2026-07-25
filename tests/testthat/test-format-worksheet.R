@@ -134,6 +134,51 @@ test_that("a sheet's default row height is applied", {
   expect_match(w, 'defaultRowHeight="22"')
 })
 
+test_that("auto_colwidth sizes columns to their content", {
+  df <- data.frame(x = c("a", "bb"), header_is_long = c(1L, 2L))
+  w <- sheet_xml(list(D = xl_sheet(df, auto_colwidth = TRUE)))
+  expect_match(w, '<col min="1" max="1" width="3')    # header "x", max value "bb"
+  expect_match(w, '<col min="2" max="2" width="15')   # 14-char header
+})
+
+test_that("explicit width overrides auto_colwidth", {
+  df <- data.frame(text = c("a very long value here indeed", "x"))
+  w <- sheet_xml(list(D = xl_sheet(df, auto_colwidth = TRUE,
+                                   cols = xl_col_spec("text", width = 5))))
+  expect_match(w, '<col min="1" max="1" width="5')
+})
+
+test_that("auto_colwidth handles Date and general columns", {
+  d <- data.frame(when = as.Date("2020-01-01") + 0:1)     # "2020-01-01" = 10
+  expect_match(sheet_xml(list(D = xl_sheet(d, auto_colwidth = TRUE))),
+               '<col min="1" max="1" width="11')
+  g <- data.frame(a = 1:2)
+  g$b <- xl_cell_general(value = c(1234.5, 6.7))           # "1234.5" = 6
+  expect_match(sheet_xml(list(D = xl_sheet(g, auto_colwidth = TRUE))),
+               '<col min="2" max="2" width="7')
+})
+
+test_that("auto_colwidth is validated", {
+  expect_error(xl_sheet(data.frame(a = 1), auto_colwidth = "yes"), "TRUE or FALSE")
+  expect_error(xl_sheet(data.frame(a = 1), auto_colwidth = NA), "TRUE or FALSE")
+})
+
+test_that("cell display width covers value/formula/hyperlink/blank", {
+  gen <- c(
+    xl_cell_general(value = 12345),
+    xl_cell_general(formula = "=SUM(A1:A9)"),
+    xl_cell_general(hyperlink = "http://example.com"),
+    xl_cell_general(hyperlink = list(url = "http://foo.com")),
+    xl_cell_general(value = NA)
+  )
+  w <- writexl:::.content_nchar(gen)
+  expect_equal(w[1], 5L)
+  expect_equal(w[2], nchar("=SUM(A1:A9)"))
+  expect_equal(w[3], nchar("http://example.com"))
+  expect_equal(w[4], nchar("http://foo.com"))
+  expect_equal(w[5], 0L)
+})
+
 test_that("xl_sheet mixes with plain data frames in one workbook", {
   wb <- list(
     Styled = xl_sheet(data.frame(a = 1.5), cols = xl_col_spec("a", width = 12)),

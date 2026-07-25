@@ -13,6 +13,7 @@ xl_sheet(
   tab_color = NA,
   zoom = NA,
   default_row_height = NA,
+  auto_colwidth = FALSE,
   autofilter = FALSE,
   protect = FALSE
 )
@@ -37,23 +38,24 @@ giving the number of rows/columns to freeze.}
 
 \item{default_row_height}{Default height (in points) for rows in the sheet.}
 
+\item{auto_colwidth}{If `TRUE`, size each column to fit its contents (a
+character-count heuristic, since the xlsx format has no true "AutoFit").
+Columns given an explicit width via [xl_col_spec()] are left untouched.}
+
 \item{autofilter}{Add an autofilter (filter dropdowns). `TRUE` covers the
 whole used range (header plus data); an Excel range string such as
 `"A1:D51"` restricts it; `FALSE` (default) adds none.}
 
-\item{protect}{Protect the worksheet. `TRUE` enables Excel's default
-protection, a string sets a password, and a list gives fine-grained
-control: `list(password = "secret", format_cells = TRUE, ...)`. The option
-names mirror libxlsxwriter's `lxw_protection` struct
-(`format_cells`, `format_columns`, `format_rows`, `insert_columns`,
+\item{protect}{Protect the worksheet: `FALSE` (default) leaves it
+unprotected, `TRUE` applies the standard protection, and a string sets a
+password. A named list gives fine-grained control, e.g.
+`list(password = "secret", format_cells = TRUE)`; an editing option set to
+`TRUE` *allows* that action on the protected sheet. Available option names:
+`format_cells`, `format_columns`, `format_rows`, `insert_columns`,
 `insert_rows`, `insert_hyperlinks`, `delete_columns`, `delete_rows`,
 `sort`, `autofilter`, `pivot_tables`, `scenarios`, `objects`,
-`no_select_locked_cells`, `no_select_unlocked_cells`). Setting one of the
-editing options to `TRUE` *allows* that action in the protected sheet
-(e.g. `format_cells = TRUE` lets users format cells); the `no_select_*`
-options instead disable selection. `FALSE` (default) leaves the sheet
-unprotected. Cell locking via [xl_protection()] only takes effect when the
-sheet is protected.}
+`no_select_locked_cells`, `no_select_unlocked_cells`. Cell locking via
+[xl_protection()] only has an effect on a protected sheet.}
 }
 \value{
 An `xl_sheet` object.

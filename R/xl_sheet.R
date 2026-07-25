@@ -121,22 +121,22 @@ xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
 #' @param tab_color Sheet tab color (see [xl_color]).
 #' @param zoom Zoom level as a percentage (10--400).
 #' @param default_row_height Default height (in points) for rows in the sheet.
+#' @param auto_colwidth If `TRUE`, size each column to fit its contents (a
+#'   character-count heuristic, since the xlsx format has no true "AutoFit").
+#'   Columns given an explicit width via [xl_col_spec()] are left untouched.
 #' @param autofilter Add an autofilter (filter dropdowns). `TRUE` covers the
 #'   whole used range (header plus data); an Excel range string such as
 #'   `"A1:D51"` restricts it; `FALSE` (default) adds none.
-#' @param protect Protect the worksheet. `TRUE` enables Excel's default
-#'   protection, a string sets a password, and a list gives fine-grained
-#'   control: `list(password = "secret", format_cells = TRUE, ...)`. The option
-#'   names mirror libxlsxwriter's `lxw_protection` struct
-#'   (`format_cells`, `format_columns`, `format_rows`, `insert_columns`,
+#' @param protect Protect the worksheet: `FALSE` (default) leaves it
+#'   unprotected, `TRUE` applies the standard protection, and a string sets a
+#'   password. A named list gives fine-grained control, e.g.
+#'   `list(password = "secret", format_cells = TRUE)`; an editing option set to
+#'   `TRUE` *allows* that action on the protected sheet. Available option names:
+#'   `format_cells`, `format_columns`, `format_rows`, `insert_columns`,
 #'   `insert_rows`, `insert_hyperlinks`, `delete_columns`, `delete_rows`,
 #'   `sort`, `autofilter`, `pivot_tables`, `scenarios`, `objects`,
-#'   `no_select_locked_cells`, `no_select_unlocked_cells`). Setting one of the
-#'   editing options to `TRUE` *allows* that action in the protected sheet
-#'   (e.g. `format_cells = TRUE` lets users format cells); the `no_select_*`
-#'   options instead disable selection. `FALSE` (default) leaves the sheet
-#'   unprotected. Cell locking via [xl_protection()] only takes effect when the
-#'   sheet is protected.
+#'   `no_select_locked_cells`, `no_select_unlocked_cells`. Cell locking via
+#'   [xl_protection()] only has an effect on a protected sheet.
 #' @return An `xl_sheet` object.
 #' @family writexl
 #' @seealso [xl_col_spec], [xl_row_spec], [write_xlsx]
@@ -152,10 +152,12 @@ xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
 #' tmp <- write_xlsx(list(Data = sheet))
 xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
                      gridlines = NA, tab_color = NA, zoom = NA,
-                     default_row_height = NA, autofilter = FALSE,
-                     protect = FALSE) {
+                     default_row_height = NA, auto_colwidth = FALSE,
+                     autofilter = FALSE, protect = FALSE) {
   if (!is.data.frame(data))
     stop("`data` must be a data frame", call. = FALSE)
+  if (!is.logical(auto_colwidth) || length(auto_colwidth) != 1L || is.na(auto_colwidth))
+    stop("`auto_colwidth` must be TRUE or FALSE", call. = FALSE)
   if (!(is.logical(autofilter) || is.character(autofilter)) ||
       length(autofilter) != 1L)
     stop('`autofilter` must be TRUE/FALSE or an Excel range string like "A1:D51"',
@@ -171,6 +173,7 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
       tab_color = tab_color,
       zoom      = zoom,
       default_row_height = default_row_height,
+      auto_colwidth = auto_colwidth,
       autofilter = autofilter,
       protect    = protect
     ),
@@ -280,6 +283,44 @@ print.xl_sheet <- function(x, ...) {
   out
 }
 
+# Estimate a column width (in Excel character units) from its rendered content.
+# There is no native "AutoFit" in the file format, so this is a heuristic based
+# on character counts of the displayed values and the header.
+.auto_col_width <- function(col, header) {
+  vals_w <- .content_nchar(col)
+  hdr_w  <- if (nzchar(header)) nchar(header, type = "width") else 0L
+  w <- max(c(hdr_w, vals_w, 0L), na.rm = TRUE)
+  min(w + 1L, 255L)   # small padding; Excel's maximum column width is 255
+}
+
+# Per-cell display width for a column (0 for blank/NA cells).
+.content_nchar <- function(col) {
+  if (inherits(col, "xl_cell_general")) {
+    vapply(unclass(col), function(rec) {
+      s <- .cell_display_string(rec)
+      if (is.na(s)) 0L else nchar(s, type = "width")
+    }, integer(1))
+  } else {
+    x <- format(col, trim = TRUE)
+    w <- nchar(x, type = "width")
+    w[is.na(col)] <- 0L
+    w
+  }
+}
+
+# The string a general cell displays (hyperlink display / value / formula).
+.cell_display_string <- function(rec) {
+  v <- rec$value
+  if (!is.null(v) && length(v) && !all(is.na(v)))
+    return(format(v, trim = TRUE)[1L])
+  fm <- rec$formula
+  if (!is.null(fm) && length(fm) && !is.na(fm)) return(as.character(fm))
+  hl <- rec$hyperlink
+  if (is.character(hl) && length(hl) && !is.na(hl)) return(hl)
+  if (is.list(hl) && !is.null(hl$url)) return(as.character(hl$url))
+  NA_character_
+}
+
 # Resolve targeted columns (names or positions) to 1-based indices.
 .resolve_col_index <- function(index, colnames) {
   if (is.character(index)) {
@@ -307,6 +348,7 @@ print.xl_sheet <- function(x, ...) {
   col_width  <- rep(NA_real_, ncols)
   col_hidden <- rep(NA_integer_, ncols)
   col_level  <- rep(NA_integer_, ncols)
+  explicit_width <- rep(FALSE, ncols)   # columns whose width the user set
   for (i in seq_len(ncols)) {
     base <- props$default_format
     if (inherits(df[[i]], "POSIXct")) {
@@ -333,7 +375,7 @@ print.xl_sheet <- function(x, ...) {
       geo <- attr(spec, "xl_geometry")
       for (i in idx) {
         col_fmt[[i]] <- merge_xl_format(col_fmt[[i]], spec)
-        if (!is.null(geo$width))  col_width[i]  <- geo$width
+        if (!is.null(geo$width)) { col_width[i] <- geo$width; explicit_width[i] <- TRUE }
         if (!is.null(geo$hidden)) col_hidden[i] <- as.integer(isTRUE(geo$hidden))
         if (!is.null(geo$level))  col_level[i]  <- as.integer(geo$level)
       }
@@ -364,6 +406,14 @@ print.xl_sheet <- function(x, ...) {
         autofilter <- c(0L, 0L, as.integer(last_row), ncols - 1L)
     }
     protect <- .resolve_protect(el$protect)
+    # auto column widths (for columns the user did not size explicitly)
+    if (isTRUE(el$auto_colwidth)) {
+      for (i in seq_len(ncols)) {
+        if (explicit_width[i]) next
+        header <- if (header_offset > 0L) cnames[i] else ""
+        col_width[i] <- .auto_col_width(df[[i]], header)
+      }
+    }
   }
 
   col_format_id <- vapply(col_fmt, function(f) .register_format(reg, f), integer(1))
