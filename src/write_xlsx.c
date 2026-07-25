@@ -95,6 +95,7 @@ static double payload_dbl(SEXP p, const char *key){
 static const char *payload_str(SEXP p, const char *key){
   SEXP v = list_get(p, key);
   if(v == R_NilValue || TYPEOF(v) != STRSXP || Rf_length(v) < 1) return NULL;
+  if(STRING_ELT(v, 0) == NA_STRING) return NULL;
   return Rf_translateCharUTF8(STRING_ELT(v, 0));
 }
 
@@ -258,6 +259,44 @@ static void apply_sheet_scalars(cell_write_ctx *ctx, SEXP opts){
   if(zoom > 0) worksheet_set_zoom(ctx->sheet, (uint16_t) zoom);
   double drh = opt_scalar_dbl(opts, "default_row_height", NA_REAL);
   if(!ISNA(drh)) worksheet_set_default_row(ctx->sheet, drh, 0);
+
+  /* autofilter: a length-4 range (first_row, first_col, last_row, last_col) */
+  SEXP af = list_get(opts, "autofilter");
+  if(af != R_NilValue && Rf_length(af) >= 4){
+    SEXP afi = PROTECT(Rf_coerceVector(af, INTSXP));
+    int *a = INTEGER(afi);
+    if(a[0] >= 0 && a[2] >= a[0] && a[3] >= a[1])
+      worksheet_autofilter(ctx->sheet, a[0], a[1], a[2], a[3]);
+    UNPROTECT(1);
+  }
+
+  /* worksheet protection */
+  if(opt_scalar_int(opts, "protect", 0)){
+    const char *pw = payload_str(opts, "protect_password");
+    SEXP po = list_get(opts, "protect_options");
+    if(po == R_NilValue){
+      worksheet_protect(ctx->sheet, pw, NULL);
+    } else {
+      lxw_protection prot;
+      memset(&prot, 0, sizeof(prot));
+      prot.no_select_locked_cells   = (uint8_t) opt_scalar_int(po, "no_select_locked_cells", 0);
+      prot.no_select_unlocked_cells = (uint8_t) opt_scalar_int(po, "no_select_unlocked_cells", 0);
+      prot.format_cells      = (uint8_t) opt_scalar_int(po, "format_cells", 0);
+      prot.format_columns    = (uint8_t) opt_scalar_int(po, "format_columns", 0);
+      prot.format_rows       = (uint8_t) opt_scalar_int(po, "format_rows", 0);
+      prot.insert_columns    = (uint8_t) opt_scalar_int(po, "insert_columns", 0);
+      prot.insert_rows       = (uint8_t) opt_scalar_int(po, "insert_rows", 0);
+      prot.insert_hyperlinks = (uint8_t) opt_scalar_int(po, "insert_hyperlinks", 0);
+      prot.delete_columns    = (uint8_t) opt_scalar_int(po, "delete_columns", 0);
+      prot.delete_rows       = (uint8_t) opt_scalar_int(po, "delete_rows", 0);
+      prot.sort              = (uint8_t) opt_scalar_int(po, "sort", 0);
+      prot.autofilter        = (uint8_t) opt_scalar_int(po, "autofilter", 0);
+      prot.pivot_tables      = (uint8_t) opt_scalar_int(po, "pivot_tables", 0);
+      prot.scenarios         = (uint8_t) opt_scalar_int(po, "scenarios", 0);
+      prot.objects           = (uint8_t) opt_scalar_int(po, "objects", 0);
+      worksheet_protect(ctx->sheet, pw, &prot);
+    }
+  }
 }
 
 /* --- Individual per-type cell writers ------------------------------------ */

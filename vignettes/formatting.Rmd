@@ -106,6 +106,21 @@ sheet <- xl_sheet(
 path <- write_xlsx(list(Sales = sheet), tempfile(fileext = ".xlsx"))
 ```
 
+`xl_sheet()` also adds **autofilters** and **worksheet protection**:
+
+```{r}
+locked <- xl_sheet(
+  data.frame(id = 1:3, note = c("a", "b", "c")),
+  autofilter = TRUE,                       # or a range like "A1:B4"
+  protect    = list(password = "secret",   # protect, but still allow sorting
+                    sort = TRUE)
+)
+path <- write_xlsx(list(Locked = locked), tempfile(fileext = ".xlsx"))
+```
+
+Cell locking set with `xl_protection()` only takes effect once the sheet is
+protected.
+
 Columns can be targeted by name or position. A plain data frame passed
 alongside an `xl_sheet` behaves exactly as before:
 

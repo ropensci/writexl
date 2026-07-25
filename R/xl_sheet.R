@@ -121,6 +121,22 @@ xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
 #' @param tab_color Sheet tab color (see [xl_color]).
 #' @param zoom Zoom level as a percentage (10--400).
 #' @param default_row_height Default height (in points) for rows in the sheet.
+#' @param autofilter Add an autofilter (filter dropdowns). `TRUE` covers the
+#'   whole used range (header plus data); an Excel range string such as
+#'   `"A1:D51"` restricts it; `FALSE` (default) adds none.
+#' @param protect Protect the worksheet. `TRUE` enables Excel's default
+#'   protection, a string sets a password, and a list gives fine-grained
+#'   control: `list(password = "secret", format_cells = TRUE, ...)`. The option
+#'   names mirror libxlsxwriter's `lxw_protection` struct
+#'   (`format_cells`, `format_columns`, `format_rows`, `insert_columns`,
+#'   `insert_rows`, `insert_hyperlinks`, `delete_columns`, `delete_rows`,
+#'   `sort`, `autofilter`, `pivot_tables`, `scenarios`, `objects`,
+#'   `no_select_locked_cells`, `no_select_unlocked_cells`). Setting one of the
+#'   editing options to `TRUE` *allows* that action in the protected sheet
+#'   (e.g. `format_cells = TRUE` lets users format cells); the `no_select_*`
+#'   options instead disable selection. `FALSE` (default) leaves the sheet
+#'   unprotected. Cell locking via [xl_protection()] only takes effect when the
+#'   sheet is protected.
 #' @return An `xl_sheet` object.
 #' @family writexl
 #' @seealso [xl_col_spec], [xl_row_spec], [write_xlsx]
@@ -136,9 +152,15 @@ xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
 #' tmp <- write_xlsx(list(Data = sheet))
 xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
                      gridlines = NA, tab_color = NA, zoom = NA,
-                     default_row_height = NA) {
+                     default_row_height = NA, autofilter = FALSE,
+                     protect = FALSE) {
   if (!is.data.frame(data))
     stop("`data` must be a data frame", call. = FALSE)
+  if (!(is.logical(autofilter) || is.character(autofilter)) ||
+      length(autofilter) != 1L)
+    stop('`autofilter` must be TRUE/FALSE or an Excel range string like "A1:D51"',
+         call. = FALSE)
+  .validate_protect(protect)
   structure(
     list(
       data      = data,
@@ -148,10 +170,38 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
       gridlines = gridlines,
       tab_color = tab_color,
       zoom      = zoom,
-      default_row_height = default_row_height
+      default_row_height = default_row_height,
+      autofilter = autofilter,
+      protect    = protect
     ),
     class = "xl_sheet"
   )
+}
+
+# The subset of lxw_protection options exposed (chartsheet-only fields omitted).
+.LXW_PROTECT_OPTS <- c(
+  "no_select_locked_cells", "no_select_unlocked_cells", "format_cells",
+  "format_columns", "format_rows", "insert_columns", "insert_rows",
+  "insert_hyperlinks", "delete_columns", "delete_rows", "sort", "autofilter",
+  "pivot_tables", "scenarios", "objects"
+)
+
+.validate_protect <- function(protect) {
+  if (is.null(protect)) return(invisible())
+  if (is.logical(protect) && length(protect) == 1L) return(invisible())
+  if (is.character(protect) && length(protect) == 1L) return(invisible())
+  if (is.list(protect)) {
+    nms <- names(protect)
+    if (is.null(nms) || any(nms == ""))
+      stop("`protect` list must be fully named", call. = FALSE)
+    bad <- setdiff(nms, c("password", .LXW_PROTECT_OPTS))
+    if (length(bad))
+      stop("unknown `protect` option(s): ", paste(bad, collapse = ", "),
+           call. = FALSE)
+    return(invisible())
+  }
+  stop("`protect` must be TRUE/FALSE, a password string, or a named list",
+       call. = FALSE)
 }
 
 #' @export
@@ -191,6 +241,43 @@ print.xl_sheet <- function(x, ...) {
   }
   stop('`freeze` must be a cell reference ("A2") or list(row =, col =)',
        call. = FALSE)
+}
+
+# Parse an Excel range ("A1:D51") into 0-based c(first_row, first_col,
+# last_row, last_col).
+.parse_range <- function(rng) {
+  parts <- strsplit(rng, ":", fixed = TRUE)[[1]]
+  cell <- function(s) {
+    m <- regmatches(s, regexec("^([A-Za-z]+)([0-9]+)$", s))[[1]]
+    if (length(m) != 3L)
+      stop('`autofilter` range must look like "A1:D51"', call. = FALSE)
+    c(as.integer(m[3L]) - 1L, .col_letters_to_index(m[2L]))
+  }
+  if (length(parts) != 2L)
+    stop('`autofilter` range must look like "A1:D51"', call. = FALSE)
+  a <- cell(parts[1L]); b <- cell(parts[2L])
+  c(a[1L], a[2L], b[1L], b[2L])
+}
+
+# Build the (flag, password, options) triple C uses for worksheet protection.
+.resolve_protect <- function(protect) {
+  out <- list(flag = 0L, password = NA_character_, options = NULL)
+  if (isTRUE(protect)) {
+    out$flag <- 1L
+  } else if (is.character(protect) && length(protect) == 1L) {
+    out$flag <- 1L; out$password <- protect
+  } else if (is.list(protect)) {
+    out$flag <- 1L
+    if (!is.null(protect$password)) out$password <- as.character(protect$password)
+    optnames <- setdiff(names(protect), "password")
+    if (length(optnames)) {
+      # a named list (not a bare vector) so the C side can look up by name
+      out$options <- stats::setNames(
+        lapply(.LXW_PROTECT_OPTS, function(nm) as.integer(isTRUE(protect[[nm]]))),
+        .LXW_PROTECT_OPTS)
+    }
+  }
+  out
 }
 
 # Resolve targeted columns (names or positions) to 1-based indices.
@@ -236,6 +323,8 @@ print.xl_sheet <- function(x, ...) {
   row_fmt_id <- integer(0); row_hidden <- integer(0); row_level <- integer(0)
   freeze <- c(-1L, -1L)
   gridlines <- -1L; tab_color <- -1L; zoom <- 0L; default_row_height <- NA_real_
+  autofilter <- c(-1L, -1L, -1L, -1L)
+  protect <- list(flag = 0L, password = NA_character_, options = NULL)
 
   if (inherits(el, "xl_sheet")) {
     # column specs
@@ -266,6 +355,15 @@ print.xl_sheet <- function(x, ...) {
     tab_color <- if (is.na(el$tab_color)) -1L else xl_color(el$tab_color)
     zoom <- if (is.na(el$zoom)) 0L else as.integer(el$zoom)
     default_row_height <- if (is.na(el$default_row_height)) NA_real_ else as.numeric(el$default_row_height)
+    af <- el$autofilter
+    if (is.character(af)) {
+      autofilter <- .parse_range(af)
+    } else if (isTRUE(af)) {
+      last_row <- (nrow(df) - 1L) + header_offset
+      if (ncols > 0L && last_row >= 0L)
+        autofilter <- c(0L, 0L, as.integer(last_row), ncols - 1L)
+    }
+    protect <- .resolve_protect(el$protect)
   }
 
   col_format_id <- vapply(col_fmt, function(f) .register_format(reg, f), integer(1))
@@ -277,6 +375,8 @@ print.xl_sheet <- function(x, ...) {
     row_hidden = row_hidden, row_level = row_level,
     freeze_row = freeze[1L], freeze_col = freeze[2L],
     gridlines = gridlines, tab_color = tab_color, zoom = zoom,
-    default_row_height = default_row_height
+    default_row_height = default_row_height,
+    autofilter = autofilter, protect = protect$flag,
+    protect_password = protect$password, protect_options = protect$options
   )
 }
