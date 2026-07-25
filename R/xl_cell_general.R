@@ -37,9 +37,15 @@
 #'   text in the cell instead of the raw URL.  The hyperlink is written via
 #'   `worksheet_write_url_opt()`.
 #'
+#' @param format An [xl_format] object (applied to every cell), or a list of
+#'   `xl_format` objects (one per cell, recycled), or `NULL` for no formatting.
+#'   Build formats with [xl_font()], [xl_fill()], [xl_border()], [xl_align()],
+#'   [xl_num_format()] and [xl_protection()], combined with [xl_format()] or
+#'   `+`.  When a cell's value is a date/time and its format sets no number
+#'   format, the default date/time number format is applied automatically.
 #' @return An object of class `c("xl_cell_general", "xl_cell")`, which is a
 #'   list of length `n` where each element is a named list with fields
-#'   `value`, `formula`, and `hyperlink`.
+#'   `value`, `formula`, `hyperlink`, and `format`.
 #'
 #' @family writexl
 #' @seealso [xl_formula()], [xl_hyperlink()], [write_xlsx()]
@@ -69,9 +75,10 @@
 #' df <- data.frame(x = 1:3)
 #' df$formula_col <- xl_formula("=A1*2")   # backward-compatible shorthand
 #' df$cell_col    <- xl_cell_general(value = 99L)  # all rows get 99
-xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL) {
+xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
+                            format = NULL) {
 
-  # 0a. Require at least one argument ---------------------------------------
+  # 0a. Require at least one content argument --------------------------------
   if (is.null(value) && is.null(formula) && is.null(hyperlink))
     stop("At least one of 'value', 'formula', or 'hyperlink' must be provided. ",
          "Use value = NA for an explicit empty cell.", call. = FALSE)
@@ -132,12 +139,29 @@ xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL) {
     rep_len(h, n)
   }
 
-  # 5. Build per-cell records -----------------------------------------------
+  # 5. Normalise format to a list of length n -------------------------------
+  format_list <- if (is.null(format)) {
+    vector("list", n)
+  } else if (is_xl_format(format)) {
+    rep(list(format), n)
+  } else if (is.list(format)) {
+    for (el in format)
+      if (!is.null(el) && !is_xl_format(el))
+        stop("each element of `format` must be an xl_format object or NULL",
+             call. = FALSE)
+    rep_len(format, n)
+  } else {
+    stop("`format` must be an xl_format object or a list of xl_format objects",
+         call. = FALSE)
+  }
+
+  # 6. Build per-cell records -----------------------------------------------
   cells <- lapply(seq_len(n), function(i) {
     list(
       value     = value_list[[i]],
       formula   = formula_vec[[i]],
-      hyperlink = hyperlink_list[[i]]
+      hyperlink = hyperlink_list[[i]],
+      format    = format_list[[i]]
     )
   })
 
@@ -201,6 +225,9 @@ print.xl_cell_general <- function(x, max = 10L, ...) {
                !(is.character(hlk) && length(hlk) == 1L && is.na(hlk))
     if (hlk_set)
       parts <- c(parts, "hyperlink=<set>")
+
+    if (is_xl_format(cell[["format"]]))
+      parts <- c(parts, "format=<set>")
 
     cat(sprintf("  [%d] %s\n", i,
                 if (length(parts)) paste(parts, collapse = ", ")

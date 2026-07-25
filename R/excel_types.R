@@ -25,6 +25,8 @@
 #'
 #' @family writexl
 #' @param x character vector to be interpreted as formula
+#' @param format An optional [xl_format] (or list of `xl_format`, one per
+#'   element) applied to the cells.  See [xl_format].
 #' @export
 #' @rdname xl_formula
 #' @examples
@@ -47,13 +49,13 @@
 #'
 #' # cleanup
 #' unlink(c('universities.xlsx', 'universities2.xlsx'))
-xl_formula <- function(x){
+xl_formula <- function(x, format = NULL){
   if(is.factor(x))
     x <- as.character(x)
   stopifnot(is.character(x))
   if(!all(grepl("^=",x) | is.na(x)))
     stop("Formulas must start with '='")
-  xl_cell_general(formula = x)
+  xl_cell_general(formula = x, format = format)
 }
 
 #' @rdname xl_formula
@@ -62,7 +64,7 @@ xl_formula <- function(x){
 #' @param name character vector of friendly display names shown in the cell
 #'   instead of the raw URL.  When `NULL`, the URL is shown.  Ignored for
 #'   `NA` URLs.
-xl_hyperlink <- function(url, name = NULL){
+xl_hyperlink <- function(url, name = NULL, format = NULL){
   if(is.factor(url))
     url <- as.character(url)
   stopifnot(is.character(url))
@@ -72,7 +74,7 @@ xl_hyperlink <- function(url, name = NULL){
     paste0("=HYPERLINK(", dubquote(url), ")")
   }
   fmlas[is.na(url)] <- NA_character_
-  xl_formula(fmlas)
+  xl_formula(fmlas, format = format)
 }
 
 #' @rdname xl_formula
@@ -81,16 +83,16 @@ xl_hyperlink <- function(url, name = NULL){
 #'   cell.  For `xl_hyperlink_cell()`, when `NULL` the raw URL is shown.
 #'   Recycled to the length of `url`.  Automatically set to `NA` for cells
 #'   whose URL is `NA`.
-xl_hyperlink_cell <- function(url, value = NULL){
+xl_hyperlink_cell <- function(url, value = NULL, format = NULL){
   if(is.factor(url))
     url <- as.character(url)
   stopifnot(is.character(url))
   if(is.null(value)){
-    xl_cell_general(hyperlink = url)
+    xl_cell_general(hyperlink = url, format = format)
   } else {
     value_arg <- rep_len(as.character(value), length(url))
     value_arg[is.na(url)] <- NA_character_
-    xl_cell_general(value = value_arg, hyperlink = url)
+    xl_cell_general(value = value_arg, hyperlink = url, format = format)
   }
 }
 

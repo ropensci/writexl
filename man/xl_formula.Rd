@@ -6,14 +6,17 @@
 \alias{xl_hyperlink_cell}
 \title{Excel Types}
 \usage{
-xl_formula(x)
+xl_formula(x, format = NULL)
 
-xl_hyperlink(url, name = NULL)
+xl_hyperlink(url, name = NULL, format = NULL)
 
-xl_hyperlink_cell(url, value = NULL)
+xl_hyperlink_cell(url, value = NULL, format = NULL)
 }
 \arguments{
 \item{x}{character vector to be interpreted as formula}
+
+\item{format}{An optional [xl_format] (or list of `xl_format`, one per
+element) applied to the cells.  See [xl_format].}
 
 \item{url}{character vector of URLs.  Use `NA` to produce a blank cell.}
 
@@ -72,7 +75,15 @@ write_xlsx(df2, 'universities2.xlsx')
 unlink(c('universities.xlsx', 'universities2.xlsx'))
 }
 \seealso{
-Other writexl: 
-\code{\link{xl_cell_general}()}
+Other writexl:
+\code{\link[=is_xl_format]{is_xl_format()}},
+\code{\link[=xl_cell_general]{xl_cell_general()}},
+\code{\link[=xl_color]{xl_color()}},
+\code{\link{xl_colrow_spec}},
+\code{\link[=xl_format]{xl_format()}},
+\code{\link{xl_format_groups}},
+\code{\link[=xl_properties]{xl_properties()}},
+\code{\link[=xl_sheet]{xl_sheet()}},
+\code{\link[=xl_workbook]{xl_workbook()}}
 }
 \concept{writexl}

@@ -17,12 +17,12 @@ Encoding: UTF-8
 URL: https://ropensci.r-universe.dev/writexl
     https://docs.ropensci.org/writexl/
 BugReports: https://github.com/ropensci/writexl/issues
-RoxygenNote: 7.3.3
 Suggests:
     spelling,
     readxl,
     nycflights13,
     testthat (>= 3.0.0),
+    xml2,
     bit64,
     knitr,
     rmarkdown
@@ -31,3 +31,4 @@ Language: en-US
 SystemRequirements:
     zlib
 Config/testthat/edition: 3
+Config/roxygen2/version: 8.0.0
