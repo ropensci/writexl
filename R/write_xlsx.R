@@ -26,28 +26,40 @@
 #' readxl::read_xlsx(tmp)
 write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
                        format_headers = TRUE, use_zip64 = FALSE){
-  if(is.data.frame(x))
+  if(is.data.frame(x) || inherits(x, "xl_sheet"))
     x <- list(x)
-  if(!is.list(x) || !all(vapply(x, is.data.frame, logical(1))))
-    stop("Argument x must be a data frame or list of data frames")
-  x <- lapply(x, normalize_df)
-  if(any(nchar(names(x)) > 31)){
+  sheet_like <- is.list(x) &&
+    all(vapply(x, function(el) is.data.frame(el) || inherits(el, "xl_sheet"),
+               logical(1)))
+  if(!sheet_like)
+    stop("Argument x must be a data frame, an xl_sheet, or a list of them")
+  # Underlying data frames (unwrap any xl_sheet wrappers), keeping the
+  # originals so their worksheet options can be resolved below.
+  elems <- x
+  dfs <- lapply(x, function(el) if(inherits(el, "xl_sheet")) el$data else el)
+  dfs <- lapply(dfs, normalize_df)
+  names(dfs) <- names(x)
+  if(any(nchar(names(dfs)) > 31)){
     warning("Truncating sheet name(s) to 31 characters")
-    names(x) <- substring(names(x), 1, 29)
+    names(dfs) <- substring(names(dfs), 1, 29)
   }
-  nm <- names(x)
+  nm <- names(dfs)
   if(length(unique(nm)) <  length(nm)){
     warning("Deduplicating sheet names")
-    names(x) <- make.unique(substring(names(x), 1, 28), sep = "_")
+    names(dfs) <- make.unique(substring(names(dfs), 1, 28), sep = "_")
   }
   stopifnot(is.character(path) && length(path))
   path <- normalizePath(path, mustWork = FALSE)
-  # Resolve per-cell formats for xl_cell_general columns into a single
-  # deduplicated workbook format table, attaching integer ids to each column.
+  # Resolve per-cell formats for xl_cell_general columns and per-sheet
+  # column/row/layout options into a single deduplicated workbook format
+  # table, attaching integer ids to each column and building a sheet plan.
+  header_offset <- if(isTRUE(as.logical(col_names))) 1L else 0L
   reg <- .new_format_registry()
-  x <- lapply(x, .resolve_sheet_formats, reg = reg)
-  ret <- .Call(C_write_data_frame_list, x, path, col_names, format_headers,
-               use_zip64, reg$table)
+  dfs <- lapply(dfs, .resolve_sheet_formats, reg = reg)
+  sheets <- Map(function(el, df) .resolve_sheet_plan(el, df, reg, header_offset),
+                elems, dfs)
+  ret <- .Call(C_write_data_frame_list, dfs, path, col_names, format_headers,
+               use_zip64, reg$table, sheets)
   invisible(ret)
 }
 

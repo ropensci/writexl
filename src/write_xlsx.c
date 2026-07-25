@@ -172,9 +172,7 @@ static lxw_format *build_lxw_format(lxw_workbook *wb, SEXP p){
 typedef struct {
   lxw_workbook  *workbook;
   lxw_worksheet *sheet;
-  lxw_format    *date_fmt;
-  lxw_format    *datetime_fmt;
-  lxw_format    *hyperlink_fmt;
+  lxw_format    *hyperlink_fmt;  /* default hyperlink style for url cells    */
   lxw_format   **fmts;   /* 1-based table of user formats; fmts[0] == NULL   */
   int            nfmts;  /* number of entries in fmts (excluding slot 0)     */
 } cell_write_ctx;
@@ -183,6 +181,84 @@ typedef struct {
 static lxw_format *ctx_format(cell_write_ctx *ctx, int id){
   if(id <= 0 || id > ctx->nfmts) return NULL;
   return ctx->fmts[id];
+}
+
+/* --- worksheet-level option appliers ------------------------------------- */
+
+static int opt_scalar_int(SEXP opts, const char *key, int dflt){
+  SEXP v = list_get(opts, key);
+  if(v == R_NilValue || Rf_length(v) < 1) return dflt;
+  int x = Rf_asInteger(v);
+  return (x == NA_INTEGER) ? dflt : x;
+}
+static double opt_scalar_dbl(SEXP opts, const char *key, double dflt){
+  SEXP v = list_get(opts, key);
+  if(v == R_NilValue || Rf_length(v) < 1) return dflt;
+  double x = Rf_asReal(v);
+  return ISNA(x) ? dflt : x;
+}
+
+/* Apply per-column width / format / hidden / outline-level options. */
+static void apply_columns(cell_write_ctx *ctx, SEXP opts, lxw_col_t cols){
+  if(opts == R_NilValue) return;
+  SEXP w  = list_get(opts, "col_width");
+  SEXP fi = list_get(opts, "col_format_id");
+  SEXP hd = list_get(opts, "col_hidden");
+  SEXP lv = list_get(opts, "col_level");
+  for(lxw_col_t i = 0; i < cols; i++){
+    double width = (w  != R_NilValue && Rf_length(w)  > i) ? REAL(w)[i]     : NA_REAL;
+    int    fid   = (fi != R_NilValue && Rf_length(fi) > i) ? INTEGER(fi)[i] : 0;
+    int    hid   = (hd != R_NilValue && Rf_length(hd) > i) ? INTEGER(hd)[i] : NA_INTEGER;
+    int    lev   = (lv != R_NilValue && Rf_length(lv) > i) ? INTEGER(lv)[i] : NA_INTEGER;
+    lxw_format *fmt = ctx_format(ctx, fid);
+    if(ISNA(width) && fmt == NULL && hid == NA_INTEGER && lev == NA_INTEGER)
+      continue;
+    lxw_row_col_options o = {0, 0, 0};
+    if(hid != NA_INTEGER && hid > 0) o.hidden = 1;
+    if(lev != NA_INTEGER && lev > 0) o.level = (uint8_t) lev;
+    double wv = ISNA(width) ? LXW_DEF_COL_WIDTH : width;
+    assert_lxw(worksheet_set_column_opt(ctx->sheet, i, i, wv, fmt, &o));
+  }
+}
+
+/* Apply a row option for worksheet row `wrow`, if one is defined. */
+static void apply_row(cell_write_ctx *ctx, SEXP opts, lxw_row_t wrow){
+  if(opts == R_NilValue) return;
+  SEXP rr = list_get(opts, "row_row");
+  if(rr == R_NilValue) return;
+  R_xlen_t n = Rf_length(rr);
+  SEXP hh = list_get(opts, "row_height");
+  SEXP fi = list_get(opts, "row_format_id");
+  SEXP hd = list_get(opts, "row_hidden");
+  SEXP lv = list_get(opts, "row_level");
+  for(R_xlen_t k = 0; k < n; k++){
+    if((lxw_row_t) INTEGER(rr)[k] != wrow) continue;
+    double height = (hh != R_NilValue && !ISNA(REAL(hh)[k])) ? REAL(hh)[k] : LXW_DEF_ROW_HEIGHT;
+    int    fid    = (fi != R_NilValue) ? INTEGER(fi)[k] : 0;
+    int    hid    = (hd != R_NilValue) ? INTEGER(hd)[k] : NA_INTEGER;
+    int    lev    = (lv != R_NilValue) ? INTEGER(lv)[k] : NA_INTEGER;
+    lxw_row_col_options o = {0, 0, 0};
+    if(hid != NA_INTEGER && hid > 0) o.hidden = 1;
+    if(lev != NA_INTEGER && lev > 0) o.level = (uint8_t) lev;
+    assert_lxw(worksheet_set_row_opt(ctx->sheet, wrow, height, ctx_format(ctx, fid), &o));
+    return;
+  }
+}
+
+/* Apply per-sheet scalar options (freeze panes, gridlines, tab color, ...). */
+static void apply_sheet_scalars(cell_write_ctx *ctx, SEXP opts){
+  if(opts == R_NilValue) return;
+  int fr = opt_scalar_int(opts, "freeze_row", -1);
+  int fc = opt_scalar_int(opts, "freeze_col", -1);
+  if(fr >= 0 && fc >= 0) worksheet_freeze_panes(ctx->sheet, (lxw_row_t) fr, (lxw_col_t) fc);
+  int gl = opt_scalar_int(opts, "gridlines", -1);
+  if(gl >= 0) worksheet_gridlines(ctx->sheet, (uint8_t) gl);
+  int tc = opt_scalar_int(opts, "tab_color", -1);
+  if(tc >= 0) worksheet_set_tab_color(ctx->sheet, (lxw_color_t) tc);
+  int zoom = opt_scalar_int(opts, "zoom", 0);
+  if(zoom > 0) worksheet_set_zoom(ctx->sheet, (uint16_t) zoom);
+  double drh = opt_scalar_dbl(opts, "default_row_height", NA_REAL);
+  if(!ISNA(drh)) worksheet_set_default_row(ctx->sheet, drh, 0);
 }
 
 /* --- Individual per-type cell writers ------------------------------------ */
@@ -357,12 +433,14 @@ static void write_cell(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
 /* --- Main entry point ---------------------------------------------------- */
 
 SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
-                             SEXP format_headers, SEXP use_zip64, SEXP formats){
+                             SEXP format_headers, SEXP use_zip64, SEXP formats,
+                             SEXP sheets){
   assert_that(Rf_isVectorList(df_list), "Object is not a list");
   assert_that(Rf_isString(file) && Rf_length(file), "Invalid file path");
   assert_that(Rf_isLogical(col_names), "col_names must be logical");
   assert_that(Rf_isLogical(format_headers), "format_headers must be logical");
   bail_if(formats != R_NilValue && !Rf_isVectorList(formats), "formats must be a list");
+  bail_if(sheets != R_NilValue && !Rf_isVectorList(sheets), "sheets must be a list");
 
   //create workbook
   lxw_workbook_options options = {
@@ -379,14 +457,6 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
   fmts[0] = NULL;
   for(int k = 0; k < nfmts; k++)
     fmts[k + 1] = build_lxw_format(workbook, VECTOR_ELT(formats, k));
-
-  //how to format dates
-  lxw_format * date = workbook_add_format(workbook);
-  format_set_num_format(date, "yyyy-mm-dd");
-
-  //how to format timetamps
-  lxw_format * datetime = workbook_add_format(workbook);
-  format_set_num_format(datetime, "yyyy-mm-dd HH:mm:ss UTC");
 
   //how to format headers (bold + center)
   lxw_format * title = workbook_add_format(workbook);
@@ -408,6 +478,9 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
       Rf_translateCharUTF8(STRING_ELT(df_names, s)) : NULL;
     lxw_worksheet *sheet = workbook_add_worksheet(workbook, sheet_name);
     assert_that(sheet, "failed to create workbook");
+
+    //per-sheet worksheet options (column/row geometry, freeze panes, ...)
+    SEXP opts = (sheets != R_NilValue && Rf_length(sheets) > s) ? VECTOR_ELT(sheets, s) : R_NilValue;
 
     //get data frame
     lxw_row_t cursor = 0;
@@ -441,10 +514,6 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
         lxw_row_t col_rows = (lxw_row_t) Rf_length(COL);
         if(col_rows > rows) rows = col_rows;
       }
-      if(coltypes[i] == COL_DATE)
-        assert_lxw(worksheet_set_column(sheet, i, i, 20, date));
-      if(coltypes[i] == COL_POSIXCT)
-        assert_lxw(worksheet_set_column(sheet, i, i, 20, datetime));
       if(coltypes[i] == COL_UNKNOWN)
         Rf_warning("Column '%s' has unrecognized data type.", CHAR(STRING_ELT(names, i)));
     }
@@ -455,10 +524,16 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
     bail_if(rows > max_rows, "data frame has too many rows for xlsx (max 1048576)");
 
     // Build context for cell writers
-    cell_write_ctx ctx = {workbook, sheet, date, datetime, hyperlink, fmts, nfmts};
+    cell_write_ctx ctx = {workbook, sheet, hyperlink, fmts, nfmts};
+
+    // Apply column geometry/formats and sheet-level options (freeze, etc.)
+    apply_columns(&ctx, opts, cols);
+    apply_sheet_scalars(&ctx, opts);
 
     // Need to iterate by row first for performance
     for (lxw_row_t i = 0; i < rows; i++) {
+      // Row options must be set before the row is flushed (constant_memory).
+      apply_row(&ctx, opts, cursor);
       for(lxw_col_t j = 0; j < cols; j++){
         SEXP col = VECTOR_ELT(df, j);
         if(Rf_length(col) <= (R_xlen_t) i) continue;
@@ -481,7 +556,7 @@ SEXP C_lxw_version(void){
 static const R_CallMethodDef CallEntries[] = {
   {"C_lxw_version",           (DL_FUNC) &C_lxw_version,           0},
   {"C_set_tempdir",           (DL_FUNC) &C_set_tempdir,           1},
-  {"C_write_data_frame_list", (DL_FUNC) &C_write_data_frame_list, 6},
+  {"C_write_data_frame_list", (DL_FUNC) &C_write_data_frame_list, 7},
   {NULL, NULL, 0}
 };
 
