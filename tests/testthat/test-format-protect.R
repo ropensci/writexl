@@ -85,3 +85,27 @@ test_that("cell locking interacts with sheet protection", {
   s <- styles_string(list(D = xl_sheet(df, protect = TRUE)))
   expect_match(s, 'locked="0"')           # the cell is unlocked in the style
 })
+
+test_that("protection formatting on an unprotected sheet warns", {
+  df <- data.frame(a = 1)
+  df$b <- xl_cell_general(value = 2, format = xl_protection(locked = FALSE))
+  expect_warning(write_tmp(df), "not protected")
+  dfh <- data.frame(a = 1)
+  dfh$b <- xl_cell_general(value = 2, format = xl_protection(hidden = TRUE))
+  expect_warning(write_tmp(dfh), "not protected")
+  # column-level protection warns and names the sheet
+  sc <- xl_sheet(data.frame(x = 1:2),
+                 cols = xl_col_spec("x", format = xl_protection(locked = FALSE)))
+  expect_warning(write_tmp(list(MySheet = sc)), "MySheet")
+})
+
+test_that("no warning when protected or when there is no protection formatting", {
+  df <- data.frame(a = 1)
+  df$b <- xl_cell_general(value = 2, format = xl_protection(locked = FALSE))
+  expect_no_warning(write_tmp(list(D = xl_sheet(df, protect = TRUE))))
+  expect_no_warning(write_tmp(data.frame(a = 1:3)))
+  # a cell left at the default locked = TRUE must NOT warn
+  df2 <- data.frame(a = 1)
+  df2$b <- xl_cell_general(value = 2, format = xl_protection(locked = TRUE))
+  expect_no_warning(write_tmp(df2))
+})

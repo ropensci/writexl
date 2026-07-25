@@ -75,7 +75,9 @@ test_that("number format reaches styles.xml", {
 test_that("protection formatting reaches styles.xml", {
   df <- data.frame(a = 1L)
   df$b <- xl_cell_general(value = 1, format = xl_protection(locked = FALSE, hidden = TRUE))
-  s <- styles_string(df)
+  # unprotected sheet warns that the cell locking has no effect (tested
+  # separately); silence it here.
+  s <- suppressWarnings(styles_string(df))
   expect_match(s, 'locked="0"')
   expect_match(s, 'hidden="1"')
 })

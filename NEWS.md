@@ -27,6 +27,10 @@
     (default cell format, header style, hyperlink style, date/time formats),
     all as overridable `xl_format` objects.
 
+* Writing a cell that unlocks (`locked = FALSE`) or hides (`hidden = TRUE`) a
+  cell on a worksheet that is not protected now warns, since the cell locking
+  has no effect until the sheet is protected.
+
 * See the new "Formatting and workbook properties" vignette.
 
 ## Internal

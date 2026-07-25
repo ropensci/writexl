@@ -175,12 +175,24 @@ typedef struct {
   lxw_worksheet *sheet;
   lxw_format   **fmts;   /* 1-based table of user formats; fmts[0] == NULL   */
   int            nfmts;  /* number of entries in fmts (excluding slot 0)     */
+  const int     *fmt_prot;         /* fmt_prot[id]: format sets unlock/hidden */
+  int            sheet_protected;  /* is this worksheet protected?            */
+  int           *warn_unlocked;    /* set when protection formatting is used  */
+                                   /* on an unprotected sheet                 */
 } cell_write_ctx;
 
 /* Resolve a 1-based format id to a format pointer (0 or out-of-range -> NULL) */
 static lxw_format *ctx_format(cell_write_ctx *ctx, int id){
   if(id <= 0 || id > ctx->nfmts) return NULL;
   return ctx->fmts[id];
+}
+
+/* Note when a format that unlocks/hides a cell is applied on a sheet that is
+   not protected (in which case the cell-locking has no effect). */
+static void note_protection(cell_write_ctx *ctx, int id){
+  if(!ctx->sheet_protected && ctx->fmt_prot && id > 0 && id <= ctx->nfmts &&
+     ctx->fmt_prot[id])
+    *ctx->warn_unlocked = 1;
 }
 
 /* --- worksheet-level option appliers ------------------------------------- */
@@ -213,6 +225,7 @@ static void apply_columns(cell_write_ctx *ctx, SEXP opts, lxw_col_t cols){
     lxw_format *fmt = ctx_format(ctx, fid);
     if(ISNA(width) && fmt == NULL && hid == NA_INTEGER && lev == NA_INTEGER)
       continue;
+    note_protection(ctx, fid);
     lxw_row_col_options o = {0, 0, 0};
     if(hid != NA_INTEGER && hid > 0) o.hidden = 1;
     if(lev != NA_INTEGER && lev > 0) o.level = (uint8_t) lev;
@@ -240,6 +253,7 @@ static void apply_row(cell_write_ctx *ctx, SEXP opts, lxw_row_t wrow){
     lxw_row_col_options o = {0, 0, 0};
     if(hid != NA_INTEGER && hid > 0) o.hidden = 1;
     if(lev != NA_INTEGER && lev > 0) o.level = (uint8_t) lev;
+    note_protection(ctx, fid);
     assert_lxw(worksheet_set_row_opt(ctx->sheet, wrow, height, ctx_format(ctx, fid), &o));
     return;
   }
@@ -404,6 +418,7 @@ static void write_cell_general(cell_write_ctx *ctx,
   if(ids != R_NilValue && TYPEOF(ids) == INTSXP && Rf_length(ids) > (R_xlen_t) i)
     fid = INTEGER(ids)[i];
   lxw_format *fmt = ctx_format(ctx, fid);
+  note_protection(ctx, fid);
 
   /* --- hyperlink (character value provides the optional display string) --- */
   const char *display = NULL;
@@ -559,8 +574,13 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
   int nfmts = (formats == R_NilValue) ? 0 : (int) Rf_length(formats);
   lxw_format **fmts = (lxw_format **) R_alloc((size_t) nfmts + 1, sizeof(lxw_format *));
   fmts[0] = NULL;
-  for(int k = 0; k < nfmts; k++)
-    fmts[k + 1] = build_lxw_format(workbook, VECTOR_ELT(formats, k));
+  int *fmt_prot = (int *) R_alloc((size_t) nfmts + 1, sizeof(int));
+  fmt_prot[0] = 0;
+  for(int k = 0; k < nfmts; k++){
+    SEXP payload = VECTOR_ELT(formats, k);
+    fmts[k + 1] = build_lxw_format(workbook, payload);
+    fmt_prot[k + 1] = payload_has(payload, "unlocked") || payload_has(payload, "hidden");
+  }
 
   //header row format id (0 = none) and height, resolved on the R side
   int hdr_id = (header_id == R_NilValue) ? 0 : Rf_asInteger(header_id);
@@ -626,7 +646,10 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
     bail_if(rows > max_rows, "data frame has too many rows for xlsx (max 1048576)");
 
     // Build context for cell writers
-    cell_write_ctx ctx = {workbook, sheet, fmts, nfmts};
+    int sheet_protected = opt_scalar_int(opts, "protect", 0);
+    int warn_unlocked = 0;
+    cell_write_ctx ctx = {workbook, sheet, fmts, nfmts, fmt_prot,
+                          sheet_protected, &warn_unlocked};
 
     // Apply column geometry/formats and sheet-level options (freeze, etc.)
     apply_columns(&ctx, opts, cols);
@@ -643,6 +666,12 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
       }
       cursor++;
     }
+
+    if(warn_unlocked)
+      Rf_warning("Worksheet '%s' uses cell protection formatting (locked = FALSE "
+                 "or hidden = TRUE) but the worksheet is not protected, so it has "
+                 "no effect. Set protect= in xl_sheet() to protect the worksheet.",
+                 sheet_name ? sheet_name : "");
   }
 
   //this both writes the xlsx file and frees the memory
