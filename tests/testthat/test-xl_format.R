@@ -231,6 +231,10 @@ test_that("merge_xl_format tolerates NULL operands directly", {
   expect_identical(writexl:::merge_xl_format(f, NULL), f)
 })
 
+test_that(".fmt_kv tolerates NULL values", {
+  expect_type(writexl:::.fmt_kv(list(a = NULL)), "character")
+})
+
 test_that("payload key is order-independent", {
   a <- writexl:::.payload_key(list(bold = TRUE, italic = TRUE))
   b <- writexl:::.payload_key(list(italic = TRUE, bold = TRUE))

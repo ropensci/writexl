@@ -210,21 +210,24 @@ print.xl_sheet <- function(x, ...) {
 }
 
 # Build the per-sheet plan (column/row/scalar options) that C applies.
-.resolve_sheet_plan <- function(el, df, reg, header_offset) {
+.resolve_sheet_plan <- function(el, df, reg, header_offset, props) {
   ncols  <- length(df)
   cnames <- names(df)
 
-  # per-column base format (date/time defaults) and geometry
+  # per-column base format: workbook default_format, plus the date/time number
+  # format for Date/POSIXct columns
   col_fmt  <- vector("list", ncols)
   col_width  <- rep(NA_real_, ncols)
   col_hidden <- rep(NA_integer_, ncols)
   col_level  <- rep(NA_integer_, ncols)
   for (i in seq_len(ncols)) {
+    base <- props$default_format
     if (inherits(df[[i]], "POSIXct")) {
-      col_fmt[[i]] <- .writexl_default_datetime_format(); col_width[i] <- 20
+      base <- merge_xl_format(base, props$datetime_format); col_width[i] <- 20
     } else if (inherits(df[[i]], "Date")) {
-      col_fmt[[i]] <- .writexl_default_date_format();     col_width[i] <- 20
+      base <- merge_xl_format(base, props$date_format);     col_width[i] <- 20
     }
+    col_fmt[[i]] <- base
   }
 
   row_row <- integer(0); row_height <- numeric(0)

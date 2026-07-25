@@ -172,7 +172,6 @@ static lxw_format *build_lxw_format(lxw_workbook *wb, SEXP p){
 typedef struct {
   lxw_workbook  *workbook;
   lxw_worksheet *sheet;
-  lxw_format    *hyperlink_fmt;  /* default hyperlink style for url cells    */
   lxw_format   **fmts;   /* 1-based table of user formats; fmts[0] == NULL   */
   int            nfmts;  /* number of entries in fmts (excluding slot 0)     */
 } cell_write_ctx;
@@ -374,11 +373,12 @@ static void write_cell_general(cell_write_ctx *ctx,
     display = Rf_translateCharUTF8(STRING_ELT(value, 0));
 
   if(hyperlink != R_NilValue && !Rf_isNull(hyperlink)){
-    lxw_format *url_fmt = fmt ? fmt : ctx->hyperlink_fmt;
+    /* the hyperlink style (default + hyperlink_format + cell) is resolved
+       into `fmt` on the R side; NULL only if no styling at all applies */
     if(TYPEOF(hyperlink) == STRSXP && STRING_ELT(hyperlink, 0) != NA_STRING){
       assert_lxw(worksheet_write_url_opt(ctx->sheet, row, col_idx,
                    Rf_translateCharUTF8(STRING_ELT(hyperlink, 0)),
-                   url_fmt, display, NULL));
+                   fmt, display, NULL));
       return;
     } else if(TYPEOF(hyperlink) == VECSXP){
       SEXP url_s = list_get(hyperlink, "url");
@@ -390,7 +390,7 @@ static void write_cell_general(cell_write_ctx *ctx,
                                ? Rf_translateCharUTF8(STRING_ELT(tip_s, 0)) : NULL;
         assert_lxw(worksheet_write_url_opt(ctx->sheet, row, col_idx,
                      Rf_translateCharUTF8(STRING_ELT(url_s, 0)),
-                     url_fmt, display, tooltip));
+                     fmt, display, tooltip));
         return;
       }
     }
@@ -430,11 +430,75 @@ static void write_cell(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
     write_atomic_value(ctx, row, col, col_data, type, i, NULL);
 }
 
+/* --- Workbook document properties ---------------------------------------- */
+
+static void apply_properties(lxw_workbook *wb, SEXP props){
+  if(props == R_NilValue) return;
+
+  /* document metadata */
+  lxw_doc_properties dp;
+  memset(&dp, 0, sizeof(dp));
+  const char *keys[] = {"title","subject","author","manager","company",
+                        "category","keywords","comments","status","hyperlink_base"};
+  const char **fields[] = {&dp.title,&dp.subject,&dp.author,&dp.manager,&dp.company,
+                           &dp.category,&dp.keywords,&dp.comments,&dp.status,&dp.hyperlink_base};
+  int any_meta = 0;
+  for(int i = 0; i < 10; i++){
+    const char *v = payload_str(props, keys[i]);
+    if(v){ *fields[i] = v; any_meta = 1; }
+  }
+  if(any_meta)
+    workbook_set_properties(wb, &dp);
+
+  /* custom properties (typed) */
+  SEXP custom = list_get(props, "custom");
+  if(custom != R_NilValue && Rf_isVectorList(custom)){
+    for(R_xlen_t i = 0; i < Rf_length(custom); i++){
+      SEXP e = VECTOR_ELT(custom, i);
+      const char *nm = payload_str(e, "name");
+      const char *ty = payload_str(e, "type");
+      SEXP val = list_get(e, "value");
+      if(!nm || !ty || val == R_NilValue) continue;
+      if(!strcmp(ty, "string"))
+        workbook_set_custom_property_string(wb, nm, payload_str(e, "value"));
+      else if(!strcmp(ty, "integer"))
+        workbook_set_custom_property_integer(wb, nm, Rf_asInteger(val));
+      else if(!strcmp(ty, "number"))
+        workbook_set_custom_property_number(wb, nm, Rf_asReal(val));
+      else if(!strcmp(ty, "boolean"))
+        workbook_set_custom_property_boolean(wb, nm, Rf_asLogical(val) == TRUE);
+    }
+  }
+
+  /* read-only recommended */
+  if(opt_scalar_int(props, "read_only", 0))
+    workbook_read_only_recommended(wb);
+
+  /* window size */
+  SEXP ws = list_get(props, "window_size");
+  if(ws != R_NilValue && Rf_length(ws) >= 2){
+    SEXP wi = PROTECT(Rf_coerceVector(ws, INTSXP));
+    workbook_set_size(wb, (uint16_t) INTEGER(wi)[0], (uint16_t) INTEGER(wi)[1]);
+    UNPROTECT(1);
+  }
+
+  /* defined names */
+  SEXP names = list_get(props, "names");
+  if(names != R_NilValue && Rf_isVectorList(names)){
+    for(R_xlen_t i = 0; i < Rf_length(names); i++){
+      SEXP e = VECTOR_ELT(names, i);
+      const char *nm = payload_str(e, "name");
+      const char *fm = payload_str(e, "formula");
+      if(nm && fm) workbook_define_name(wb, nm, fm);
+    }
+  }
+}
+
 /* --- Main entry point ---------------------------------------------------- */
 
 SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
                              SEXP format_headers, SEXP use_zip64, SEXP formats,
-                             SEXP sheets){
+                             SEXP sheets, SEXP header_id, SEXP properties){
   assert_that(Rf_isVectorList(df_list), "Object is not a list");
   assert_that(Rf_isString(file) && Rf_length(file), "Invalid file path");
   assert_that(Rf_isLogical(col_names), "col_names must be logical");
@@ -451,22 +515,19 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
   lxw_workbook *workbook = workbook_new_opt(Rf_translateChar(STRING_ELT(file, 0)), &options);
   assert_that(workbook, "failed to create workbook");
 
-  //build the user-format table (1-based; index 0 is the NULL format)
+  //build the user-format table (1-based; index 0 is the NULL format).  All
+  //formats -- header, hyperlink, date, and user cell formats -- come from R.
   int nfmts = (formats == R_NilValue) ? 0 : (int) Rf_length(formats);
   lxw_format **fmts = (lxw_format **) R_alloc((size_t) nfmts + 1, sizeof(lxw_format *));
   fmts[0] = NULL;
   for(int k = 0; k < nfmts; k++)
     fmts[k + 1] = build_lxw_format(workbook, VECTOR_ELT(formats, k));
 
-  //how to format headers (bold + center)
-  lxw_format * title = workbook_add_format(workbook);
-  format_set_bold(title);
-  format_set_align(title, LXW_ALIGN_CENTER);
+  //header row format id (0 = none), resolved on the R side
+  int hdr_id = (header_id == R_NilValue) ? 0 : Rf_asInteger(header_id);
 
-  //how to format hyperlinks (underline + blue)
-  lxw_format * hyperlink = workbook_add_format(workbook);
-  format_set_underline(hyperlink, LXW_UNDERLINE_SINGLE);
-  format_set_font_color(hyperlink, LXW_COLOR_BLUE);
+  //workbook document properties
+  apply_properties(workbook, properties);
 
   //iterate over sheets
   SEXP df_names = PROTECT(Rf_getAttrib(df_list, R_NamesSymbol));
@@ -495,10 +556,11 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
 
     //create header row
     if(Rf_asLogical(col_names)){
+      lxw_format *hdr_fmt = (hdr_id > 0 && hdr_id <= nfmts) ? fmts[hdr_id] : NULL;
       for(lxw_col_t i = 0; i < cols; i++)
         assert_lxw(worksheet_write_string(sheet, cursor, i, Rf_translateCharUTF8(STRING_ELT(names, i)), NULL));
       if(Rf_asLogical(format_headers))
-        assert_lxw(worksheet_set_row(sheet, cursor, 15, title));
+        assert_lxw(worksheet_set_row(sheet, cursor, 15, hdr_fmt));
       cursor++;
     }
 
@@ -524,7 +586,7 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
     bail_if(rows > max_rows, "data frame has too many rows for xlsx (max 1048576)");
 
     // Build context for cell writers
-    cell_write_ctx ctx = {workbook, sheet, hyperlink, fmts, nfmts};
+    cell_write_ctx ctx = {workbook, sheet, fmts, nfmts};
 
     // Apply column geometry/formats and sheet-level options (freeze, etc.)
     apply_columns(&ctx, opts, cols);
@@ -556,7 +618,7 @@ SEXP C_lxw_version(void){
 static const R_CallMethodDef CallEntries[] = {
   {"C_lxw_version",           (DL_FUNC) &C_lxw_version,           0},
   {"C_set_tempdir",           (DL_FUNC) &C_set_tempdir,           1},
-  {"C_write_data_frame_list", (DL_FUNC) &C_write_data_frame_list, 7},
+  {"C_write_data_frame_list", (DL_FUNC) &C_write_data_frame_list, 9},
   {NULL, NULL, 0}
 };
 

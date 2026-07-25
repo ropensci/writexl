@@ -157,6 +157,8 @@ Other writexl:
 \code{\link{xl_colrow_spec}},
 \code{\link[=xl_format]{xl_format()}},
 \code{\link[=xl_formula]{xl_formula()}},
-\code{\link[=xl_sheet]{xl_sheet()}}
+\code{\link[=xl_properties]{xl_properties()}},
+\code{\link[=xl_sheet]{xl_sheet()}},
+\code{\link[=xl_workbook]{xl_workbook()}}
 }
 \concept{writexl}

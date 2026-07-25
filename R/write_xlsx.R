@@ -26,19 +26,22 @@
 #' readxl::read_xlsx(tmp)
 write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
                        format_headers = TRUE, use_zip64 = FALSE){
-  if(is.data.frame(x) || inherits(x, "xl_sheet"))
-    x <- list(x)
-  sheet_like <- is.list(x) &&
-    all(vapply(x, function(el) is.data.frame(el) || inherits(el, "xl_sheet"),
-               logical(1)))
-  if(!sheet_like)
-    stop("Argument x must be a data frame, an xl_sheet, or a list of them")
-  # Underlying data frames (unwrap any xl_sheet wrappers), keeping the
-  # originals so their worksheet options can be resolved below.
-  elems <- x
-  dfs <- lapply(x, function(el) if(inherits(el, "xl_sheet")) el$data else el)
+  # Resolve the input to an xl_workbook.  A bare data frame / xl_sheet / list
+  # is wrapped in a workbook with default properties; an explicit xl_workbook
+  # overrides col_names/format_headers.
+  if(inherits(x, "xl_workbook")){
+    wb <- x
+    col_names <- wb$col_names
+    format_headers <- wb$format_headers
+  } else {
+    wb <- xl_workbook(x, properties = xl_properties(),
+                      col_names = col_names, format_headers = format_headers)
+  }
+  props <- wb$properties
+  elems <- wb$sheets
+  dfs <- lapply(elems, function(el) if(inherits(el, "xl_sheet")) el$data else el)
   dfs <- lapply(dfs, normalize_df)
-  names(dfs) <- names(x)
+  names(dfs) <- names(elems)
   if(any(nchar(names(dfs)) > 31)){
     warning("Truncating sheet name(s) to 31 characters")
     names(dfs) <- substring(names(dfs), 1, 29)
@@ -50,41 +53,39 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
   }
   stopifnot(is.character(path) && length(path))
   path <- normalizePath(path, mustWork = FALSE)
-  # Resolve per-cell formats for xl_cell_general columns and per-sheet
-  # column/row/layout options into a single deduplicated workbook format
-  # table, attaching integer ids to each column and building a sheet plan.
+  # Resolve everything into one deduplicated workbook format table: the header
+  # format, each general cell's effective format, and each sheet's column/row
+  # plan -- all cascaded over the workbook default_format.
   header_offset <- if(isTRUE(as.logical(col_names))) 1L else 0L
   reg <- .new_format_registry()
-  dfs <- lapply(dfs, .resolve_sheet_formats, reg = reg)
-  sheets <- Map(function(el, df) .resolve_sheet_plan(el, df, reg, header_offset),
+  header_id <- .register_format(reg, merge_xl_format(props$default_format,
+                                                     props$header_format))
+  dfs <- lapply(dfs, .resolve_sheet_formats, reg = reg, props = props)
+  sheets <- Map(function(el, df) .resolve_sheet_plan(el, df, reg, header_offset, props),
                 elems, dfs)
   ret <- .Call(C_write_data_frame_list, dfs, path, col_names, format_headers,
-               use_zip64, reg$table, sheets)
+               use_zip64, reg$table, sheets, header_id, .properties_payload(props))
   invisible(ret)
 }
 
-# Default number formats applied to date/time values written through
-# xl_cell_general when the cell's own format sets no number format.  These
-# mirror the column-level defaults used for plain Date/POSIXct columns.
-.writexl_default_date_format     <- function() xl_num_format("yyyy-mm-dd")
-.writexl_default_datetime_format <- function() xl_num_format("yyyy-mm-dd HH:mm:ss UTC")
-
 # Walk a sheet's xl_cell_general columns, register each cell's effective format
 # in the workbook registry, and attach the resulting integer id vector.
-.resolve_sheet_formats <- function(df, reg) {
+.resolve_sheet_formats <- function(df, reg, props) {
   for (j in seq_along(df)) {
     col <- df[[j]]
     if (!inherits(col, "xl_cell_general")) next
     recs <- unclass(col)
-    ids <- vapply(recs, .resolve_cell_format_id, integer(1), reg = reg)
+    ids <- vapply(recs, .resolve_cell_format_id, integer(1), reg = reg, props = props)
     attr(col, "writexl_format_ids") <- ids
     df[[j]] <- col
   }
   df
 }
 
-# Resolve one cell record's effective format to a registry id (0 = none).
-.resolve_cell_format_id <- function(rec, reg) {
+# Resolve one cell record's effective format to a registry id (0 = none),
+# cascading workbook default_format, then the hyperlink/date default, then the
+# cell's own format.
+.resolve_cell_format_id <- function(rec, reg, props) {
   fmt <- rec$format
   val <- rec$value
   fm  <- rec$formula
@@ -92,16 +93,17 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
   formula_set   <- !(is.null(fm) || (length(fm) == 1L && is.na(fm)))
   hyperlink_set <- !(is.null(hl) || identical(hl, NA) ||
                      (is.character(hl) && length(hl) == 1L && is.na(hl)))
-  if (!formula_set && !hyperlink_set && !is.null(val) &&
-      (inherits(val, "Date") || inherits(val, "POSIXct"))) {
+  base <- props$default_format
+  if (hyperlink_set) {
+    base <- merge_xl_format(base, props$hyperlink_format)
+  } else if (!formula_set && !is.null(val) &&
+             (inherits(val, "Date") || inherits(val, "POSIXct"))) {
     has_num <- is_xl_format(fmt) && !is.null(unclass(fmt)$num_format)
-    if (!has_num) {
-      base <- if (inherits(val, "POSIXct")) .writexl_default_datetime_format()
-              else .writexl_default_date_format()
-      fmt <- if (is.null(fmt)) base else merge_xl_format(base, fmt)
-    }
+    if (!has_num)
+      base <- merge_xl_format(base, if (inherits(val, "POSIXct"))
+                                props$datetime_format else props$date_format)
   }
-  .register_format(reg, fmt)
+  .register_format(reg, merge_xl_format(base, fmt))
 }
 
 normalize_df <- function(df){
