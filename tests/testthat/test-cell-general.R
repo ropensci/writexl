@@ -451,3 +451,23 @@ test_that("normalize_df passes xl_cell_general columns through unchanged", {
   norm <- normalize_df(df)
   expect_s3_class(norm$c, "xl_cell_general")
 })
+
+test_that("xl_cell_general rejects value types writexl cannot write", {
+  # the same predicate guards columns and cell objects, so an unsupported type
+  # cannot slip in by being wrapped in a cell
+  expect_error(xl_cell_general(value = complex(real = 1, imaginary = 1)),
+               "cannot write these value type")
+  expect_error(xl_cell_general(value = as.raw(1)), "raw")
+  # inside a mixed-type list the offending element is identified by position
+  expect_error(xl_cell_general(value = list(1, complex(real = 1, imaginary = 1))),
+               "value[[2]]", fixed = TRUE)
+
+  # supported values, including the blank-cell sentinels, are unaffected
+  expect_s3_class(xl_cell_general(value = list(1.5, "text", TRUE)), "xl_cell_general")
+  expect_s3_class(xl_cell_general(value = list(as.Date("2020-01-01"),
+                                               as.POSIXct("2020-01-01", tz = "UTC"))),
+                  "xl_cell_general")
+  expect_s3_class(xl_cell_general(value = NA), "xl_cell_general")
+  expect_s3_class(xl_cell_general(value = list(1, NULL)), "xl_cell_general")
+  expect_s3_class(xl_cell_general(formula = "=1+1"), "xl_cell_general")
+})

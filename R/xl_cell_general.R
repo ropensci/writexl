@@ -88,6 +88,28 @@ xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
     stop("At least one of 'value', 'formula', 'hyperlink', or 'comment' must ",
          "be provided. Use value = NA for an explicit empty cell.", call. = FALSE)
 
+  # 0aa. Reject values writexl cannot write.  Uses the same predicate as the
+  #      column-level check in normalize_df(), so an unsupported type cannot
+  #      slip in by being wrapped in a cell object.  NULL and NA are allowed:
+  #      both mean "blank cell".
+  if (!is.null(value)) {
+    vals <- if (is.list(value)) value else list(value)
+    keep <- !vapply(vals, is.null, logical(1))
+    bad <- which(keep & !vapply(vals, .is_supported_column, logical(1)))
+    if (length(bad)) {
+      detail <- vapply(bad, function(k) {
+        v <- vals[[k]]
+        cls <- paste(class(v), collapse = "/")
+        ty <- typeof(v)
+        lab <- if (identical(cls, ty)) cls else sprintf("%s (%s)", cls, ty)
+        if (is.list(value)) sprintf("value[[%d]]: %s", k, lab)
+        else sprintf("value: %s", lab)
+      }, character(1))
+      stop("xl_cell_general() cannot write these value type(s):\n  ",
+           paste(detail, collapse = "\n  "), call. = FALSE)
+    }
+  }
+
   # 0b. Pre-normalise hyperlink: a named list with 'url' is a single hyperlink
   #     spec, not a list of multiple hyperlinks.  Wrap it so length() = 1.
   if (is.list(hyperlink) && !is.null(hyperlink[["url"]])) {
