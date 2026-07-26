@@ -5,5 +5,5 @@
 ^src/.*\.o$
 ^README.md$
 ^\.github$
-^cran-comments\\.md$
+^cran-comments\.md$
 ^codecov\.yml$
