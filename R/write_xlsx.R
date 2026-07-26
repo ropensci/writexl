@@ -136,5 +136,34 @@ normalize_df <- function(df){
     getNamespace("bit64")
     df[[i]] <- as.double(df[[i]])
   }
+  .check_supported_columns(df)
   df
+}
+
+# Column classes writexl can represent.  After the coercions above, a *classed*
+# column is only supported when every one of its classes is in this set.
+.SUPPORTED_COLUMN_CLASSES <- c("Date", "POSIXct", "POSIXt",
+                               "xl_cell_general", "xl_cell")
+
+.is_supported_column <- function(x){
+  cls <- attr(x, "class")
+  if(!is.null(cls) && !all(cls %in% .SUPPORTED_COLUMN_CLASSES))
+    return(FALSE)
+  if(inherits(x, "xl_cell_general"))
+    return(TRUE)
+  is.character(x) || is.integer(x) || is.double(x) || is.logical(x)
+}
+
+# Fail loudly on column types writexl cannot represent, rather than silently
+# writing the underlying values (or nothing at all).
+.check_supported_columns <- function(df){
+  bad <- which(!vapply(df, .is_supported_column, logical(1)))
+  if(!length(bad))
+    return(invisible(NULL))
+  detail <- vapply(bad, function(i){
+    sprintf("'%s' (column %d): %s", names(df)[i], i,
+            paste(class(df[[i]]), collapse = "/"))
+  }, character(1))
+  stop("writexl cannot write column(s) of these types:\n  ",
+       paste(detail, collapse = "\n  "), call. = FALSE)
 }

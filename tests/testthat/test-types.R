@@ -29,3 +29,36 @@ test_that("Writing formulas", {
   # currently readxl does not support formulas so inspect manually
   expect_true(file.exists(write_xlsx(df)))
 })
+
+test_that("unsupported column types raise an error naming the column", {
+  df <- data.frame(a = 1)
+  df$bad <- complex(real = 1, imaginary = 1)
+  expect_error(write_xlsx(df), "cannot write column")
+  expect_error(write_xlsx(df), "'bad' (column 2)", fixed = TRUE)
+  expect_error(write_xlsx(df), "complex")
+
+  # a bare list column and a classed numeric are equally unrepresentable
+  df2 <- data.frame(a = 1); df2$bad <- I(list(1))
+  expect_error(write_xlsx(df2), "cannot write column")
+  df3 <- data.frame(a = 1); df3$bad <- as.difftime(1, units = "days")
+  expect_error(write_xlsx(df3), "difftime")
+
+  # every unsupported column is reported, not just the first
+  df4 <- data.frame(a = 1)
+  df4$b <- complex(real = 1, imaginary = 1)
+  df4$c <- as.difftime(1, units = "days")
+  expect_error(write_xlsx(df4), "'b'")
+  expect_error(write_xlsx(df4), "'c'")
+})
+
+test_that("supported column types are still accepted", {
+  df <- data.frame(int = 1:2, dbl = c(1.5, 2.5), chr = c("x", "y"),
+                   lgl = c(TRUE, FALSE), date = as.Date("2020-01-01") + 0:1,
+                   stringsAsFactors = FALSE)
+  df$time <- as.POSIXct(c("2020-01-01 10:00", "2020-01-02 10:00"), tz = "UTC")
+  df$cell <- xl_cell_general(value = 1:2)
+  expect_true(file.exists(write_xlsx(df)))
+  # classes that normalize_df coerces must not trip the check
+  expect_true(file.exists(write_xlsx(data.frame(f = factor(c("a", "b"))))))
+  expect_true(file.exists(write_xlsx(data.frame(p = as.POSIXlt("2020-01-01")))))
+})

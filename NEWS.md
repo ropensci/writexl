@@ -37,6 +37,12 @@
   defaults are worksheet-scoped); a comment's own `author` overrides the sheet
   default.
 
+* Columns of a type writexl cannot represent (e.g. `complex`, `difftime`, or a
+  bare list column) now raise an **error** naming the offending column, its
+  position and its class, instead of writing a warning and leaving the cells
+  empty. Types that were already coerced on the way out (`factor`, `hms`,
+  `POSIXlt`, `integer64`) are unaffected.
+
 * Writing a cell that unlocks (`locked = FALSE`) or hides (`hidden = TRUE`) a
   cell on a worksheet that is not protected now warns, since the cell locking
   has no effect until the sheet is protected.
