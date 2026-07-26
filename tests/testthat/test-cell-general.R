@@ -471,3 +471,74 @@ test_that("xl_cell_general rejects value types writexl cannot write", {
   expect_s3_class(xl_cell_general(value = list(1, NULL)), "xl_cell_general")
   expect_s3_class(xl_cell_general(formula = "=1+1"), "xl_cell_general")
 })
+
+# ── Formatted blank cells ─────────────────────────────────────────────────────
+#
+# A cell with a format but no writable value must still exist, or the format is
+# silently lost.  Excel ignores blank cells that carry no format, so the
+# unformatted case must continue to write no cell at all.
+
+# The style index of one cell, or NA_character_ if the cell is absent.
+cell_style <- function(path, ref) {
+  w <- xlsx_part(path, "xl/worksheets/sheet1.xml", raw = TRUE)
+  m <- regmatches(w, regexec(sprintf('<c r="%s"([^>]*)>?', ref), w))[[1]]
+  if (!length(m)) return(NA_character_)
+  s <- regmatches(m[2L], regexec('s="([0-9]+)"', m[2L]))[[1]]
+  if (length(s) == 2L) s[2L] else ""
+}
+
+test_that("an NA value with a format writes a formatted blank cell", {
+  df <- data.frame(x = 1:2)
+  df$b <- xl_cell_general(value = c(NA, NA),
+                          format = xl_fill(background = "yellow"))
+  p <- write_tmp(df)
+
+  # the cell exists and carries a real (non-default) style
+  expect_false(is.na(cell_style(p, "B2")))
+  expect_true(nzchar(cell_style(p, "B2")))
+  expect_true(as.integer(cell_style(p, "B2")) > 0L)
+
+  # ... and it is genuinely blank: no value and no inline string
+  w <- xlsx_part(p, "xl/worksheets/sheet1.xml", raw = TRUE)
+  blank <- regmatches(w, regexec('<c r="B2"[^>]*/>', w))[[1]]
+  expect_length(blank, 1L)
+
+  # the fill really reached styles.xml
+  expect_match(xlsx_part(p, "xl/styles.xml", raw = TRUE), "FFFFFF00",
+               ignore.case = TRUE)
+})
+
+test_that("an NA value with no format writes no cell at all", {
+  df <- data.frame(x = 1:2)
+  df$b <- xl_cell_general(value = c(NA, NA))
+  expect_true(is.na(cell_style(write_tmp(df), "B2")))
+})
+
+test_that("every NA flavour with a format writes a formatted blank", {
+  fmt <- xl_fill(background = "yellow")
+  for (v in list(NA, NA_character_, NA_real_, NA_integer_, NaN,
+                 as.Date(NA), as.POSIXct(NA_real_, origin = "1970-01-01",
+                                         tz = "UTC"))) {
+    df <- data.frame(x = 1L)
+    df$b <- xl_cell_general(value = list(v), format = fmt)
+    lbl <- paste(class(v), collapse = "/")
+    expect_true(as.integer(cell_style(write_tmp(df), "B2")) > 0L, label = lbl)
+  }
+})
+
+test_that("a formatted blank survives alongside a comment on the same cell", {
+  df <- data.frame(x = 1L)
+  df$b <- xl_cell_general(value = NA, comment = "note",
+                          format = xl_fill(background = "yellow"))
+  p <- write_tmp(df)
+  expect_true(as.integer(cell_style(p, "B2")) > 0L)
+  expect_match(xlsx_part(p, "xl/comments1.xml", raw = TRUE), "note")
+})
+
+test_that("NA in a plain column is left alone even under a column format", {
+  # deliberate: Excel already applies the column format to empty cells, so
+  # plain columns keep writing no cell for an NA
+  sheet <- xl_sheet(data.frame(x = 1L, b = NA_character_),
+                    cols = xl_col_spec("b", format = xl_fill(background = "yellow")))
+  expect_true(is.na(cell_style(write_tmp(list(S = sheet)), "B2")))
+})

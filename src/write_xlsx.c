@@ -357,9 +357,14 @@ static void apply_sheet_overlays(cell_write_ctx *ctx, SEXP opts){
 }
 
 /* --- Individual per-type cell writers ------------------------------------ */
+/*
+ * Each writer returns 1 if it wrote a cell and 0 if the value had no
+ * representation in xlsx (NA, NaN).  Callers that care -- write_cell_general()
+ * -- use that to fall back to a formatted blank rather than losing the format.
+ */
 
-static void write_cell_date(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
-                             SEXP col_data, lxw_row_t i, lxw_format *fmt){
+static int write_cell_date(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                            SEXP col_data, lxw_row_t i, lxw_format *fmt){
   double val = Rf_isReal(col_data) ? REAL(col_data)[i] : INTEGER(col_data)[i];
   if(Rf_isReal(col_data) ? R_FINITE(val) : val != NA_INTEGER){
     /* Same arithmetic as write_cell_posixct() below: R days since 1970-01-01
@@ -371,30 +376,37 @@ static void write_cell_date(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
     if(serial >= 60.0)
       serial = serial + 1.0;
     assert_lxw(worksheet_write_number(ctx->sheet, row, col, serial, fmt));
+    return 1;
   }
+  return 0;
 }
 
-static void write_cell_posixct(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
-                                SEXP col_data, lxw_row_t i, lxw_format *fmt){
+static int write_cell_posixct(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                               SEXP col_data, lxw_row_t i, lxw_format *fmt){
   double val = REAL(col_data)[i];
   if(R_FINITE(val)){
     val = 25568.0 + val / (24*60*60);
     if(val >= 60.0)
       val = val + 1.0;
     assert_lxw(worksheet_write_number(ctx->sheet, row, col, val, fmt));
+    return 1;
   }
+  return 0;
 }
 
-static void write_cell_string(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
-                               SEXP col_data, lxw_row_t i, lxw_format *fmt){
+static int write_cell_string(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                              SEXP col_data, lxw_row_t i, lxw_format *fmt){
   SEXP val = STRING_ELT(col_data, i);
   // NB: xlsx does distinguish between empty string and NA
-  if(val != NA_STRING && Rf_length(val))
+  if(val != NA_STRING && Rf_length(val)){
     assert_lxw(worksheet_write_string(ctx->sheet, row, col, Rf_translateCharUTF8(val), fmt));
+    return 1;
+  }
+  return 0;
 }
 
-static void write_cell_real(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
-                             SEXP col_data, lxw_row_t i, lxw_format *fmt){
+static int write_cell_real(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                            SEXP col_data, lxw_row_t i, lxw_format *fmt){
   double val = REAL(col_data)[i];
   if(val == R_PosInf)
     assert_lxw(worksheet_write_string(ctx->sheet, row, col, "Inf", fmt));
@@ -402,48 +414,51 @@ static void write_cell_real(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
     assert_lxw(worksheet_write_string(ctx->sheet, row, col, "-Inf", fmt));
   else if(R_FINITE(val)) // skips NA and NAN
     assert_lxw(worksheet_write_number(ctx->sheet, row, col, val, fmt));
+  else
+    return 0;
+  return 1;
 }
 
-static void write_cell_integer(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
-                                SEXP col_data, lxw_row_t i, lxw_format *fmt){
+static int write_cell_integer(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                               SEXP col_data, lxw_row_t i, lxw_format *fmt){
   int val = INTEGER(col_data)[i];
-  if(val != NA_INTEGER)
+  if(val != NA_INTEGER){
     assert_lxw(worksheet_write_number(ctx->sheet, row, col, val, fmt));
+    return 1;
+  }
+  return 0;
 }
 
-static void write_cell_logical(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
-                                SEXP col_data, lxw_row_t i, lxw_format *fmt){
+static int write_cell_logical(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                               SEXP col_data, lxw_row_t i, lxw_format *fmt){
   int val = LOGICAL(col_data)[i];
-  if(val != NA_LOGICAL)
+  if(val != NA_LOGICAL){
     assert_lxw(worksheet_write_boolean(ctx->sheet, row, col, val, fmt));
+    return 1;
+  }
+  return 0;
 }
 
 /* --- Atomic value dispatcher (all non-xl_cell_general types) ------------- */
 
-static void write_atomic_value(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
-                                SEXP col_data, R_COL_TYPE type, lxw_row_t i,
-                                lxw_format *fmt){
+static int write_atomic_value(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                               SEXP col_data, R_COL_TYPE type, lxw_row_t i,
+                               lxw_format *fmt){
   switch(type){
   case COL_DATE:
-    write_cell_date(ctx, row, col, col_data, i, fmt);
-    break;
+    return write_cell_date(ctx, row, col, col_data, i, fmt);
   case COL_POSIXCT:
-    write_cell_posixct(ctx, row, col, col_data, i, fmt);
-    break;
+    return write_cell_posixct(ctx, row, col, col_data, i, fmt);
   case COL_STRING:
-    write_cell_string(ctx, row, col, col_data, i, fmt);
-    break;
+    return write_cell_string(ctx, row, col, col_data, i, fmt);
   case COL_REAL:
-    write_cell_real(ctx, row, col, col_data, i, fmt);
-    break;
+    return write_cell_real(ctx, row, col, col_data, i, fmt);
   case COL_INTEGER:
-    write_cell_integer(ctx, row, col, col_data, i, fmt);
-    break;
+    return write_cell_integer(ctx, row, col, col_data, i, fmt);
   case COL_LOGICAL:
-    write_cell_logical(ctx, row, col, col_data, i, fmt);
-    break;
+    return write_cell_logical(ctx, row, col, col_data, i, fmt);
   default:
-    break;
+    return 0;
   }
 }
 
@@ -548,8 +563,15 @@ static void write_cell_general(cell_write_ctx *ctx,
   }
 
   /* --- value only: dispatch through the atomic writer --------------------- */
-  if(value == R_NilValue || Rf_isNull(value) || Rf_length(value) == 0) return;
-  write_atomic_value(ctx, row, col_idx, value, get_type(value), 0, fmt);
+  /* A cell whose value has no xlsx representation (absent, NA, NaN) still needs
+     to exist when a format applies, or the format is silently lost.  Note that
+     worksheet_write_blank() is a no-op on a NULL format -- Excel ignores
+     unformatted blanks -- so the unformatted case costs nothing and adds no
+     cell.  Plain (non-xl_cell_general) columns are deliberately left alone:
+     their NAs are covered by the column format Excel already applies. */
+  if(value == R_NilValue || Rf_isNull(value) || Rf_length(value) == 0 ||
+     !write_atomic_value(ctx, row, col_idx, value, get_type(value), 0, fmt))
+    assert_lxw(worksheet_write_blank(ctx->sheet, row, col_idx, fmt));
 }
 
 /* --- Top-level cell dispatcher ------------------------------------------- */
