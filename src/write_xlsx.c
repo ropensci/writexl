@@ -323,8 +323,17 @@ static void apply_sheet_scalars(cell_write_ctx *ctx, SEXP opts){
 static void write_cell_date(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
                              SEXP col_data, lxw_row_t i, lxw_format *fmt){
   double val = Rf_isReal(col_data) ? REAL(col_data)[i] : INTEGER(col_data)[i];
-  if(Rf_isReal(col_data) ? R_FINITE(val) : val != NA_INTEGER)
-    assert_lxw(worksheet_write_number(ctx->sheet, row, col, 25569 + val, fmt));
+  if(Rf_isReal(col_data) ? R_FINITE(val) : val != NA_INTEGER){
+    /* Same arithmetic as write_cell_posixct() below: R days since 1970-01-01
+       map to Excel serial 25568 + val, then +1 for every date on or after
+       1900-03-01 to skip Excel's phantom 1900-02-29 (Excel treats 1900 as a
+       leap year).  Without the correction 1900-01-01 .. 1900-02-28 are written
+       one day too late, and 1900-02-28 lands on the nonexistent serial 60. */
+    double serial = 25568.0 + val;
+    if(serial >= 60.0)
+      serial = serial + 1.0;
+    assert_lxw(worksheet_write_number(ctx->sheet, row, col, serial, fmt));
+  }
 }
 
 static void write_cell_posixct(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,

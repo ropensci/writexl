@@ -43,6 +43,18 @@
 
 * See the new "Formatting and workbook properties" vignette.
 
+## Bug fixes
+
+* `Date` columns holding dates before 1900-03-01 were written one day too late.
+  Excel's 1900 date system wrongly treats 1900 as a leap year, and the `Date`
+  writer did not compensate for that phantom 1900-02-29 (the `POSIXct` writer
+  already did). As a result `1900-01-01` was written as `1900-01-02`, and
+  `1900-02-28` landed on the nonexistent serial 60 so readers such as `readxl`
+  returned `NA` with a warning about an "impossible 1900-02-29 datetime".
+  `Date` and `POSIXct` columns now write identical serial numbers. Dates from
+  1900-03-01 on, and all times written as `POSIXct`, are unaffected. Note
+  that dates before 1900-01-01 still have no valid Excel serial number.
+
 ## Internal
 
 * The header, hyperlink, and date/time formats that were previously hard-coded
