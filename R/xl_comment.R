@@ -67,17 +67,14 @@ xl_comment <- function(text, format = NULL, author = NA, visible = NA,
   if (!is.character(text) || length(text) != 1L || is.na(text))
     stop("`text` must be a single non-NA string", call. = FALSE)
 
-  # styling: reuse xl_format, keep only what comments support
-  color <- font_name <- font_size <- font_family <- NULL
+  # styling: validate now, but keep the xl_format object itself so it stays
+  # easy to inspect and modify (e.g. cm$format <- cm$format + xl_font(size = 9)).
+  # It is flattened to the fields libxlsxwriter wants only on the way to C, in
+  # .comment_c_payload().
   if (!is.null(format)) {
     if (!is_xl_format(format))
       stop("`format` must be an xl_format object", call. = FALSE)
     .check_comment_format(format)
-    f <- unclass(format)
-    color       <- f$fill$background
-    font_name   <- f$font$name
-    font_size   <- f$font$size
-    font_family <- f$font$family
   }
 
   vis <- .val_flag(visible, "visible")
@@ -85,16 +82,13 @@ xl_comment <- function(text, format = NULL, author = NA, visible = NA,
 
   payload <- .drop_null(list(
     text        = text,
+    format      = format,
     author      = .val_str(author, "author"),
     visible     = visible_code,
     width       = .val_int(width, "width", min = 0),
     height      = .val_int(height, "height", min = 0),
     x_scale     = .val_num(x_scale, "x_scale", min = 0),
     y_scale     = .val_num(y_scale, "y_scale", min = 0),
-    color       = color,
-    font_name   = font_name,
-    font_size   = font_size,
-    font_family = font_family,
     start_row   = .val_int(start_row, "start_row", min = 0),
     start_col   = .val_int(start_col, "start_col", min = 0),
     x_offset    = .val_int(x_offset, "x_offset"),
@@ -103,13 +97,31 @@ xl_comment <- function(text, format = NULL, author = NA, visible = NA,
   structure(payload, class = "xl_comment")
 }
 
+# Flatten a comment payload for C: replace the `format` object with the four
+# fields Excel comments actually support.  Called on the final pass to C so the
+# xl_format stays editable up to that point.
+.comment_c_payload <- function(cm) {
+  if (is.null(cm)) return(NULL)
+  fmt <- cm$format
+  cm$format <- NULL
+  if (!is.null(fmt)) {
+    f <- unclass(fmt)
+    cm$color       <- f$fill$background
+    cm$font_name   <- f$font$name
+    cm$font_size   <- f$font$size
+    cm$font_family <- f$font$family
+  }
+  .drop_null(cm)
+}
+
 #' @export
 print.xl_comment <- function(x, ...) {
   p <- unclass(x)
   cat("<xl_comment>\n")
   cat("  text:", p$text, "\n")
-  for (o in setdiff(names(p), "text"))
+  for (o in setdiff(names(p), c("text", "format")))
     cat(sprintf("  %s: %s\n", o, paste(format(p[[o]]), collapse = ",")))
+  if (!is.null(p$format)) print(p$format)
   invisible(x)
 }
 

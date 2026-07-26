@@ -444,6 +444,6 @@ print.xl_sheet <- function(x, ...) {
     autofilter = autofilter, protect = protect$flag,
     protect_password = protect$password, protect_options = protect$options,
     comment_author = as.character(comment_author),
-    show_comments = as.integer(isTRUE(show_comments))
+    show_comments = as.integer(show_comments)
   )
 }
