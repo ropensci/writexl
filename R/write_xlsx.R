@@ -73,8 +73,10 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
   dfs <- lapply(dfs, .resolve_sheet_formats, reg = reg, props = props)
   sheets <- Map(function(el, df) .resolve_sheet_plan(el, df, reg, header_offset, props),
                 elems, dfs)
+  cm <- .resolve_constant_memory(elems, props)
   ret <- .Call(C_write_data_frame_list, dfs, path, col_names, format_headers,
-               use_zip64, reg$table, sheets, header_id, .properties_payload(props))
+               use_zip64, reg$table, sheets, header_id,
+               .properties_payload(props, cm$on))
   invisible(ret)
 }
 

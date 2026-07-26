@@ -85,3 +85,17 @@
 * The header, hyperlink, and date/time formats that were previously hard-coded
   in C are now supplied from R as ordinary formats, so their defaults live in
   `xl_properties()` and can be overridden.
+
+* All range addressing now goes through one resolver, which also accepts
+  absolute references and whole-column / whole-row forms. As a result
+  `xl_sheet(freeze =)` additionally accepts `"$A$2"`, and
+  `xl_sheet(autofilter =)` additionally accepts `"$A$1:$D$51"`, `"B:D"` and
+  `"2:10"`; every previously accepted spelling behaves exactly as before.
+
+* Range-scoped worksheet features are applied through a single sheet-overlay
+  stage that runs before rows are written (a requirement of the libxlsxwriter
+  constant-memory mode). The autofilter is its first user.
+
+* Whether the workbook is written in the libxlsxwriter constant-memory mode is
+  now resolved rather than hard-coded. It still always resolves to "on"; no
+  feature yet requires it off.

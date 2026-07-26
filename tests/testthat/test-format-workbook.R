@@ -148,3 +148,58 @@ test_that("de-hardcoded defaults match the previous behavior (regression)", {
   expect_match(s, "yyyy", fixed = TRUE)            # date number format
   expect_match(s, "FF0000FF", ignore.case = TRUE)  # blue hyperlink font
 })
+
+# --- constant memory --------------------------------------------------------
+
+test_that("constant memory resolves to on", {
+  cm <- .resolve_constant_memory(list(data.frame(a = 1)), xl_properties())
+  expect_equal(cm$on, 1L)
+  expect_equal(cm$reasons, character(0))
+  expect_equal(.properties_payload(xl_properties())$constant_memory, 1L)
+  expect_equal(.properties_payload(xl_properties(), 0L)$constant_memory, 0L)
+})
+
+test_that("the constant_memory override is honoured and validated", {
+  old <- options(writexl.constant_memory = FALSE)
+  on.exit(options(old), add = TRUE)
+  expect_equal(.resolve_constant_memory(list(), xl_properties())$on, 0L)
+  options(writexl.constant_memory = TRUE)
+  expect_equal(.resolve_constant_memory(list(), xl_properties())$on, 1L)
+  options(writexl.constant_memory = "yes")
+  expect_error(.resolve_constant_memory(list(), xl_properties()), "TRUE or FALSE")
+  options(writexl.constant_memory = NA)
+  expect_error(.resolve_constant_memory(list(), xl_properties()), "TRUE or FALSE")
+})
+
+test_that("workbooks write the same content with constant memory on and off", {
+  skip_if_not_installed("readxl")
+  df <- data.frame(txt = c("alpha", "beta", "alpha"),
+                   num = c(1.5, 2, 3),
+                   flag = c(TRUE, FALSE, NA),
+                   when = as.Date("2020-01-01") + 0:2,
+                   stringsAsFactors = FALSE)
+  on_path <- write_tmp(list(D = xl_sheet(df, autofilter = TRUE, freeze = "A2")))
+  old <- options(writexl.constant_memory = FALSE)
+  on.exit(options(old), add = TRUE)
+  off_path <- write_tmp(list(D = xl_sheet(df, autofilter = TRUE, freeze = "A2")))
+  options(old)
+
+  # Content must match; the bytes need not -- with constant memory off, strings
+  # go to the shared string table instead of being written inline.
+  rd_on  <- as.data.frame(readxl::read_xlsx(on_path))
+  rd_off <- as.data.frame(readxl::read_xlsx(off_path))
+  expect_equal(rd_off, rd_on)
+  expect_equal(rd_off$txt, df$txt)
+  expect_equal(as.Date(rd_off$when), df$when)
+
+  # ... and the worksheet features survive either way
+  for (p in c(on_path, off_path)) {
+    w <- xlsx_part(p, "xl/worksheets/sheet1.xml", raw = TRUE)
+    expect_match(w, '<autoFilter ref="A1:D4"')
+    expect_match(w, "<pane")
+  }
+
+  # the storage difference itself, so the off path cannot rot unnoticed
+  expect_null(xlsx_part(on_path, "xl/sharedStrings.xml"))
+  expect_s3_class(xlsx_part(off_path, "xl/sharedStrings.xml"), "xml_document")
+})

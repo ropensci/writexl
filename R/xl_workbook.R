@@ -163,8 +163,40 @@ print.xl_workbook <- function(x, ...) {
   invisible(x)
 }
 
+# --- constant memory ---------------------------------------------------------
+#
+# libxlsxwriter can write a workbook in "constant memory" mode, streaming each
+# row to disk as soon as it is written.  That keeps memory flat for large
+# exports, which is why writexl uses it, but it constrains what may still be
+# applied once a row has been flushed: `worksheet_add_table()` is rejected
+# outright, and `worksheet_merge_range()` only works within the current row.
+# Data validation, conditional formats, images and charts are unaffected.
+#
+# Nothing writexl writes today needs the mode off, so this always resolves to
+# "on".  It exists as a resolver rather than a constant so a feature that
+# cannot work under row streaming can turn it off *and say why* -- append the
+# reason to `reasons` and the flag follows.
+
+# Resolve the constant-memory flag for a workbook.  Returns the C-side integer
+# flag plus the reasons (if any) the mode had to be turned off.
+.resolve_constant_memory <- function(elems, props) {
+  reasons <- character(0)
+  # (future) features that cannot work under row streaming append their reason
+  # here, e.g. reasons <- c(reasons, "worksheet tables are not supported ...")
+  override <- getOption("writexl.constant_memory")
+  if (!is.null(override)) {
+    if (!is.logical(override) || length(override) != 1L || is.na(override))
+      stop("option `writexl.constant_memory` must be TRUE or FALSE",
+           call. = FALSE)
+    return(list(on = as.integer(override), reasons = character(0)))
+  }
+  list(on = as.integer(!length(reasons)), reasons = reasons)
+}
+
 # Build the C-side document-properties payload from an xl_properties object.
-.properties_payload <- function(props) {
+# `constant_memory` rides along here rather than as another .Call() argument so
+# the C entry point's signature stays put as features are added.
+.properties_payload <- function(props, constant_memory = 1L) {
   meta_keys <- c("title", "subject", "author", "manager", "company",
                  "category", "keywords", "comments", "status", "hyperlink_base")
   out <- list()
@@ -185,6 +217,7 @@ print.xl_workbook <- function(x, ...) {
   }
   out$read_only <- as.integer(isTRUE(props$read_only))
   out$header_row_height <- as.numeric(props$header_row_height)
+  out$constant_memory <- as.integer(constant_memory)
   if (!is.null(props$window_size))
     out$window_size <- as.integer(props$window_size)
   if (!is.null(props$names) && length(props$names))
