@@ -2,6 +2,11 @@
 # Workbook layer: xl_properties() and xl_workbook()
 # =============================================================================
 
+# The default number format for POSIXct columns.  Shared with
+# .resolve_timezones(), which swaps it out when the time zone is dropped, so
+# the two definitions cannot drift apart.
+.default_datetime_format <- function() xl_num_format("yyyy-mm-dd HH:mm:ss UTC")
+
 #' Workbook properties, defaults, and metadata
 #'
 #' @description
@@ -38,6 +43,13 @@
 #'   `POSIXct` columns.
 #' @param header_row_height Height (in points) of the header row.
 #' @return An `xl_properties` object.
+#' @section Time zones:
+#' Excel has no concept of a time zone.  When every `POSIXct` in the workbook
+#' shares one time zone, writexl drops the zone and writes local wall-clock
+#' time, and the default `datetime_format` loses its `" UTC"` suffix so that
+#' nothing is mislabelled.  When the time zones differ, all datetimes are
+#' converted to UTC with a warning.  Supplying your own `datetime_format`
+#' overrides the label in either case.
 #' @family writexl
 #' @seealso [xl_workbook], [write_xlsx]
 #' @export
@@ -56,7 +68,7 @@ xl_properties <- function(title = NA, subject = NA, author = NA, manager = NA,
                           hyperlink_format = xl_font(color = "blue",
                                                      underline = "single"),
                           date_format      = xl_num_format("yyyy-mm-dd"),
-                          datetime_format  = xl_num_format("yyyy-mm-dd HH:mm:ss UTC"),
+                          datetime_format  = .default_datetime_format(),
                           date_col_width = 20, datetime_col_width = 20,
                           header_row_height = 15) {
   fmts <- list(default_format = default_format, header_format = header_format,

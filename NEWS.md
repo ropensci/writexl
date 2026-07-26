@@ -45,6 +45,24 @@
 
 ## Bug fixes
 
+* `POSIXct` columns are no longer silently converted to UTC. Excel has no
+  concept of a time zone, so writexl now decides once per workbook:
+
+  * if every datetime in the workbook shares one time zone, the zone is dropped
+    and local wall-clock time is written -- `as.POSIXct("2025-12-01 01:00:00",
+    tz = "Australia/Perth")` now appears in Excel as `2025-12-01 01:00:00`
+    rather than `2025-11-30 17:00:00`. Daylight saving is handled per value.
+    The default `datetime_format` also loses its `" UTC"` suffix in this case,
+    since the value is no longer UTC;
+  * if the time zones differ, all datetimes are converted to UTC (as before)
+    and a warning is raised, because no single wall clock can represent them
+    all. Convert them yourself beforehand if you want something else.
+
+  Datetimes inside [xl_cell_general()] cells are included in this survey.
+  Supplying your own `datetime_format` overrides the label either way. Code
+  that relied on the previous behaviour of always writing the UTC instant will
+  see shifted values when a non-UTC time zone is used throughout.
+
 * `Date` columns holding dates before 1900-03-01 were written one day too late.
   Excel's 1900 date system wrongly treats 1900 as a leap year, and the `Date`
   writer did not compensate for that phantom 1900-02-29 (the `POSIXct` writer

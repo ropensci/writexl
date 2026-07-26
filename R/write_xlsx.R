@@ -58,6 +58,11 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
   }
   stopifnot(is.character(path) && length(path))
   path <- normalizePath(path, mustWork = FALSE)
+  # Excel has no concept of a time zone, so decide once, for the whole workbook,
+  # how POSIXct values are written (see .resolve_timezones()).
+  tz_res <- .resolve_timezones(dfs, props)
+  dfs <- tz_res$dfs
+  props <- tz_res$props
   # Resolve everything into one deduplicated workbook format table: the header
   # format, each general cell's effective format, and each sheet's column/row
   # plan -- all cascaded over the workbook default_format.
@@ -71,6 +76,104 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
   ret <- .Call(C_write_data_frame_list, dfs, path, col_names, format_headers,
                use_zip64, reg$table, sheets, header_id, .properties_payload(props))
   invisible(ret)
+}
+
+# =============================================================================
+# Time zones
+# =============================================================================
+#
+# Excel stores a datetime as a naive serial number: it has no time zone.  Rather
+# than silently converting every POSIXct to UTC, writexl decides per workbook:
+#
+#   * all POSIXct values share one time zone -> drop the zone and write local
+#     wall-clock time (2025-12-01 01:00 in Perth is written as 01:00), and drop
+#     the " UTC" suffix from the default datetime format so nothing is mislabelled;
+#   * the time zones differ -> convert everything to UTC and warn, since no
+#     single wall clock can represent them all.
+#
+# The survey covers plain POSIXct columns and POSIXct values inside
+# xl_cell_general cells.
+
+# The time zone of a POSIXct, with NULL/"" (meaning local time) resolved to the
+# session zone so that an unset zone and an explicit local zone compare equal.
+.tzone_of <- function(x){
+  tz <- attr(x, "tzone", exact = TRUE)
+  if(is.null(tz) || !length(tz) || !nzchar(tz[1])){
+    loc <- Sys.timezone()
+    if(is.na(loc)) "" else loc
+  } else {
+    tz[1]
+  }
+}
+
+# Every distinct time zone used by a POSIXct anywhere in the workbook.
+.collect_tzones <- function(dfs){
+  out <- character(0)
+  for(df in dfs){
+    for(col in df){
+      if(inherits(col, "POSIXct")){
+        out <- c(out, .tzone_of(col))
+      } else if(inherits(col, "xl_cell_general")){
+        for(rec in unclass(col))
+          if(inherits(rec$value, "POSIXct"))
+            out <- c(out, .tzone_of(rec$value))
+      }
+    }
+  }
+  unique(out)
+}
+
+# Re-express a POSIXct so that its wall-clock reading is what reaches the cell.
+# The offset is taken per instant, so daylight saving is handled correctly.
+.drop_tzone <- function(x){
+  off <- as.POSIXlt(x, tz = .tzone_of(x))$gmtoff
+  # Some platforms do not report gmtoff; leave the value alone (i.e. UTC) rather
+  # than writing something wrong.
+  if(is.null(off) || any(is.na(off) & !is.na(as.numeric(x))))
+    return(x)
+  off[is.na(off)] <- 0
+  structure(as.numeric(x) + off, class = c("POSIXct", "POSIXt"), tzone = "UTC")
+}
+
+# Apply .drop_tzone() to every POSIXct in a sheet, including inside cell objects.
+.drop_tzones_sheet <- function(df){
+  for(j in seq_along(df)){
+    col <- df[[j]]
+    if(inherits(col, "POSIXct")){
+      df[[j]] <- .drop_tzone(col)
+    } else if(inherits(col, "xl_cell_general")){
+      recs <- unclass(col)
+      touched <- FALSE
+      for(k in seq_along(recs)){
+        if(inherits(recs[[k]]$value, "POSIXct")){
+          recs[[k]]$value <- .drop_tzone(recs[[k]]$value)
+          touched <- TRUE
+        }
+      }
+      if(touched)
+        df[[j]] <- structure(recs, class = class(col))
+    }
+  }
+  df
+}
+
+.resolve_timezones <- function(dfs, props){
+  tzs <- .collect_tzones(dfs)
+  if(length(tzs) > 1L){
+    warning("The workbook contains datetimes in ", length(tzs),
+            " different time zones (", paste(tzs, collapse = ", "),
+            "); all of them were converted to UTC because Excel does not ",
+            "support time zones. Convert them yourself beforehand if you want ",
+            "different behaviour.", call. = FALSE)
+  } else if(length(tzs) == 1L){
+    dfs <- lapply(dfs, .drop_tzones_sheet)
+    # The default format labels datetimes "UTC"; that is no longer true once the
+    # zone has been dropped.  Only replace it if the caller kept the default.
+    if(identical(unclass(props$datetime_format),
+                 unclass(.default_datetime_format())))
+      props$datetime_format <- xl_num_format("yyyy-mm-dd HH:mm:ss")
+  }
+  list(dfs = dfs, props = props)
 }
 
 # Walk a sheet's xl_cell_general columns, register each cell's effective format

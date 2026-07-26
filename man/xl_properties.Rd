@@ -23,7 +23,7 @@ xl_properties(
   header_format = xl_font(bold = TRUE) + xl_align(horizontal = "center"),
   hyperlink_format = xl_font(color = "blue", underline = "single"),
   date_format = xl_num_format("yyyy-mm-dd"),
-  datetime_format = xl_num_format("yyyy-mm-dd HH:mm:ss UTC"),
+  datetime_format = .default_datetime_format(),
   date_col_width = 20,
   datetime_col_width = 20,
   header_row_height = 15
@@ -76,6 +76,16 @@ it is merged beneath each cell/column format).  `header_format` styles the
 header row and `hyperlink_format` styles cell hyperlinks; both are also
 cascaded over `default_format`.
 }
+\section{Time zones}{
+
+Excel has no concept of a time zone.  When every `POSIXct` in the workbook
+shares one time zone, writexl drops the zone and writes local wall-clock
+time, and the default `datetime_format` loses its `" UTC"` suffix so that
+nothing is mislabelled.  When the time zones differ, all datetimes are
+converted to UTC with a warning.  Supplying your own `datetime_format`
+overrides the label in either case.
+}
+
 \examples{
 xl_properties(title = "Quarterly report", author = "Finance",
               header_format = xl_font(bold = TRUE, color = "white") +
