@@ -37,18 +37,27 @@ test_that("unsupported column types raise an error naming the column", {
   expect_error(write_xlsx(df), "'bad' (column 2)", fixed = TRUE)
   expect_error(write_xlsx(df), "complex")
 
-  # a bare list column and a classed numeric are equally unrepresentable
+  # a bare list column and a raw vector are equally unrepresentable; the
+  # underlying type is reported when the class alone would be unhelpful
   df2 <- data.frame(a = 1); df2$bad <- I(list(1))
-  expect_error(write_xlsx(df2), "cannot write column")
-  df3 <- data.frame(a = 1); df3$bad <- as.difftime(1, units = "days")
-  expect_error(write_xlsx(df3), "difftime")
+  expect_error(write_xlsx(df2), "(list)", fixed = TRUE)
+  df3 <- data.frame(a = 1); df3$bad <- as.raw(1)
+  expect_error(write_xlsx(df3), "raw")
 
   # every unsupported column is reported, not just the first
   df4 <- data.frame(a = 1)
   df4$b <- complex(real = 1, imaginary = 1)
-  df4$c <- as.difftime(1, units = "days")
+  df4$c <- as.raw(2)
   expect_error(write_xlsx(df4), "'b'")
   expect_error(write_xlsx(df4), "'c'")
+})
+
+test_that("classed numeric columns such as difftime are still written", {
+  # difftime is a double underneath, so it is written from its numeric value
+  df <- data.frame(a = 1)
+  df$elapsed <- as.difftime(c(1.5), units = "days")
+  expect_silent(path <- write_xlsx(df))
+  expect_equal(readxl::read_xlsx(path)$elapsed, 1.5)
 })
 
 test_that("supported column types are still accepted", {

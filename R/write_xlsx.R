@@ -140,15 +140,13 @@ normalize_df <- function(df){
   df
 }
 
-# Column classes writexl can represent.  After the coercions above, a *classed*
-# column is only supported when every one of its classes is in this set.
-.SUPPORTED_COLUMN_CLASSES <- c("Date", "POSIXct", "POSIXt",
-                               "xl_cell_general", "xl_cell")
-
+# Whether a column can be written at all.  This mirrors get_type() in
+# src/write_xlsx.c: anything backed by a character, integer, double or logical
+# vector is writable (a classed column such as Date, POSIXct or difftime is
+# written from its underlying values), and xl_cell_general carries its own
+# writer.  Everything else -- complex, raw, a plain list column -- has no
+# representation in xlsx.
 .is_supported_column <- function(x){
-  cls <- attr(x, "class")
-  if(!is.null(cls) && !all(cls %in% .SUPPORTED_COLUMN_CLASSES))
-    return(FALSE)
   if(inherits(x, "xl_cell_general"))
     return(TRUE)
   is.character(x) || is.integer(x) || is.double(x) || is.logical(x)
@@ -161,8 +159,10 @@ normalize_df <- function(df){
   if(!length(bad))
     return(invisible(NULL))
   detail <- vapply(bad, function(i){
+    cls <- paste(class(df[[i]]), collapse = "/")
+    ty <- typeof(df[[i]])
     sprintf("'%s' (column %d): %s", names(df)[i], i,
-            paste(class(df[[i]]), collapse = "/"))
+            if(identical(cls, ty)) cls else sprintf("%s (%s)", cls, ty))
   }, character(1))
   stop("writexl cannot write column(s) of these types:\n  ",
        paste(detail, collapse = "\n  "), call. = FALSE)
