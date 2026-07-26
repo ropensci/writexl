@@ -37,6 +37,9 @@
 #' @param date_col_width,datetime_col_width Default column width for `Date` /
 #'   `POSIXct` columns.
 #' @param header_row_height Height (in points) of the header row.
+#' @param comment_author Default author for cell comments across the workbook
+#'   (a sheet's or a comment's own `author` overrides it).
+#' @param show_comments If `TRUE`, comments are initially shown on every sheet.
 #' @return An `xl_properties` object.
 #' @family writexl
 #' @seealso [xl_workbook], [write_xlsx]
@@ -58,7 +61,8 @@ xl_properties <- function(title = NA, subject = NA, author = NA, manager = NA,
                           date_format      = xl_num_format("yyyy-mm-dd"),
                           datetime_format  = xl_num_format("yyyy-mm-dd HH:mm:ss UTC"),
                           date_col_width = 20, datetime_col_width = 20,
-                          header_row_height = 15) {
+                          header_row_height = 15,
+                          comment_author = NA, show_comments = FALSE) {
   fmts <- list(default_format = default_format, header_format = header_format,
                hyperlink_format = hyperlink_format, date_format = date_format,
                datetime_format = datetime_format)
@@ -86,7 +90,8 @@ xl_properties <- function(title = NA, subject = NA, author = NA, manager = NA,
          hyperlink_format = hyperlink_format, date_format = date_format,
          datetime_format = datetime_format, date_col_width = date_col_width,
          datetime_col_width = datetime_col_width,
-         header_row_height = header_row_height),
+         header_row_height = header_row_height,
+         comment_author = comment_author, show_comments = show_comments),
     class = "xl_properties"
   )
 }

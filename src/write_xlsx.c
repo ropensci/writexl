@@ -274,6 +274,11 @@ static void apply_sheet_scalars(cell_write_ctx *ctx, SEXP opts){
   double drh = opt_scalar_dbl(opts, "default_row_height", NA_REAL);
   if(!ISNA(drh)) worksheet_set_default_row(ctx->sheet, drh, 0);
 
+  /* comment defaults (set before any per-cell comment is written) */
+  const char *comment_author = payload_str(opts, "comment_author");
+  if(comment_author) worksheet_set_comments_author(ctx->sheet, comment_author);
+  if(opt_scalar_int(opts, "show_comments", 0)) worksheet_show_comments(ctx->sheet);
+
   /* autofilter: a length-4 range (first_row, first_col, last_row, last_col) */
   SEXP af = list_get(opts, "autofilter");
   if(af != R_NilValue && Rf_length(af) >= 4){

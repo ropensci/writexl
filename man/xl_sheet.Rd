@@ -15,7 +15,9 @@ xl_sheet(
   default_row_height = NA,
   auto_colwidth = FALSE,
   autofilter = FALSE,
-  protect = FALSE
+  protect = FALSE,
+  comment_author = NA,
+  show_comments = FALSE
 )
 }
 \arguments{
@@ -56,6 +58,13 @@ password. A named list gives fine-grained control, e.g.
 `sort`, `autofilter`, `pivot_tables`, `scenarios`, `objects`,
 `no_select_locked_cells`, `no_select_unlocked_cells`. Cell locking via
 [xl_protection()] only has an effect on a protected sheet.}
+
+\item{comment_author}{Default author for this sheet's cell comments (a
+per-comment `author` overrides it; falls back to the workbook
+`comment_author`).}
+
+\item{show_comments}{If `TRUE`, all comments on the sheet are initially
+shown (individual comments can still be forced via `xl_comment(visible=)`).}
 }
 \value{
 An `xl_sheet` object.

@@ -137,6 +137,11 @@ xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
 #'   `sort`, `autofilter`, `pivot_tables`, `scenarios`, `objects`,
 #'   `no_select_locked_cells`, `no_select_unlocked_cells`. Cell locking via
 #'   [xl_protection()] only has an effect on a protected sheet.
+#' @param comment_author Default author for this sheet's cell comments (a
+#'   per-comment `author` overrides it; falls back to the workbook
+#'   `comment_author`).
+#' @param show_comments If `TRUE`, all comments on the sheet are initially
+#'   shown (individual comments can still be forced via `xl_comment(visible=)`).
 #' @return An `xl_sheet` object.
 #' @family writexl
 #' @seealso [xl_col_spec], [xl_row_spec], [write_xlsx]
@@ -153,7 +158,8 @@ xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
 xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
                      gridlines = NA, tab_color = NA, zoom = NA,
                      default_row_height = NA, auto_colwidth = FALSE,
-                     autofilter = FALSE, protect = FALSE) {
+                     autofilter = FALSE, protect = FALSE,
+                     comment_author = NA, show_comments = FALSE) {
   if (!is.data.frame(data))
     stop("`data` must be a data frame", call. = FALSE)
   if (!is.logical(auto_colwidth) || length(auto_colwidth) != 1L || is.na(auto_colwidth))
@@ -163,6 +169,8 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
     stop('`autofilter` must be TRUE/FALSE or an Excel range string like "A1:D51"',
          call. = FALSE)
   .validate_protect(protect)
+  if (!is.logical(show_comments) || length(show_comments) != 1L || is.na(show_comments))
+    stop("`show_comments` must be TRUE or FALSE", call. = FALSE)
   structure(
     list(
       data      = data,
@@ -175,7 +183,9 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
       default_row_height = default_row_height,
       auto_colwidth = auto_colwidth,
       autofilter = autofilter,
-      protect    = protect
+      protect    = protect,
+      comment_author = comment_author,
+      show_comments  = show_comments
     ),
     class = "xl_sheet"
   )
@@ -367,6 +377,9 @@ print.xl_sheet <- function(x, ...) {
   gridlines <- -1L; tab_color <- -1L; zoom <- 0L; default_row_height <- NA_real_
   autofilter <- c(-1L, -1L, -1L, -1L)
   protect <- list(flag = 0L, password = NA_character_, options = NULL)
+  # comment defaults cascade from the workbook properties; a sheet overrides
+  comment_author <- props$comment_author
+  show_comments <- isTRUE(props$show_comments)
 
   if (inherits(el, "xl_sheet")) {
     # column specs
@@ -406,6 +419,8 @@ print.xl_sheet <- function(x, ...) {
         autofilter <- c(0L, 0L, as.integer(last_row), ncols - 1L)
     }
     protect <- .resolve_protect(el$protect)
+    if (!is.na(el$comment_author)) comment_author <- el$comment_author
+    show_comments <- isTRUE(el$show_comments) || show_comments
     # auto column widths (for columns the user did not size explicitly)
     if (isTRUE(el$auto_colwidth)) {
       for (i in seq_len(ncols)) {
@@ -427,6 +442,8 @@ print.xl_sheet <- function(x, ...) {
     gridlines = gridlines, tab_color = tab_color, zoom = zoom,
     default_row_height = default_row_height,
     autofilter = autofilter, protect = protect$flag,
-    protect_password = protect$password, protect_options = protect$options
+    protect_password = protect$password, protect_options = protect$options,
+    comment_author = as.character(comment_author),
+    show_comments = as.integer(isTRUE(show_comments))
   )
 }
