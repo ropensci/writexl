@@ -1,5 +1,6 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
+^\.git$
 ^src/.*\.a$
 ^src/.*\.o$
 ^README.md$
