@@ -172,17 +172,24 @@ print.xl_workbook <- function(x, ...) {
 # outright, and `worksheet_merge_range()` only works within the current row.
 # Data validation, conditional formats, images and charts are unaffected.
 #
-# Nothing writexl writes today needs the mode off, so this always resolves to
-# "on".  It exists as a resolver rather than a constant so a feature that
-# cannot work under row streaming can turn it off *and say why* -- append the
-# reason to `reasons` and the flag follows.
+# A feature that cannot work under row streaming turns the mode off *and says
+# why*: append to `reasons` and the flag follows.
 
-# Resolve the constant-memory flag for a workbook.  Returns the C-side integer
-# flag plus the reasons (if any) the mode had to be turned off.
-.resolve_constant_memory <- function(elems, props) {
+# Resolve the constant-memory flag for a workbook, from the sheets it is about
+# to write.  Returns the C-side integer flag plus the reasons (if any) the mode
+# had to be turned off.
+.resolve_constant_memory <- function(dfs, props) {
   reasons <- character(0)
-  # (future) features that cannot work under row streaming append their reason
-  # here, e.g. reasons <- c(reasons, "worksheet tables are not supported ...")
+  # A multi-cell array formula range is padded by libxlsxwriter, and it skips
+  # that padding entirely when row streaming is on -- silently, returning
+  # success -- so the range would be left half-written.  Collected per sheet by
+  # .resolve_sheet_formats().
+  n_array <- sum(vapply(dfs, function(df)
+    length(attr(df, "writexl_array_multicell")), integer(1)))
+  if (n_array > 0L)
+    reasons <- c(reasons, sprintf(
+      paste0("%d multi-cell array formula range(s): libxlsxwriter only pads an ",
+             "array range when row streaming is off"), n_array))
   list(on = as.integer(!length(reasons)), reasons = reasons)
 }
 

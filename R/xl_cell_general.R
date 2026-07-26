@@ -47,9 +47,30 @@
 #'   (one per cell, recycled; `NA` for no comment), a single [xl_comment()]
 #'   (recycled to every cell), or a list mixing strings / `xl_comment` / `NA`
 #'   per cell.  `NULL` for no comments.
+#' @param array,dynamic Logical (one per cell, recycled): how the cell's
+#'   `formula` is stored.  `array = TRUE` writes a legacy *array* (Ctrl-Shift-
+#'   Enter) formula; `dynamic = TRUE` writes a modern *dynamic array* formula,
+#'   which Excel spills over as many cells as the result needs.  Neither can
+#'   carry a character `value`, because Excel stores no cached string result for
+#'   an array formula.  On a cell that has no `formula` the flags are inert, so a
+#'   single `array = TRUE` can be recycled across a column that mixes formula
+#'   and value cells.
+#' @param array_range The range a legacy array formula covers, for the rare case
+#'   where it must be declared: an Excel range string (`"C2:C11"`) or a
+#'   `list(rows = , cols = )` spec, one per cell (`NA` for none). It must start
+#'   at the cell holding the formula, and must extend into cells the sheet does
+#'   not otherwise write --- the range is padded on write, so an overlap would
+#'   have the padding and the sheet's own values overwrite each other.
+#'
+#'   Leave it unset for almost everything: a single-cell `dynamic` formula
+#'   spills automatically in Excel 365 / 2021, and a single-cell `array` formula
+#'   is the right spelling for a `SUMPRODUCT`-style aggregate. Supplying it
+#'   forces the workbook out of the memory-efficient row-streaming mode, since
+#'   libxlsxwriter cannot pad an array range while streaming.
 #' @return An object of class `c("xl_cell_general", "xl_cell")`, which is a
 #'   list of length `n` where each element is a named list with fields
-#'   `value`, `formula`, `hyperlink`, `format`, and `comment`.
+#'   `value`, `formula`, `hyperlink`, `format`, `comment`, `array`, `dynamic`
+#'   and `array_range`.
 #'
 #' @family writexl
 #' @seealso [xl_formula()], [xl_hyperlink()], [write_xlsx()]
@@ -80,7 +101,8 @@
 #' df$formula_col <- xl_formula("=A1*2")   # backward-compatible shorthand
 #' df$cell_col    <- xl_cell_general(value = 99L)  # all rows get 99
 xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
-                            format = NULL, comment = NULL) {
+                            format = NULL, comment = NULL, array = FALSE,
+                            dynamic = FALSE, array_range = NULL) {
 
   # Require at least one content argument -------------------------------------
   if (is.null(value) && is.null(formula) && is.null(hyperlink) &&
@@ -117,6 +139,14 @@ xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
     hyperlink <- list(hyperlink)
   }
 
+  # Pre-normalise the array_range argument ------------------------------------
+  # Same wrapping problem as `hyperlink`: a list(rows = , cols = ) spec is one
+  # range, not a list of ranges.
+  if (is.list(array_range) &&
+      (!is.null(array_range[["rows"]]) || !is.null(array_range[["cols"]]))) {
+    array_range <- list(array_range)
+  }
+
   # Determine the output length n ---------------------------------------------
   # A single xl_comment counts as one comment (not its number of fields).
   comment_n <- if (is.null(comment)) 0L
@@ -126,6 +156,7 @@ xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
     if (!is.null(value))     length(value)     else 0L,
     if (!is.null(formula))   length(formula)   else 0L,
     if (!is.null(hyperlink)) length(hyperlink) else 0L,
+    if (!is.null(array_range)) length(array_range) else 0L,
     comment_n
   ))
 
@@ -203,18 +234,88 @@ xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
          "strings/xl_comment objects", call. = FALSE)
   }
 
+  # Normalise the array / dynamic flags and their range -----------------------
+  array_vec   <- .cell_flag_vec(array, "array", n)
+  dynamic_vec <- .cell_flag_vec(dynamic, "dynamic", n)
+  range_list  <- .cell_range_list(array_range, n)
+  .check_array_args(value_list, formula_vec, array_vec, dynamic_vec, range_list,
+                    formula_given = !is.null(formula))
+
   # Build the per-cell records ------------------------------------------------
   cells <- lapply(seq_len(n), function(i) {
     list(
-      value     = value_list[[i]],
-      formula   = formula_vec[[i]],
-      hyperlink = hyperlink_list[[i]],
-      format    = format_list[[i]],
-      comment   = comment_list[[i]]
+      value       = value_list[[i]],
+      formula     = formula_vec[[i]],
+      hyperlink   = hyperlink_list[[i]],
+      format      = format_list[[i]],
+      comment     = comment_list[[i]],
+      array       = array_vec[[i]],
+      dynamic     = dynamic_vec[[i]],
+      array_range = range_list[[i]]
     )
   })
 
   structure(cells, class = c("xl_cell_general", "xl_cell"))
+}
+
+# --- array / dynamic formula helpers -----------------------------------------
+
+# Recycle a logical flag argument to length n, refusing NA (a flag is a
+# decision, and NA would leave it ambiguous).
+.cell_flag_vec <- function(x, arg, n) {
+  if (is.null(x)) return(rep(FALSE, n))
+  if (!is.logical(x) || !length(x) || anyNA(x))
+    stop(sprintf("`%s` must be TRUE or FALSE (no NA)", arg), call. = FALSE)
+  rep_len(x, n)
+}
+
+# Normalise array_range to a list of length n whose elements are NULL (no
+# declared range) or a range spec to be resolved at write time.
+.cell_range_list <- function(x, n) {
+  if (is.null(x)) return(vector("list", n))
+  r <- if (is.list(x)) x else as.list(x)
+  r <- lapply(r, function(el) {
+    if (is.null(el) || (length(el) == 1L && !is.list(el) && is.na(el)))
+      return(NULL)
+    if (is.character(el) && length(el) == 1L) return(el)
+    if (is.list(el)) return(el)
+    stop("each `array_range` must be NA, an Excel range string, or a ",
+         "list(rows = , cols = ) spec", call. = FALSE)
+  })
+  rep_len(r, n)
+}
+
+# Validate the array/dynamic arguments.
+#
+# `array` / `dynamic` describe how a *formula* is stored, so on a cell with no
+# formula they are simply inert -- which is what recycling a single TRUE across
+# a column of mixed formula and value cells has to mean.  What is worth
+# refusing is a flag that can never apply to anything, and a combination Excel
+# cannot represent.
+.check_array_args <- function(values, formulas, arrays, dynamics, ranges,
+                              formula_given) {
+  any_flag  <- any(arrays) || any(dynamics)
+  any_range <- any(!vapply(ranges, is.null, logical(1)))
+  if (any_flag && !formula_given)
+    stop("`array`/`dynamic` describe how a formula is stored, but no `formula` ",
+         "was supplied", call. = FALSE)
+  if (any_range && !any_flag)
+    stop("`array_range` applies only to an `array` or `dynamic` formula, and ",
+         "neither is set", call. = FALSE)
+  for (i in seq_along(formulas)) {
+    if (is.na(formulas[[i]])) next          # flags are inert without a formula
+    if (!(arrays[[i]] || dynamics[[i]])) next
+    # libxlsxwriter has write_array_formula_num() but no _str() counterpart:
+    # Excel stores no cached string result for an array formula.  Erroring beats
+    # silently downgrading to a plain formula and losing the array semantics.
+    v <- values[[i]]
+    if (is.character(v) && length(v) == 1L && !is.na(v))
+      stop(sprintf(paste0("cell %d combines a character `value` with ",
+                          "`array`/`dynamic`; only a numeric pre-calculated ",
+                          "result can be stored for an array formula"), i),
+           call. = FALSE)
+  }
+  invisible(NULL)
 }
 
 # --- S3 methods --------------------------------------------------------------

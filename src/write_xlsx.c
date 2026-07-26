@@ -462,6 +462,55 @@ static int write_atomic_value(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
   }
 }
 
+/* --- xl_cell_general field accessors ------------------------------------- */
+
+/* A per-cell logical field, absent or NA reading as FALSE. */
+static int cell_flag(SEXP cell, const char *key){
+  SEXP v = list_get(cell, key);
+  if(v == R_NilValue || Rf_length(v) < 1) return 0;
+  int f = Rf_asLogical(v);
+  return f == NA_LOGICAL ? 0 : f;
+}
+
+/*
+ * A formula's pre-calculated numeric result, if it has one.  Both double and
+ * integer values count: an integer result used to fall through to the
+ * no-result writer, silently dropping the value the caller supplied.
+ */
+static int formula_result(SEXP value, double *out){
+  if(value == R_NilValue || Rf_length(value) < 1) return 0;
+  if(TYPEOF(value) == REALSXP && R_FINITE(REAL(value)[0])){
+    *out = REAL(value)[0];
+    return 1;
+  }
+  if(TYPEOF(value) == INTSXP && INTEGER(value)[0] != NA_INTEGER){
+    *out = (double) INTEGER(value)[0];
+    return 1;
+  }
+  return 0;
+}
+
+/*
+ * The array range resolved in R ("array_quad", 0-based first/last row/col).
+ * Falls back to the anchor cell so a missing quad degenerates to a single-cell
+ * array formula rather than to an invalid range.
+ */
+static void array_quad(SEXP cell, lxw_row_t *r1, lxw_col_t *c1,
+                       lxw_row_t *r2, lxw_col_t *c2,
+                       lxw_row_t row, lxw_col_t col){
+  *r1 = row; *c1 = col; *r2 = row; *c2 = col;
+  SEXP q = list_get(cell, "array_quad");
+  if(q == R_NilValue || Rf_length(q) < 4) return;
+  SEXP qi = PROTECT(Rf_coerceVector(q, INTSXP));
+  int *a = INTEGER(qi);
+  if(a[0] != NA_INTEGER && a[1] != NA_INTEGER &&
+     a[2] != NA_INTEGER && a[3] != NA_INTEGER){
+    *r1 = (lxw_row_t) a[0]; *c1 = (lxw_col_t) a[1];
+    *r2 = (lxw_row_t) a[2]; *c2 = (lxw_col_t) a[3];
+  }
+  UNPROTECT(1);
+}
+
 /*
  * write_cell_general: write the i-th cell of an xl_cell_general column.
  * col is the full xl_cell_general list-column; VECTOR_ELT(col, i) is one
@@ -548,10 +597,49 @@ static void write_cell_general(cell_write_ctx *ctx,
   if(formula != R_NilValue && TYPEOF(formula) == STRSXP &&
      STRING_ELT(formula, 0) != NA_STRING && Rf_length(formula) > 0){
     const char *fstr = Rf_translateCharUTF8(STRING_ELT(formula, 0));
-    if(value != R_NilValue && TYPEOF(value) == REALSXP &&
-       Rf_length(value) > 0 && R_FINITE(REAL(value)[0])){
+    double result;
+    int have_num = formula_result(value, &result);
+    int is_array   = cell_flag(cell, "array");
+    int is_dynamic = cell_flag(cell, "dynamic");
+
+    if(is_array || is_dynamic){
+      /* The range is resolved in R: absent it is the cell itself, which is the
+         modern dynamic-array spelling (Excel spills the result).  There is no
+         write_array_formula_str(), so a character result cannot reach here --
+         xl_cell_general() rejects that combination. */
+      lxw_row_t r1 = row, r2 = row;
+      lxw_col_t c1 = col_idx, c2 = col_idx;
+      array_quad(cell, &r1, &c1, &r2, &c2, row, col_idx);
+      int single = (r1 == r2 && c1 == c2);
+
+      if(is_dynamic && single){
+        if(have_num)
+          assert_lxw(worksheet_write_dynamic_formula_num(ctx->sheet, r1, c1,
+                       fstr, fmt, result));
+        else
+          assert_lxw(worksheet_write_dynamic_formula(ctx->sheet, r1, c1,
+                       fstr, fmt));
+      } else if(is_dynamic){
+        if(have_num)
+          assert_lxw(worksheet_write_dynamic_array_formula_num(ctx->sheet,
+                       r1, c1, r2, c2, fstr, fmt, result));
+        else
+          assert_lxw(worksheet_write_dynamic_array_formula(ctx->sheet,
+                       r1, c1, r2, c2, fstr, fmt));
+      } else {
+        if(have_num)
+          assert_lxw(worksheet_write_array_formula_num(ctx->sheet,
+                       r1, c1, r2, c2, fstr, fmt, result));
+        else
+          assert_lxw(worksheet_write_array_formula(ctx->sheet,
+                       r1, c1, r2, c2, fstr, fmt));
+      }
+      return;
+    }
+
+    if(have_num){
       assert_lxw(worksheet_write_formula_num(ctx->sheet, row, col_idx,
-                                              fstr, fmt, REAL(value)[0]));
+                                              fstr, fmt, result));
     } else if(value != R_NilValue && TYPEOF(value) == STRSXP &&
               Rf_length(value) > 0 && STRING_ELT(value, 0) != NA_STRING){
       assert_lxw(worksheet_write_formula_str(ctx->sheet, row, col_idx, fstr, fmt,
