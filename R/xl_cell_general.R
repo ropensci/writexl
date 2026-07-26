@@ -82,16 +82,16 @@
 xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
                             format = NULL, comment = NULL) {
 
-  # 0a. Require at least one content argument --------------------------------
+  # Require at least one content argument -------------------------------------
   if (is.null(value) && is.null(formula) && is.null(hyperlink) &&
       is.null(comment))
     stop("At least one of 'value', 'formula', 'hyperlink', or 'comment' must ",
          "be provided. Use value = NA for an explicit empty cell.", call. = FALSE)
 
-  # 0aa. Reject values writexl cannot write.  Uses the same predicate as the
-  #      column-level check in normalize_df(), so an unsupported type cannot
-  #      slip in by being wrapped in a cell object.  NULL and NA are allowed:
-  #      both mean "blank cell".
+  # Reject values writexl cannot write ----------------------------------------
+  # Uses the same predicate as the column-level check in normalize_df(), so an
+  # unsupported type cannot slip in by being wrapped in a cell object.  NULL
+  # and NA are allowed: both mean "blank cell".
   if (!is.null(value)) {
     vals <- if (is.list(value)) value else list(value)
     keep <- !vapply(vals, is.null, logical(1))
@@ -110,13 +110,14 @@ xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
     }
   }
 
-  # 0b. Pre-normalise hyperlink: a named list with 'url' is a single hyperlink
-  #     spec, not a list of multiple hyperlinks.  Wrap it so length() = 1.
+  # Pre-normalise the hyperlink argument --------------------------------------
+  # A named list with a 'url' element is a single hyperlink spec, not a list of
+  # multiple hyperlinks.  Wrap it so length() = 1.
   if (is.list(hyperlink) && !is.null(hyperlink[["url"]])) {
     hyperlink <- list(hyperlink)
   }
 
-  # 1. Determine output length n -------------------------------------------
+  # Determine the output length n ---------------------------------------------
   # A single xl_comment counts as one comment (not its number of fields).
   comment_n <- if (is.null(comment)) 0L
                else if (is_xl_comment(comment)) 1L
@@ -128,14 +129,14 @@ xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
     comment_n
   ))
 
-  # 2. Normalise value to a list of length n --------------------------------
+  # Normalise value to a list of length n -------------------------------------
   value_list <- if (is.null(value)) {
     rep(list(NA), n)
   } else {
     rep_len(if (is.list(value)) value else as.list(value), n)
   }
 
-  # 3. Normalise formula to a character vector of length n ------------------
+  # Normalise formula to a character vector of length n -----------------------
   formula_vec <- if (is.null(formula)) {
     rep(NA_character_, n)
   } else {
@@ -146,7 +147,7 @@ xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
     rep_len(formula, n)
   }
 
-  # 4. Normalise hyperlink to a list of length n ----------------------------
+  # Normalise hyperlink to a list of length n ---------------------------------
   hyperlink_list <- if (is.null(hyperlink)) {
     rep(list(NA), n)
   } else {
@@ -171,7 +172,7 @@ xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
     rep_len(h, n)
   }
 
-  # 5. Normalise format to a list of length n -------------------------------
+  # Normalise format to a list of length n ------------------------------------
   format_list <- if (is.null(format)) {
     vector("list", n)
   } else if (is_xl_format(format)) {
@@ -187,7 +188,7 @@ xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
          call. = FALSE)
   }
 
-  # 5b. Normalise comment to a list of length n -----------------------------
+  # Normalise comment to a list of length n -----------------------------------
   # Each element is NULL (no comment) or a C-ready comment payload.  A
   # character vector gives per-cell text with default options; a single
   # xl_comment recycles to every cell; a list mixes strings/xl_comment/NA.
@@ -202,7 +203,7 @@ xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
          "strings/xl_comment objects", call. = FALSE)
   }
 
-  # 6. Build per-cell records -----------------------------------------------
+  # Build the per-cell records ------------------------------------------------
   cells <- lapply(seq_len(n), function(i) {
     list(
       value     = value_list[[i]],
