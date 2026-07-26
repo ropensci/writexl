@@ -279,16 +279,6 @@ static void apply_sheet_scalars(cell_write_ctx *ctx, SEXP opts){
   if(comment_author) worksheet_set_comments_author(ctx->sheet, comment_author);
   if(opt_scalar_int(opts, "show_comments", 0)) worksheet_show_comments(ctx->sheet);
 
-  /* autofilter: a length-4 range (first_row, first_col, last_row, last_col) */
-  SEXP af = list_get(opts, "autofilter");
-  if(af != R_NilValue && Rf_length(af) >= 4){
-    SEXP afi = PROTECT(Rf_coerceVector(af, INTSXP));
-    int *a = INTEGER(afi);
-    if(a[0] >= 0 && a[2] >= a[0] && a[3] >= a[1])
-      worksheet_autofilter(ctx->sheet, a[0], a[1], a[2], a[3]);
-    UNPROTECT(1);
-  }
-
   /* worksheet protection */
   if(opt_scalar_int(opts, "protect", 0)){
     const char *pw = payload_str(opts, "protect_password");
@@ -316,6 +306,54 @@ static void apply_sheet_scalars(cell_write_ctx *ctx, SEXP opts){
       worksheet_protect(ctx->sheet, pw, &prot);
     }
   }
+}
+
+/* --- Sheet overlays ------------------------------------------------------
+ *
+ * Range-scoped worksheet features (the autofilter today; merged cells, data
+ * validation, conditional formats, images, charts and tables later) are all
+ * applied here, in one pass after the per-sheet scalars and *before* the row
+ * loop: under constant_memory each row is flushed as it is written, so
+ * anything spanning rows has to be declared up front.
+ *
+ * Each payload is a named R list built by .resolve_sheet_plan() carrying a
+ * `kind` string.  A new feature adds a kind here rather than another argument
+ * to C_write_data_frame_list().
+ */
+
+/* Read a length-4 0-based range (first_row, first_col, last_row, last_col). */
+static int overlay_range(SEXP p, const char *key, int *out){
+  SEXP v = list_get(p, key);
+  if(v == R_NilValue || Rf_length(v) < 4) return 0;
+  SEXP iv = PROTECT(Rf_coerceVector(v, INTSXP));
+  for(int k = 0; k < 4; k++) out[k] = INTEGER(iv)[k];
+  UNPROTECT(1);
+  return 1;
+}
+
+static void apply_overlay(cell_write_ctx *ctx, SEXP p){
+  const char *kind = payload_str(p, "kind");
+  bail_if(kind == NULL, "sheet overlay payload is missing a 'kind'");
+  if(strcmp(kind, "autofilter") == 0){
+    int r[4];
+    bail_if(!overlay_range(p, "range", r),
+            "autofilter overlay needs a length-4 range");
+    if(r[0] >= 0 && r[2] >= r[0] && r[3] >= r[1])
+      assert_lxw(worksheet_autofilter(ctx->sheet, (lxw_row_t) r[0], (lxw_col_t) r[1],
+                                      (lxw_row_t) r[2], (lxw_col_t) r[3]));
+  } else {
+    Rf_errorcall(R_NilValue,
+                 "Error in writexl: unknown sheet overlay kind '%s'", kind);
+  }
+}
+
+static void apply_sheet_overlays(cell_write_ctx *ctx, SEXP opts){
+  if(opts == R_NilValue) return;
+  SEXP ov = list_get(opts, "overlay");
+  if(ov == R_NilValue || !Rf_isVectorList(ov)) return;
+  R_xlen_t n = Rf_length(ov);
+  for(R_xlen_t k = 0; k < n; k++)
+    apply_overlay(ctx, VECTOR_ELT(ov, k));
 }
 
 /* --- Individual per-type cell writers ------------------------------------ */
@@ -600,9 +638,11 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
   bail_if(formats != R_NilValue && !Rf_isVectorList(formats), "formats must be a list");
   bail_if(sheets != R_NilValue && !Rf_isVectorList(sheets), "sheets must be a list");
 
-  //create workbook
+  //create workbook.  constant_memory (libxlsxwriter's row-streaming mode) is
+  //resolved on the R side by .resolve_constant_memory() and arrives inside the
+  //properties payload; it defaults to on.
   lxw_workbook_options options = {
-    .constant_memory = 1,
+    .constant_memory = (uint8_t) (opt_scalar_int(properties, "constant_memory", 1) ? 1 : 0),
     .tmpdir = TEMPDIR,
     .use_zip64 = Rf_asLogical(use_zip64)
   };
@@ -691,9 +731,12 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
     cell_write_ctx ctx = {workbook, sheet, fmts, nfmts, fmt_prot,
                           sheet_protected, &warn_unlocked};
 
-    // Apply column geometry/formats and sheet-level options (freeze, etc.)
+    // Apply column geometry/formats and sheet-level options (freeze, etc.),
+    // then the range-scoped overlays.  All of this must precede the row loop
+    // because constant_memory flushes each row as it is written.
     apply_columns(&ctx, opts, cols);
     apply_sheet_scalars(&ctx, opts);
+    apply_sheet_overlays(&ctx, opts);
 
     // Need to iterate by row first for performance
     for (lxw_row_t i = 0; i < rows; i++) {

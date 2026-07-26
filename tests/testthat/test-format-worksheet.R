@@ -188,3 +188,56 @@ test_that("xl_sheet mixes with plain data frames in one workbook", {
   expect_silent(write_xlsx(wb, tmp))
   expect_equal(readxl::read_xlsx(tmp, sheet = "Plain")$b, 1:2)
 })
+
+# --- sheet overlays ---------------------------------------------------------
+#
+# Range-scoped features are applied through one payload list dispatched on
+# `kind` in C.  The autofilter is the first kind (its own behavior is covered
+# in test-format-protect.R); these tests cover the mechanism itself.
+
+test_that("the autofilter reaches C as an overlay payload", {
+  plan <- .resolve_sheet_plan(xl_sheet(data.frame(a = 1:3), autofilter = TRUE),
+                              data.frame(a = 1:3), .new_format_registry(), 1L,
+                              xl_properties())
+  expect_equal(plan$overlay,
+               list(list(kind = "autofilter", range = c(0L, 0L, 3L, 0L))))
+  expect_null(plan$autofilter)   # the old scalar slot is gone
+})
+
+test_that("a sheet with no range features carries no overlays", {
+  plan <- .resolve_sheet_plan(xl_sheet(data.frame(a = 1:3)), data.frame(a = 1:3),
+                              .new_format_registry(), 1L, xl_properties())
+  expect_equal(plan$overlay, list())
+})
+
+test_that("an overlay set on the sheet is applied", {
+  s <- xl_sheet(data.frame(a = 1:3))
+  s$overlay <- list(kind = "autofilter", range = c(0L, 0L, 3L, 0L))
+  expect_match(sheet_xml(list(D = s)), '<autoFilter ref="A1:A4"')
+})
+
+test_that("an unknown overlay kind is an error, not a silent no-op", {
+  s <- xl_sheet(data.frame(a = 1:3))
+  s$overlay <- list(kind = "bogus")
+  expect_error(write_tmp(list(D = s)), "unknown sheet overlay kind 'bogus'")
+})
+
+test_that("an overlay payload without a kind is an error", {
+  s <- xl_sheet(data.frame(a = 1:3))
+  s$overlay <- list(list(range = c(0L, 0L, 1L, 0L)))
+  expect_error(write_tmp(list(D = s)), "missing a 'kind'")
+})
+
+test_that("an autofilter overlay without a usable range is an error", {
+  s <- xl_sheet(data.frame(a = 1:3))
+  s$overlay <- list(kind = "autofilter", range = 1:2)
+  expect_error(write_tmp(list(D = s)), "length-4 range")
+})
+
+test_that("overlay payload lists are normalised", {
+  one <- list(kind = "autofilter", range = 1:4)
+  expect_equal(.as_overlay_list(NULL), list())
+  expect_equal(.as_overlay_list(one), list(one))
+  expect_equal(.as_overlay_list(list(one, one)), list(one, one))
+  expect_error(.as_overlay_list("x"), "overlay payload")
+})

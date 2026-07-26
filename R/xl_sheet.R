@@ -227,50 +227,6 @@ print.xl_sheet <- function(x, ...) {
 
 # --- resolution: turn a sheet into the plan C consumes --------------------
 
-# Convert column letters ("A", "AB") to a 0-based column index.
-.col_letters_to_index <- function(letters_str) {
-  chars <- utf8ToInt(toupper(letters_str)) - utf8ToInt("A") + 1L
-  idx <- 0L
-  for (v in chars) idx <- idx * 26L + v
-  idx - 1L
-}
-
-# Parse a freeze specification into c(freeze_row, freeze_col) (counts), or
-# c(-1, -1) for none.
-.parse_freeze <- function(freeze) {
-  if (is.null(freeze) || (length(freeze) == 1L && is.na(freeze)))
-    return(c(-1L, -1L))
-  if (is.list(freeze)) {
-    r <- if (!is.null(freeze$row)) as.integer(freeze$row) else 0L
-    cc <- if (!is.null(freeze$col)) as.integer(freeze$col) else 0L
-    return(c(r, cc))
-  }
-  if (is.character(freeze) && length(freeze) == 1L) {
-    m <- regmatches(freeze, regexec("^([A-Za-z]+)([0-9]+)$", freeze))[[1]]
-    if (length(m) != 3L)
-      stop('`freeze` must be a cell reference like "A2"', call. = FALSE)
-    return(c(as.integer(m[3L]) - 1L, .col_letters_to_index(m[2L])))
-  }
-  stop('`freeze` must be a cell reference ("A2") or list(row =, col =)',
-       call. = FALSE)
-}
-
-# Parse an Excel range ("A1:D51") into 0-based c(first_row, first_col,
-# last_row, last_col).
-.parse_range <- function(rng) {
-  parts <- strsplit(rng, ":", fixed = TRUE)[[1]]
-  cell <- function(s) {
-    m <- regmatches(s, regexec("^([A-Za-z]+)([0-9]+)$", s))[[1]]
-    if (length(m) != 3L)
-      stop('`autofilter` range must look like "A1:D51"', call. = FALSE)
-    c(as.integer(m[3L]) - 1L, .col_letters_to_index(m[2L]))
-  }
-  if (length(parts) != 2L)
-    stop('`autofilter` range must look like "A1:D51"', call. = FALSE)
-  a <- cell(parts[1L]); b <- cell(parts[2L])
-  c(a[1L], a[2L], b[1L], b[2L])
-}
-
 # Build the (flag, password, options) triple C uses for worksheet protection.
 .resolve_protect <- function(protect) {
   out <- list(flag = 0L, password = NA_character_, options = NULL)
@@ -330,20 +286,48 @@ print.xl_sheet <- function(x, ...) {
   NA_character_
 }
 
-# Resolve targeted columns (names or positions) to 1-based indices.
-.resolve_col_index <- function(index, colnames) {
+# Resolve targeted columns (names or positions) to 1-based indices.  `arg` names
+# the calling argument in the error messages.
+.resolve_col_index <- function(index, colnames, arg = "cols") {
   if (is.character(index)) {
     idx <- match(index, colnames)
     if (anyNA(idx))
-      stop("unknown column(s): ", paste(index[is.na(idx)], collapse = ", "),
-           call. = FALSE)
+      stop(sprintf("`%s`: unknown column(s): ", arg),
+           paste(index[is.na(idx)], collapse = ", "), call. = FALSE)
     idx
   } else {
     idx <- as.integer(index)
     if (any(idx < 1L | idx > length(colnames)))
-      stop("column index out of range", call. = FALSE)
+      stop(sprintf("`%s`: column index out of range", arg), call. = FALSE)
     idx
   }
+}
+
+# --- sheet overlays -------------------------------------------------------
+#
+# A sheet overlay is a range-scoped worksheet feature applied in one pass after
+# the per-sheet scalar options and *before* the row loop -- required under
+# libxlsxwriter's constant-memory mode, where each row is flushed as it is
+# written.  Each payload is a named list carrying a `kind` string that C
+# dispatches on, so a new feature adds a payload kind rather than a new
+# argument to C_write_data_frame_list().
+#
+# The autofilter is the first (and currently only) kind.  `xl_sheet()` has no
+# public `overlay` argument yet; an `overlay` element set on the sheet object
+# is picked up here so the mechanism is reachable for testing and for the
+# features that will populate it.
+
+# The autofilter payload for an already-resolved 0-based range.
+.overlay_autofilter <- function(range) {
+  list(kind = "autofilter", range = as.integer(range))
+}
+
+# Normalise a single payload or a list of payloads to a list of payloads.
+.as_overlay_list <- function(x) {
+  if (is.null(x)) return(list())
+  if (!is.list(x))
+    stop("`overlay` must be an overlay payload or a list of them", call. = FALSE)
+  if (!is.null(x$kind)) list(x) else x
 }
 
 # Build the per-sheet plan (column/row/scalar options) that C applies.
@@ -374,7 +358,7 @@ print.xl_sheet <- function(x, ...) {
   row_fmt_id <- integer(0); row_hidden <- integer(0); row_level <- integer(0)
   freeze <- c(-1L, -1L)
   gridlines <- -1L; tab_color <- -1L; zoom <- 0L; default_row_height <- NA_real_
-  autofilter <- c(-1L, -1L, -1L, -1L)
+  overlay <- list()
   protect <- list(flag = 0L, password = NA_character_, options = NULL)
   # comment defaults are worksheet-scoped (as in libxlsxwriter); a comment's own
   # author overrides the sheet default
@@ -412,12 +396,15 @@ print.xl_sheet <- function(x, ...) {
     default_row_height <- if (is.na(el$default_row_height)) NA_real_ else as.numeric(el$default_row_height)
     af <- el$autofilter
     if (is.character(af)) {
-      autofilter <- .parse_range(af)
+      overlay <- c(overlay, list(.overlay_autofilter(
+        .parse_range(af, "autofilter", df, header_offset))))
     } else if (isTRUE(af)) {
       last_row <- (nrow(df) - 1L) + header_offset
       if (ncols > 0L && last_row >= 0L)
-        autofilter <- c(0L, 0L, as.integer(last_row), ncols - 1L)
+        overlay <- c(overlay, list(.overlay_autofilter(
+          c(0L, 0L, as.integer(last_row), ncols - 1L))))
     }
+    overlay <- c(overlay, .as_overlay_list(el$overlay))
     protect <- .resolve_protect(el$protect)
     comment_author <- el$comment_author
     show_comments <- isTRUE(el$show_comments)
@@ -441,7 +428,7 @@ print.xl_sheet <- function(x, ...) {
     freeze_row = freeze[1L], freeze_col = freeze[2L],
     gridlines = gridlines, tab_color = tab_color, zoom = zoom,
     default_row_height = default_row_height,
-    autofilter = autofilter, protect = protect$flag,
+    overlay = overlay, protect = protect$flag,
     protect_password = protect$password, protect_options = protect$options,
     comment_author = as.character(comment_author),
     show_comments = as.integer(show_comments)
