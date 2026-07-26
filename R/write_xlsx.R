@@ -74,13 +74,19 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
 }
 
 # Walk a sheet's xl_cell_general columns, register each cell's effective format
-# in the workbook registry, and attach the resulting integer id vector.
+# in the workbook registry, attach the resulting integer id vector, and flatten
+# each comment's xl_format into the flat fields C applies.
 .resolve_sheet_formats <- function(df, reg, props) {
   for (j in seq_along(df)) {
     col <- df[[j]]
     if (!inherits(col, "xl_cell_general")) next
     recs <- unclass(col)
     ids <- vapply(recs, .resolve_cell_format_id, integer(1), reg = reg, props = props)
+    recs <- lapply(recs, function(rec) {
+      if (!is.null(rec$comment)) rec$comment <- .comment_c_payload(rec$comment)
+      rec
+    })
+    col <- structure(recs, class = class(col))
     attr(col, "writexl_format_ids") <- ids
     df[[j]] <- col
   }

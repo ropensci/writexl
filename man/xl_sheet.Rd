@@ -15,7 +15,9 @@ xl_sheet(
   default_row_height = NA,
   auto_colwidth = FALSE,
   autofilter = FALSE,
-  protect = FALSE
+  protect = FALSE,
+  comment_author = NA,
+  show_comments = FALSE
 )
 }
 \arguments{
@@ -56,6 +58,12 @@ password. A named list gives fine-grained control, e.g.
 `sort`, `autofilter`, `pivot_tables`, `scenarios`, `objects`,
 `no_select_locked_cells`, `no_select_unlocked_cells`. Cell locking via
 [xl_protection()] only has an effect on a protected sheet.}
+
+\item{comment_author}{Default author for this sheet's cell comments (a
+per-comment `author` overrides it).}
+
+\item{show_comments}{If `TRUE`, all comments on the sheet are initially
+shown (individual comments can still be forced via `xl_comment(visible=)`).}
 }
 \value{
 An `xl_sheet` object.
@@ -80,10 +88,12 @@ tmp <- write_xlsx(list(Data = sheet))
 [xl_col_spec], [xl_row_spec], [write_xlsx]
 
 Other writexl:
+\code{\link[=is_xl_comment]{is_xl_comment()}},
 \code{\link[=is_xl_format]{is_xl_format()}},
 \code{\link[=xl_cell_general]{xl_cell_general()}},
 \code{\link[=xl_color]{xl_color()}},
 \code{\link{xl_colrow_spec}},
+\code{\link[=xl_comment]{xl_comment()}},
 \code{\link[=xl_format]{xl_format()}},
 \code{\link{xl_format_groups}},
 \code{\link[=xl_formula]{xl_formula()}},

@@ -274,6 +274,11 @@ static void apply_sheet_scalars(cell_write_ctx *ctx, SEXP opts){
   double drh = opt_scalar_dbl(opts, "default_row_height", NA_REAL);
   if(!ISNA(drh)) worksheet_set_default_row(ctx->sheet, drh, 0);
 
+  /* comment defaults (set before any per-cell comment is written) */
+  const char *comment_author = payload_str(opts, "comment_author");
+  if(comment_author) worksheet_set_comments_author(ctx->sheet, comment_author);
+  if(opt_scalar_int(opts, "show_comments", 0)) worksheet_show_comments(ctx->sheet);
+
   /* autofilter: a length-4 range (first_row, first_col, last_row, last_col) */
   SEXP af = list_get(opts, "autofilter");
   if(af != R_NilValue && Rf_length(af) >= 4){
@@ -419,6 +424,32 @@ static void write_cell_general(cell_write_ctx *ctx,
     fid = INTEGER(ids)[i];
   lxw_format *fmt = ctx_format(ctx, fid);
   note_protection(ctx, fid);
+
+  /* --- comment overlay (independent of value/formula/hyperlink) ----------- */
+  SEXP comment = list_get(cell, "comment");
+  if(comment != R_NilValue && Rf_isVectorList(comment)){
+    const char *ctext = payload_str(comment, "text");
+    if(ctext){
+      lxw_comment_options copts;
+      memset(&copts, 0, sizeof(copts));
+      const char *s;
+      if((s = payload_str(comment, "author")))    copts.author = s;
+      if((s = payload_str(comment, "font_name"))) copts.font_name = s;
+      if(payload_has(comment, "visible"))     copts.visible     = (uint8_t)  payload_int(comment, "visible");
+      if(payload_has(comment, "width"))       copts.width       = (uint16_t) payload_int(comment, "width");
+      if(payload_has(comment, "height"))      copts.height      = (uint16_t) payload_int(comment, "height");
+      if(payload_has(comment, "x_scale"))     copts.x_scale     = payload_dbl(comment, "x_scale");
+      if(payload_has(comment, "y_scale"))     copts.y_scale     = payload_dbl(comment, "y_scale");
+      if(payload_has(comment, "color"))       copts.color       = (lxw_color_t) payload_int(comment, "color");
+      if(payload_has(comment, "font_size"))   copts.font_size   = payload_dbl(comment, "font_size");
+      if(payload_has(comment, "font_family")) copts.font_family = (uint8_t)  payload_int(comment, "font_family");
+      if(payload_has(comment, "start_row"))   copts.start_row   = (lxw_row_t) payload_int(comment, "start_row");
+      if(payload_has(comment, "start_col"))   copts.start_col   = (lxw_col_t) payload_int(comment, "start_col");
+      if(payload_has(comment, "x_offset"))    copts.x_offset    = payload_int(comment, "x_offset");
+      if(payload_has(comment, "y_offset"))    copts.y_offset    = payload_int(comment, "y_offset");
+      assert_lxw(worksheet_write_comment_opt(ctx->sheet, row, col_idx, ctext, &copts));
+    }
+  }
 
   /* --- hyperlink (character value provides the optional display string) --- */
   const char *display = NULL;
