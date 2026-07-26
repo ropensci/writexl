@@ -7,7 +7,10 @@ test_that("Types roundtrip properly",{
   num <- c(NA_real_, pi, 1.2345e80)
   int <- c(NA_integer_, 0L, -100L)
   str <- c(NA_character_, "foo", kremlin) #note empty strings don't work yet
-  time <- Sys.time() + 1:3
+  # The zone is set explicitly: writexl drops a single shared time zone and
+  # writes local wall-clock time, so pinning this column to UTC (offset 0) keeps
+  # this test about type round-tripping. Time zones are covered separately below.
+  time <- structure(Sys.time() + 1:3, tzone = "UTC")
   bigint <- bit64::as.integer64(.Machine$integer.max) ^ c(0,1,1.5)
   input <- data.frame(num = num, int = int, bigint = bigint, str = str, time = time, stringsAsFactors = FALSE)
   expect_warning(output <- roundtrip(input), "int64")
@@ -143,4 +146,103 @@ test_that("supported column types are still accepted", {
   # classes that normalize_df coerces must not trip the check
   expect_true(file.exists(write_xlsx(data.frame(f = factor(c("a", "b"))))))
   expect_true(file.exists(write_xlsx(data.frame(p = as.POSIXlt("2020-01-01")))))
+})
+
+# ── POSIXct time zones (Excel stores naive datetimes) ─────────────────────────
+
+# The Excel serial for a naive wall clock, independent of writexl's own maths.
+expected_serial <- function(wall_clock) {
+  25569 + as.numeric(as.POSIXct(wall_clock, tz = "UTC")) / 86400
+}
+datetime_format_of <- function(path) {
+  xml <- xlsx_part(path, "xl/styles.xml", raw = TRUE)
+  if (grepl("HH:mm:ss UTC", xml, fixed = TRUE)) "utc-labelled" else "unlabelled"
+}
+
+test_that("a single time zone is dropped, writing local wall-clock time", {
+  # the reproducer from the issue: Perth 01:00 must not become 17:00 UTC
+  df <- data.frame(dt = as.POSIXct("2025-12-01 01:00:00", tz = "Australia/Perth"))
+  path <- write_tmp(df)
+  expect_equal(sheet_serials(path)[["A2"]],
+               expected_serial("2025-12-01 01:00:00"))
+  # and the default format must no longer claim the value is UTC
+  expect_equal(datetime_format_of(path), "unlabelled")
+})
+
+test_that("dropping a time zone is daylight-saving correct", {
+  # both instants read 12:00 locally despite different UTC offsets
+  df <- data.frame(dt = as.POSIXct(c("2025-01-15 12:00:00", "2025-07-15 12:00:00"),
+                                   tz = "America/New_York"))
+  s <- sheet_serials(write_tmp(df))
+  expect_equal(s[["A2"]], expected_serial("2025-01-15 12:00:00"))
+  expect_equal(s[["A3"]], expected_serial("2025-07-15 12:00:00"))
+})
+
+test_that("an all-UTC workbook is unchanged in value", {
+  df <- data.frame(dt = as.POSIXct("2020-06-01 12:00:00", tz = "UTC"))
+  expect_equal(sheet_serials(write_tmp(df))[["A2"]],
+               expected_serial("2020-06-01 12:00:00"))
+})
+
+test_that("differing time zones warn and are converted to UTC", {
+  df <- data.frame(a = as.POSIXct("2025-12-01 01:00:00", tz = "Australia/Perth"))
+  df$b <- as.POSIXct("2025-12-01 01:00:00", tz = "UTC")
+  expect_warning(path <- write_tmp(df), "different time zones")
+  expect_warning(write_tmp(df), "converted to UTC")
+  s <- sheet_serials(path)
+  expect_equal(s[["A2"]], expected_serial("2025-11-30 17:00:00"))  # Perth -> UTC
+  expect_equal(s[["B2"]], expected_serial("2025-12-01 01:00:00"))
+  # here the UTC label is accurate, so it is kept
+  expect_equal(datetime_format_of(path), "utc-labelled")
+})
+
+test_that("the time zone survey includes POSIXct inside cell objects", {
+  df <- data.frame(a = as.POSIXct("2025-12-01 01:00:00", tz = "Australia/Perth"))
+  df$b <- xl_cell_general(value = as.POSIXct("2025-12-01 01:00:00", tz = "UTC"))
+  expect_warning(write_tmp(df), "different time zones")
+  # a cell object sharing the column's zone must NOT warn, and is shifted too
+  df2 <- data.frame(a = as.POSIXct("2025-12-01 01:00:00", tz = "Australia/Perth"))
+  df2$b <- xl_cell_general(value = as.POSIXct("2025-12-01 03:00:00", tz = "Australia/Perth"))
+  expect_no_warning(path <- write_tmp(df2))
+  s <- sheet_serials(path)
+  expect_equal(s[["A2"]], expected_serial("2025-12-01 01:00:00"))
+  expect_equal(s[["B2"]], expected_serial("2025-12-01 03:00:00"))
+})
+
+test_that("time zones are surveyed across every sheet, not per sheet", {
+  s1 <- data.frame(a = as.POSIXct("2025-12-01 01:00:00", tz = "Australia/Perth"))
+  s2 <- data.frame(a = as.POSIXct("2025-12-01 01:00:00", tz = "UTC"))
+  expect_warning(write_tmp(list(one = s1, two = s2)), "different time zones")
+})
+
+test_that("a supplied datetime_format is never overridden", {
+  df <- data.frame(dt = as.POSIXct("2025-12-01 01:00:00", tz = "Australia/Perth"))
+  wb <- xl_workbook(df, properties = xl_properties(
+    datetime_format = xl_num_format("yyyy/mm/dd hh:mm")))
+  expect_match(xlsx_part(write_tmp(wb), "xl/styles.xml", raw = TRUE),
+               "yyyy/mm/dd hh:mm", fixed = TRUE)
+})
+
+test_that("workbooks without POSIXct are untouched", {
+  expect_no_warning(write_tmp(data.frame(x = 1:3, d = as.Date("2020-01-01") + 0:2)))
+})
+
+test_that("NA datetimes survive the time zone pass", {
+  df <- data.frame(dt = as.POSIXct(c("2025-12-01 01:00:00", NA), tz = "Australia/Perth"))
+  path <- write_tmp(df)
+  s <- sheet_serials(path)
+  expect_equal(s[["A2"]], expected_serial("2025-12-01 01:00:00"))
+  expect_false("A3" %in% names(s))     # NA stays an empty cell
+})
+
+test_that("dropping a time zone preserves length and NA positions", {
+  # A platform that cannot report a UTC offset must fall back to leaving the
+  # value alone. Without a length check a zero-length offset would recycle to
+  # nothing and silently empty the whole column, so pin the invariant.
+  x <- as.POSIXct(c("2025-01-01 10:00:00", NA, "2025-07-01 10:00:00"),
+                  tz = "America/New_York")
+  y <- .drop_tzone(x)
+  expect_length(y, length(x))
+  expect_equal(is.na(y), is.na(x))
+  expect_length(.drop_tzone(as.POSIXct(character(0), tz = "UTC")), 0L)
 })
