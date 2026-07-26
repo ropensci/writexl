@@ -115,9 +115,12 @@ xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
   # unsupported type cannot slip in by being wrapped in a cell object.  NULL
   # and NA are allowed: both mean "blank cell".
   if (!is.null(value)) {
-    vals <- if (is.list(value)) value else list(value)
+    vals <- if (is_xl_rich_string(value)) list(value)
+            else if (is.list(value)) value else list(value)
     keep <- !vapply(vals, is.null, logical(1))
-    bad <- which(keep & !vapply(vals, .is_supported_column, logical(1)))
+    ok <- vapply(vals, function(v)
+      is_xl_rich_string(v) || .is_supported_column(v), logical(1))
+    bad <- which(keep & !ok)
     if (length(bad)) {
       detail <- vapply(bad, function(k) {
         v <- vals[[k]]
@@ -153,7 +156,7 @@ xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
                else if (is_xl_comment(comment)) 1L
                else length(comment)
   n <- max(c(
-    if (!is.null(value))     length(value)     else 0L,
+    if (!is.null(value))     .value_length(value) else 0L,
     if (!is.null(formula))   length(formula)   else 0L,
     if (!is.null(hyperlink)) length(hyperlink) else 0L,
     if (!is.null(array_range)) length(array_range) else 0L,
@@ -161,8 +164,12 @@ xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
   ))
 
   # Normalise value to a list of length n -------------------------------------
+  # An xl_rich_string is itself a list (of runs), so it has to be recognised
+  # before the is.list() branch or its runs would be spread across cells.
   value_list <- if (is.null(value)) {
     rep(list(NA), n)
+  } else if (is_xl_rich_string(value)) {
+    rep(list(value), n)
   } else {
     rep_len(if (is.list(value)) value else as.list(value), n)
   }
@@ -240,6 +247,7 @@ xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
   range_list  <- .cell_range_list(array_range, n)
   .check_array_args(value_list, formula_vec, array_vec, dynamic_vec, range_list,
                     formula_given = !is.null(formula))
+  .check_rich_value(value_list, formula_vec, hyperlink_list)
 
   # Build the per-cell records ------------------------------------------------
   cells <- lapply(seq_len(n), function(i) {
@@ -256,6 +264,34 @@ xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
   })
 
   structure(cells, class = c("xl_cell_general", "xl_cell"))
+}
+
+# A rich string is the cell's text, so it cannot share the cell with a formula
+# (whose result Excel supplies) or a hyperlink (whose display text is a plain
+# string).  Both would silently discard the runs, so refuse the combination.
+.check_rich_value <- function(values, formulas, hyperlinks) {
+  for (i in seq_along(values)) {
+    if (!is_xl_rich_string(values[[i]])) next
+    if (!is.na(formulas[[i]]))
+      stop(sprintf(paste0("cell %d combines a rich string `value` with a ",
+                          "`formula`; a formula's result comes from Excel, so ",
+                          "the runs would be discarded"), i), call. = FALSE)
+    hl <- hyperlinks[[i]]
+    hl_set <- !(is.null(hl) || identical(hl, NA) ||
+                (is.character(hl) && length(hl) == 1L && is.na(hl)))
+    if (hl_set)
+      stop(sprintf(paste0("cell %d combines a rich string `value` with a ",
+                          "`hyperlink`; a hyperlink's display text is a plain ",
+                          "string, so the runs would be discarded"), i),
+           call. = FALSE)
+  }
+  invisible(NULL)
+}
+
+# The number of cells a `value` argument describes.  An xl_rich_string is one
+# cell's worth of text, not one cell per run.
+.value_length <- function(value) {
+  if (is_xl_rich_string(value)) 1L else length(value)
 }
 
 # --- array / dynamic formula helpers -----------------------------------------

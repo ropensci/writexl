@@ -212,6 +212,14 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
           multicell <- c(multicell, list(q))
         }
       }
+      # a rich string's runs each carry their own font, registered like any
+      # other format; C receives the parallel text / id vectors
+      if (is_xl_rich_string(rec$value)) {
+        rich <- .rich_string_c_payload(rec$value, reg, props)
+        rec$rich_text <- rich$rich_text
+        rec$rich_format_id <- rich$rich_format_id
+        rec$value <- NULL
+      }
       # the unresolved user spec has served its purpose; keep the C payload tight
       rec$array_range <- NULL
       recs[[k]] <- rec

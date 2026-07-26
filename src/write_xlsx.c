@@ -512,6 +512,32 @@ static void array_quad(SEXP cell, lxw_row_t *r1, lxw_col_t *c1,
 }
 
 /*
+ * Write a rich string: one cell whose text is split into runs, each with its
+ * own font.  R has already flattened the runs into the parallel "rich_text" and
+ * "rich_format_id" vectors and guaranteed at least two of them (libxlsxwriter
+ * rejects fewer).  The tuple array libxlsxwriter takes is NULL-terminated.
+ */
+static void write_rich_string_cell(cell_write_ctx *ctx, lxw_row_t row,
+                                    lxw_col_t col, SEXP txt, SEXP ids,
+                                    lxw_format *fmt){
+  R_xlen_t n = Rf_length(txt);
+  lxw_rich_string_tuple **tuples = (lxw_rich_string_tuple **)
+    R_alloc((size_t) n + 1, sizeof(lxw_rich_string_tuple *));
+  lxw_rich_string_tuple *runs = (lxw_rich_string_tuple *)
+    R_alloc((size_t) n, sizeof(lxw_rich_string_tuple));
+  for(R_xlen_t k = 0; k < n; k++){
+    runs[k].string = Rf_translateCharUTF8(STRING_ELT(txt, k));
+    int fid = (ids != R_NilValue && TYPEOF(ids) == INTSXP &&
+               Rf_length(ids) > k) ? INTEGER(ids)[k] : 0;
+    runs[k].format = ctx_format(ctx, fid);
+    note_protection(ctx, fid);
+    tuples[k] = &runs[k];
+  }
+  tuples[n] = NULL;
+  assert_lxw(worksheet_write_rich_string(ctx->sheet, row, col, tuples, fmt));
+}
+
+/*
  * write_cell_general: write the i-th cell of an xl_cell_general column.
  * col is the full xl_cell_general list-column; VECTOR_ELT(col, i) is one
  * per-cell named list with elements: value, formula, hyperlink.  The
@@ -647,6 +673,16 @@ static void write_cell_general(cell_write_ctx *ctx,
     } else {
       assert_lxw(worksheet_write_formula(ctx->sheet, row, col_idx, fstr, fmt));
     }
+    return;
+  }
+
+  /* --- rich string: the cell's text, in per-run fonts --------------------- */
+  /* R refuses a rich string alongside a formula or hyperlink, so reaching here
+     after those branches means the runs are the cell's whole content. */
+  SEXP rtext = list_get(cell, "rich_text");
+  if(rtext != R_NilValue && TYPEOF(rtext) == STRSXP && Rf_length(rtext) > 0){
+    write_rich_string_cell(ctx, row, col_idx, rtext,
+                           list_get(cell, "rich_format_id"), fmt);
     return;
   }
 
