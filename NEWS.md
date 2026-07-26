@@ -27,6 +27,15 @@
     (default cell format, header style, hyperlink style, date/time formats),
     all as overridable `xl_format` objects.
 
+* Cell **comments** (notes) are now supported. `xl_cell_general()` gains a
+  `comment` argument: a character vector of text (the easy default), a single
+  `xl_comment()` (recycled), or a per-cell list. `xl_comment()` exposes the full
+  set of comment options (author, visibility, box size/position) and reuses the
+  format engine for styling — only the fill background color and font
+  name/size/family are supported, and any other format property triggers a
+  warning. `xl_sheet()` and `xl_properties()` gain `comment_author` and
+  `show_comments`, with the author cascading workbook -> sheet -> comment.
+
 * Writing a cell that unlocks (`locked = FALSE`) or hides (`hidden = TRUE`) a
   cell on a worksheet that is not protected now warns, since the cell locking
   has no effect until the sheet is protected.

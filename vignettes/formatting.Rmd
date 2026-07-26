@@ -167,3 +167,46 @@ applying the same format to thousands of cells stays compact.
 Note that a workbook-wide `default_format` is *emulated* (it is applied beneath
 every cell) because the underlying library has no native "Normal style"
 setter; it does not change Excel's built-in Normal style.
+
+## Comments
+
+Cell comments (notes) are attached through `xl_cell_general()`'s `comment`
+argument. The simplest form is just text — a character vector, one comment per
+cell (`NA` for none):
+
+```{r}
+df <- data.frame(item = c("Widget", "Gadget", "Gizmo"))
+df$item <- xl_cell_general(
+  value   = c("Widget", "Gadget", "Gizmo"),
+  comment = c("Discontinued", NA, "Low stock")
+)
+path <- write_xlsx(df, tempfile(fileext = ".xlsx"))
+```
+
+`xl_comment()` adds options — an author, initial visibility, and box
+size/position — and styling. Excel comment boxes support only a background
+color and a font name/size/family, so styling is supplied by reusing the format
+engine via `format`; any other format property triggers a warning.
+
+```{r}
+note <- xl_comment(
+  "Please verify with Finance",
+  author  = "Reviewer",
+  visible = TRUE,
+  format  = xl_font(name = "Arial", size = 10) + xl_fill(background = "lightyellow")
+)
+d <- data.frame(x = 1)
+d$x <- xl_cell_general(value = 1234.5, comment = note)
+path <- write_xlsx(d, tempfile(fileext = ".xlsx"))
+```
+
+A default author for a whole sheet or workbook, and showing all comments, are
+set on `xl_sheet()` / `xl_properties()`; the author cascades workbook → sheet →
+per-comment:
+
+```{r}
+wb <- xl_workbook(
+  list(Data = xl_sheet(df, comment_author = "QA", show_comments = TRUE))
+)
+path <- write_xlsx(wb, tempfile(fileext = ".xlsx"))
+```
