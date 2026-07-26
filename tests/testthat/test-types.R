@@ -7,15 +7,14 @@ test_that("Types roundtrip properly",{
   num <- c(NA_real_, pi, 1.2345e80)
   int <- c(NA_integer_, 0L, -100L)
   str <- c(NA_character_, "foo", kremlin) #note empty strings don't work yet
-  time <- Sys.time() + 1:3
+  # The zone is set explicitly: writexl drops a single shared time zone and
+  # writes local wall-clock time, so pinning this column to UTC (offset 0) keeps
+  # this test about type round-tripping. Time zones are covered separately below.
+  time <- structure(Sys.time() + 1:3, tzone = "UTC")
   bigint <- bit64::as.integer64(.Machine$integer.max) ^ c(0,1,1.5)
   input <- data.frame(num = num, int = int, bigint = bigint, str = str, time = time, stringsAsFactors = FALSE)
   expect_warning(output <- roundtrip(input), "int64")
   output$bigint <- bit64::as.integer64(output$bigint)
-  # Excel has no time zones. Every datetime here shares one zone, so writexl
-  # writes local wall-clock time rather than the UTC instant (see the time-zone
-  # tests below); shift back by the UTC offset to recover the instant.
-  output$time <- output$time - as.POSIXlt(time)$gmtoff
   attr(output$time, 'tzone') <- attr(time, 'tzone')
   expect_equal(input, as.data.frame(output))
 })
@@ -234,4 +233,16 @@ test_that("NA datetimes survive the time zone pass", {
   s <- sheet_serials(path)
   expect_equal(s[["A2"]], expected_serial("2025-12-01 01:00:00"))
   expect_false("A3" %in% names(s))     # NA stays an empty cell
+})
+
+test_that("dropping a time zone preserves length and NA positions", {
+  # A platform that cannot report a UTC offset must fall back to leaving the
+  # value alone. Without a length check a zero-length offset would recycle to
+  # nothing and silently empty the whole column, so pin the invariant.
+  x <- as.POSIXct(c("2025-01-01 10:00:00", NA, "2025-07-01 10:00:00"),
+                  tz = "America/New_York")
+  y <- .drop_tzone(x)
+  expect_length(y, length(x))
+  expect_equal(is.na(y), is.na(x))
+  expect_length(.drop_tzone(as.POSIXct(character(0), tz = "UTC")), 0L)
 })

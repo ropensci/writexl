@@ -127,9 +127,12 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
 # The offset is taken per instant, so daylight saving is handled correctly.
 .drop_tzone <- function(x){
   off <- as.POSIXlt(x, tz = .tzone_of(x))$gmtoff
-  # Some platforms do not report gmtoff; leave the value alone (i.e. UTC) rather
-  # than writing something wrong.
-  if(is.null(off) || any(is.na(off) & !is.na(as.numeric(x))))
+  # Not every platform reports gmtoff: older Windows builds of R return NULL or
+  # a zero-length vector.  Fall back to leaving the value alone (i.e. UTC)
+  # rather than writing something wrong -- note the length check, without which
+  # a zero-length offset would recycle to nothing and silently empty the column.
+  if(is.null(off) || length(off) != length(x) ||
+     any(is.na(off) & !is.na(as.numeric(x))))
     return(x)
   off[is.na(off)] <- 0
   structure(as.numeric(x) + off, class = c("POSIXct", "POSIXt"), tzone = "UTC")
