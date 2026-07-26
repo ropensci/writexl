@@ -97,5 +97,7 @@
   constant-memory mode). The autofilter is its first user.
 
 * Whether the workbook is written in the libxlsxwriter constant-memory mode is
-  now resolved rather than hard-coded. It still always resolves to "on"; no
-  feature yet requires it off.
+  now resolved from the features the workbook actually uses, rather than being
+  hard-coded. It still always resolves to "on"; no feature yet requires it off.
+  The `writexl.constant_memory` option that briefly existed to override this has
+  been removed — the mode is not a user setting.

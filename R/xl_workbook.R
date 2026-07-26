@@ -183,13 +183,6 @@ print.xl_workbook <- function(x, ...) {
   reasons <- character(0)
   # (future) features that cannot work under row streaming append their reason
   # here, e.g. reasons <- c(reasons, "worksheet tables are not supported ...")
-  override <- getOption("writexl.constant_memory")
-  if (!is.null(override)) {
-    if (!is.logical(override) || length(override) != 1L || is.na(override))
-      stop("option `writexl.constant_memory` must be TRUE or FALSE",
-           call. = FALSE)
-    return(list(on = as.integer(override), reasons = character(0)))
-  }
   list(on = as.integer(!length(reasons)), reasons = reasons)
 }
 

@@ -226,9 +226,6 @@ print.xl_sheet <- function(x, ...) {
 }
 
 # --- resolution: turn a sheet into the plan C consumes --------------------
-#
-# Range parsing (`.parse_range()`, `.parse_freeze()`, and the shared resolver
-# they wrap) lives in R/xl_range.R.
 
 # Build the (flag, password, options) triple C uses for worksheet protection.
 .resolve_protect <- function(protect) {

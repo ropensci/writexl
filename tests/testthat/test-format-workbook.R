@@ -159,18 +159,6 @@ test_that("constant memory resolves to on", {
   expect_equal(.properties_payload(xl_properties(), 0L)$constant_memory, 0L)
 })
 
-test_that("the constant_memory override is honoured and validated", {
-  old <- options(writexl.constant_memory = FALSE)
-  on.exit(options(old), add = TRUE)
-  expect_equal(.resolve_constant_memory(list(), xl_properties())$on, 0L)
-  options(writexl.constant_memory = TRUE)
-  expect_equal(.resolve_constant_memory(list(), xl_properties())$on, 1L)
-  options(writexl.constant_memory = "yes")
-  expect_error(.resolve_constant_memory(list(), xl_properties()), "TRUE or FALSE")
-  options(writexl.constant_memory = NA)
-  expect_error(.resolve_constant_memory(list(), xl_properties()), "TRUE or FALSE")
-})
-
 test_that("workbooks write the same content with constant memory on and off", {
   skip_if_not_installed("readxl")
   df <- data.frame(txt = c("alpha", "beta", "alpha"),
@@ -179,10 +167,17 @@ test_that("workbooks write the same content with constant memory on and off", {
                    when = as.Date("2020-01-01") + 0:2,
                    stringsAsFactors = FALSE)
   on_path <- write_tmp(list(D = xl_sheet(df, autofilter = TRUE, freeze = "A2")))
-  old <- options(writexl.constant_memory = FALSE)
-  on.exit(options(old), add = TRUE)
-  off_path <- write_tmp(list(D = xl_sheet(df, autofilter = TRUE, freeze = "A2")))
-  options(old)
+  # No feature writexl writes today turns the mode off, so drive the off path by
+  # mocking the resolver.  It must stay exercised: the C side and libxlsxwriter
+  # behave differently with row streaming disabled, and a phase that needs the
+  # mode off (worksheet tables, multi-cell array formulas) will rely on it.
+  off_path <- local({
+    local_mocked_bindings(
+      .resolve_constant_memory = function(elems, props)
+        list(on = 0L, reasons = "forced off by test")
+    )
+    write_tmp(list(D = xl_sheet(df, autofilter = TRUE, freeze = "A2")))
+  })
 
   # Content must match; the bytes need not -- with constant memory off, strings
   # go to the shared string table instead of being written inline.
