@@ -80,10 +80,12 @@ tmp <- write_xlsx(list(Data = sheet))
 [xl_col_spec], [xl_row_spec], [write_xlsx]
 
 Other writexl:
+\code{\link[=is_xl_comment]{is_xl_comment()}},
 \code{\link[=is_xl_format]{is_xl_format()}},
 \code{\link[=xl_cell_general]{xl_cell_general()}},
 \code{\link[=xl_color]{xl_color()}},
 \code{\link{xl_colrow_spec}},
+\code{\link[=xl_comment]{xl_comment()}},
 \code{\link[=xl_format]{xl_format()}},
 \code{\link{xl_format_groups}},
 \code{\link[=xl_formula]{xl_formula()}},
