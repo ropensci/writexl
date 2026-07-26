@@ -35,7 +35,7 @@ test_that("xl_font handles rarely-used properties", {
   f <- xl_font(family = 2, charset = 1, outline = TRUE, shadow = TRUE,
                condense = TRUE, extend = TRUE, scheme = "minor", theme = 1,
                color_indexed = 8, font_only = TRUE)
-  p <- writexl:::.xl_format_payload(f)
+  p <- .xl_format_payload(f)
   expect_equal(p$font_family, 2L)
   expect_equal(p$font_charset, 1L)
   expect_true(p$font_outline)
@@ -70,7 +70,7 @@ test_that("xl_fill maps background/foreground/pattern and auto-solids", {
   f2 <- xl_fill(background = "yellow", foreground = "black", pattern = "light-gray")
   fi <- unclass(f2)$fill
   expect_equal(fi$pattern, "light-gray")            # explicit pattern preserved
-  p <- writexl:::.xl_format_payload(f2)
+  p <- .xl_format_payload(f2)
   expect_equal(p$bg_color, xl_color("yellow"))
   expect_equal(p$fg_color, xl_color("black"))
   expect_equal(p$pattern, 4L)
@@ -92,7 +92,7 @@ test_that("xl_border 'all' and 'color' fan out to four sides", {
 test_that("xl_border diagonal and payload", {
   b <- xl_border(diagonal = "up-down", diagonal_style = "hair",
                  diagonal_color = "red", bottom = "double", bottom_color = "blue")
-  p <- writexl:::.xl_format_payload(b)
+  p <- .xl_format_payload(b)
   expect_equal(p$diag_type, 3L)
   expect_equal(p$diag_border, 7L)
   expect_equal(p$diag_color, xl_color("red"))
@@ -105,7 +105,7 @@ test_that("xl_border diagonal and payload", {
 test_that("xl_align validates and maps alignment", {
   a <- xl_align(horizontal = "center", vertical = "top", wrap = TRUE,
                 rotation = 45, indent = 2, shrink = TRUE, reading_order = "rtl")
-  p <- writexl:::.xl_format_payload(a)
+  p <- .xl_format_payload(a)
   expect_equal(p$align_h, 2L)
   expect_equal(p$align_v, 8L)
   expect_true(p$text_wrap)
@@ -113,25 +113,25 @@ test_that("xl_align validates and maps alignment", {
   expect_equal(p$indent, 2L)
   expect_true(p$shrink)
   expect_equal(p$reading_order, 2L)
-  expect_equal(writexl:::.xl_format_payload(xl_align(rotation = 270))$rotation, 270L)
+  expect_equal(.xl_format_payload(xl_align(rotation = 270))$rotation, 270L)
   expect_error(xl_align(horizontal = "middle"), "horizontal")
   expect_error(xl_align(vertical = "sideways"), "vertical")
   expect_error(xl_align(rotation = 120), "270")
 })
 
 test_that("xl_num_format takes a string or an index", {
-  expect_equal(writexl:::.xl_format_payload(xl_num_format("#,##0.00"))$num_format, "#,##0.00")
-  expect_equal(writexl:::.xl_format_payload(xl_num_format(index = 3))$num_format_index, 3L)
+  expect_equal(.xl_format_payload(xl_num_format("#,##0.00"))$num_format, "#,##0.00")
+  expect_equal(.xl_format_payload(xl_num_format(index = 3))$num_format_index, 3L)
   expect_error(xl_num_format(format = 1), "format")
   expect_error(xl_num_format(index = 999), "between 0 and 255")
 })
 
 test_that("xl_protection inverts locked and sets hidden", {
-  p <- writexl:::.xl_format_payload(xl_protection(locked = FALSE, hidden = TRUE))
+  p <- .xl_format_payload(xl_protection(locked = FALSE, hidden = TRUE))
   expect_true(p$unlocked)
   expect_true(p$hidden)
   # locked = TRUE is Excel's default -> no unlocked call
-  expect_null(writexl:::.xl_format_payload(xl_protection(locked = TRUE))$unlocked)
+  expect_null(.xl_format_payload(xl_protection(locked = TRUE))$unlocked)
   expect_error(xl_protection(locked = "no"), "locked")
 })
 
@@ -153,7 +153,7 @@ test_that("xl_format merges groups property-by-property, right-biased", {
 
 test_that("xl_format scalar flags and NULL handling", {
   f <- xl_format(xl_font(bold = TRUE), quote_prefix = TRUE, hyperlink = TRUE)
-  p <- writexl:::.xl_format_payload(f)
+  p <- .xl_format_payload(f)
   expect_true(p$quote_prefix)
   expect_true(p$set_hyperlink)
   expect_true(is_xl_format(xl_format()))              # empty
@@ -175,12 +175,12 @@ test_that("print methods run for coverage", {
 })
 
 test_that("format registry deduplicates and reserves 0 for none", {
-  reg <- writexl:::.new_format_registry()
-  i1 <- writexl:::.register_format(reg, xl_font(bold = TRUE))
-  i2 <- writexl:::.register_format(reg, xl_font(bold = TRUE))
-  i3 <- writexl:::.register_format(reg, xl_font(italic = TRUE))
-  i0 <- writexl:::.register_format(reg, NULL)
-  iE <- writexl:::.register_format(reg, xl_format())    # empty -> 0
+  reg <- .new_format_registry()
+  i1 <- .register_format(reg, xl_font(bold = TRUE))
+  i2 <- .register_format(reg, xl_font(bold = TRUE))
+  i3 <- .register_format(reg, xl_font(italic = TRUE))
+  i0 <- .register_format(reg, NULL)
+  iE <- .register_format(reg, xl_format())    # empty -> 0
   expect_equal(i1, 1L)
   expect_equal(i2, 1L)
   expect_equal(i3, 2L)
@@ -193,7 +193,7 @@ test_that("full font payload round-trips every property", {
   f <- xl_font(name = "Arial", size = 12, color = "red", bold = TRUE,
                italic = TRUE, underline = "single", strikeout = TRUE,
                script = "sub")
-  p <- writexl:::.xl_format_payload(f)
+  p <- .xl_format_payload(f)
   expect_equal(p$font_name, "Arial")
   expect_equal(p$font_size, 12)
   expect_equal(p$font_color, xl_color("red"))
@@ -206,7 +206,7 @@ test_that("full border payload round-trips every side and color", {
   b <- xl_border(left = "thin", right = "medium", top = "thick", bottom = "double",
                  left_color = "red", right_color = "green", top_color = "blue",
                  bottom_color = "black")
-  p <- writexl:::.xl_format_payload(b)
+  p <- .xl_format_payload(b)
   expect_equal(p$border_left, 1L)
   expect_equal(p$border_right, 2L)
   expect_equal(p$border_top, 5L)
@@ -227,17 +227,17 @@ test_that("numeric validators reject non-numeric and non-scalar input", {
 
 test_that("merge_xl_format tolerates NULL operands directly", {
   f <- xl_font(bold = TRUE)
-  expect_identical(writexl:::merge_xl_format(NULL, f), f)
-  expect_identical(writexl:::merge_xl_format(f, NULL), f)
+  expect_identical(merge_xl_format(NULL, f), f)
+  expect_identical(merge_xl_format(f, NULL), f)
 })
 
 test_that(".fmt_kv tolerates NULL values", {
-  expect_type(writexl:::.fmt_kv(list(a = NULL)), "character")
+  expect_type(.fmt_kv(list(a = NULL)), "character")
 })
 
 test_that("payload key is order-independent", {
-  a <- writexl:::.payload_key(list(bold = TRUE, italic = TRUE))
-  b <- writexl:::.payload_key(list(italic = TRUE, bold = TRUE))
+  a <- .payload_key(list(bold = TRUE, italic = TRUE))
+  b <- .payload_key(list(italic = TRUE, bold = TRUE))
   expect_equal(a, b)
-  expect_equal(writexl:::.payload_key(list()), "")
+  expect_equal(.payload_key(list()), "")
 })

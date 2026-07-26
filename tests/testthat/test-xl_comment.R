@@ -60,7 +60,7 @@ test_that("the comment keeps its xl_format and stays editable", {
   expect_true(is_xl_format(unclass(cm)$format))
   # the whole point of keeping it: a format can be adjusted after construction
   cm$format <- cm$format + xl_fill(background = "lightyellow")
-  p <- writexl:::.comment_c_payload(unclass(cm))
+  p <- .comment_c_payload(unclass(cm))
   expect_equal(p$font_name, "Arial")
   expect_equal(p$color, xl_color("lightyellow"))
 })
@@ -69,7 +69,7 @@ test_that(".comment_c_payload flattens the format to the supported C fields", {
   cm <- xl_comment("note",
                    format = xl_font(name = "Arial", size = 10, family = 2) +
                             xl_fill(background = "lightyellow"))
-  p <- writexl:::.comment_c_payload(unclass(cm))
+  p <- .comment_c_payload(unclass(cm))
   expect_null(p$format)                     # replaced by flat fields
   expect_equal(p$text, "note")
   expect_equal(p$color, xl_color("lightyellow"))
@@ -77,8 +77,8 @@ test_that(".comment_c_payload flattens the format to the supported C fields", {
   expect_equal(p$font_size, 10)
   expect_equal(p$font_family, 2L)
   # no format -> no styling fields, and NULL passes through
-  expect_null(writexl:::.comment_c_payload(unclass(xl_comment("x")))$color)
-  expect_null(writexl:::.comment_c_payload(NULL))
+  expect_null(.comment_c_payload(unclass(xl_comment("x")))$color)
+  expect_null(.comment_c_payload(NULL))
 })
 
 test_that(".check_comment_format warns on unsupported properties", {
@@ -106,12 +106,12 @@ test_that("supported-only format does not warn", {
 })
 
 test_that(".comment_payload normalizes strings, xl_comment, and NA", {
-  expect_equal(writexl:::.comment_payload("hi")$text, "hi")
-  expect_equal(writexl:::.comment_payload(xl_comment("hey"))$text, "hey")
-  expect_null(writexl:::.comment_payload(NA))
-  expect_null(writexl:::.comment_payload(NA_character_))
-  expect_null(writexl:::.comment_payload(NULL))
-  expect_error(writexl:::.comment_payload(42), "NA, a single string, or an xl_comment")
+  expect_equal(.comment_payload("hi")$text, "hi")
+  expect_equal(.comment_payload(xl_comment("hey"))$text, "hey")
+  expect_null(.comment_payload(NA))
+  expect_null(.comment_payload(NA_character_))
+  expect_null(.comment_payload(NULL))
+  expect_error(.comment_payload(42), "NA, a single string, or an xl_comment")
 })
 
 # --- attaching comments to cells and writing them ---------------------------

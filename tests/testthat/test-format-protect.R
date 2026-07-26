@@ -26,10 +26,10 @@ test_that("autofilter is absent by default and validated", {
 })
 
 test_that(".parse_range parses and rejects", {
-  expect_equal(writexl:::.parse_range("A1:D51"), c(0L, 0L, 50L, 3L))
-  expect_equal(writexl:::.parse_range("B2:B2"), c(1L, 1L, 1L, 1L))
-  expect_error(writexl:::.parse_range("A1"), "A1:D51")
-  expect_error(writexl:::.parse_range("A1:9"), "A1:D51")
+  expect_equal(.parse_range("A1:D51"), c(0L, 0L, 50L, 3L))
+  expect_equal(.parse_range("B2:B2"), c(1L, 1L, 1L, 1L))
+  expect_error(.parse_range("A1"), "A1:D51")
+  expect_error(.parse_range("A1:9"), "A1:D51")
 })
 
 test_that("protect = TRUE adds default sheet protection", {

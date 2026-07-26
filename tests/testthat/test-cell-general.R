@@ -448,6 +448,6 @@ test_that("xl_hyperlink_cell() with NA url writes valid xlsx", {
 test_that("normalize_df passes xl_cell_general columns through unchanged", {
   df <- data.frame(x = 1:3)
   df$c <- xl_cell_general(value = c(1, 2, 3))
-  norm <- writexl:::normalize_df(df)
+  norm <- normalize_df(df)
   expect_s3_class(norm$c, "xl_cell_general")
 })

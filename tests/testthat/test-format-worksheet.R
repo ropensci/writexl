@@ -62,21 +62,21 @@ test_that("xl_sheet validates data and spec lists", {
 })
 
 test_that("freeze parsing handles cell refs, lists, and errors", {
-  expect_equal(writexl:::.parse_freeze(NULL), c(-1L, -1L))
-  expect_equal(writexl:::.parse_freeze(NA), c(-1L, -1L))
-  expect_equal(writexl:::.parse_freeze("A2"), c(1L, 0L))
-  expect_equal(writexl:::.parse_freeze("B3"), c(2L, 1L))
-  expect_equal(writexl:::.parse_freeze("AA1"), c(0L, 26L))
-  expect_equal(writexl:::.parse_freeze(list(row = 2, col = 1)), c(2L, 1L))
-  expect_error(writexl:::.parse_freeze("nonsense"), "cell reference")
-  expect_error(writexl:::.parse_freeze(42), "cell reference")
+  expect_equal(.parse_freeze(NULL), c(-1L, -1L))
+  expect_equal(.parse_freeze(NA), c(-1L, -1L))
+  expect_equal(.parse_freeze("A2"), c(1L, 0L))
+  expect_equal(.parse_freeze("B3"), c(2L, 1L))
+  expect_equal(.parse_freeze("AA1"), c(0L, 26L))
+  expect_equal(.parse_freeze(list(row = 2, col = 1)), c(2L, 1L))
+  expect_error(.parse_freeze("nonsense"), "cell reference")
+  expect_error(.parse_freeze(42), "cell reference")
 })
 
 test_that("column targeting resolves names and positions", {
-  expect_equal(writexl:::.resolve_col_index(c("b", "a"), c("a", "b")), c(2L, 1L))
-  expect_equal(writexl:::.resolve_col_index(c(1, 3), c("a", "b", "c")), c(1L, 3L))
-  expect_error(writexl:::.resolve_col_index("z", c("a", "b")), "unknown column")
-  expect_error(writexl:::.resolve_col_index(9, c("a", "b")), "out of range")
+  expect_equal(.resolve_col_index(c("b", "a"), c("a", "b")), c(2L, 1L))
+  expect_equal(.resolve_col_index(c(1, 3), c("a", "b", "c")), c(1L, 3L))
+  expect_error(.resolve_col_index("z", c("a", "b")), "unknown column")
+  expect_error(.resolve_col_index(9, c("a", "b")), "out of range")
 })
 
 test_that("column width and format reach the worksheet/styles xml", {
@@ -171,7 +171,7 @@ test_that("cell display width covers value/formula/hyperlink/blank", {
     xl_cell_general(hyperlink = list(url = "http://foo.com")),
     xl_cell_general(value = NA)
   )
-  w <- writexl:::.content_nchar(gen)
+  w <- .content_nchar(gen)
   expect_equal(w[1], 5L)
   expect_equal(w[2], nchar("=SUM(A1:A9)"))
   expect_equal(w[3], nchar("http://example.com"))
