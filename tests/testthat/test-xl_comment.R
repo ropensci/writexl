@@ -195,31 +195,20 @@ test_that("sheet comment_author and show_comments apply", {
   expect_match(xlsx_part(tmp, "xl/drawings/vmlDrawing1.vml", raw = TRUE), "visible")
 })
 
-test_that("workbook comment_author cascades and is overridden downstream", {
-  mk <- function() { df <- data.frame(x = 1L)
-    df$x <- xl_cell_general(value = 1, comment = "n"); df }
-  author_in <- function(wb) {
-    tmp <- tempfile(fileext = ".xlsx"); write_xlsx(wb, tmp)
-    xlsx_part(tmp, "xl/comments1.xml", raw = TRUE)
-  }
-  # workbook default reaches a plain-df sheet
-  expect_match(author_in(xl_workbook(mk(), properties = xl_properties(comment_author = "WB"))),
-               "WB")
-  # sheet overrides workbook
-  cm <- author_in(xl_workbook(list(D = xl_sheet(mk(), comment_author = "SheetWins")),
-                              properties = xl_properties(comment_author = "WB")))
-  expect_match(cm, "SheetWins"); expect_false(grepl(">WB<", cm))
-  # a per-cell author overrides the sheet default
+test_that("a per-comment author overrides the sheet default", {
   df <- data.frame(x = 1L)
   df$x <- xl_cell_general(value = 1, comment = xl_comment("n", author = "CellWins"))
-  expect_match(author_in(list(D = xl_sheet(df, comment_author = "SheetAuthor"))), "CellWins")
+  tmp <- tempfile(fileext = ".xlsx")
+  write_xlsx(list(D = xl_sheet(df, comment_author = "SheetAuthor")), tmp)
+  expect_match(xlsx_part(tmp, "xl/comments1.xml", raw = TRUE), "CellWins")
 })
 
-test_that("workbook show_comments shows comments on every sheet", {
+test_that("comments work on a sheet with no comment defaults set", {
   df <- data.frame(x = 1L); df$x <- xl_cell_general(value = 1, comment = "n")
-  wb <- xl_workbook(df, properties = xl_properties(show_comments = TRUE))
-  tmp <- tempfile(fileext = ".xlsx"); write_xlsx(wb, tmp)
-  expect_match(xlsx_part(tmp, "xl/drawings/vmlDrawing1.vml", raw = TRUE), "visible")
+  cm <- comments_xml(list(D = xl_sheet(df)))
+  expect_match(cm, "n")
+  # comments are hidden by default
+  expect_false(grepl("visible", vml_xml(list(D = xl_sheet(df)))))
 })
 
 test_that("show_comments is validated", {

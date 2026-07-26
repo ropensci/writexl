@@ -138,8 +138,7 @@ xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
 #'   `no_select_locked_cells`, `no_select_unlocked_cells`. Cell locking via
 #'   [xl_protection()] only has an effect on a protected sheet.
 #' @param comment_author Default author for this sheet's cell comments (a
-#'   per-comment `author` overrides it; falls back to the workbook
-#'   `comment_author`).
+#'   per-comment `author` overrides it).
 #' @param show_comments If `TRUE`, all comments on the sheet are initially
 #'   shown (individual comments can still be forced via `xl_comment(visible=)`).
 #' @return An `xl_sheet` object.
@@ -377,9 +376,10 @@ print.xl_sheet <- function(x, ...) {
   gridlines <- -1L; tab_color <- -1L; zoom <- 0L; default_row_height <- NA_real_
   autofilter <- c(-1L, -1L, -1L, -1L)
   protect <- list(flag = 0L, password = NA_character_, options = NULL)
-  # comment defaults cascade from the workbook properties; a sheet overrides
-  comment_author <- props$comment_author
-  show_comments <- isTRUE(props$show_comments)
+  # comment defaults are worksheet-scoped (as in libxlsxwriter); a comment's own
+  # author overrides the sheet default
+  comment_author <- NA_character_
+  show_comments <- FALSE
 
   if (inherits(el, "xl_sheet")) {
     # column specs
@@ -419,8 +419,8 @@ print.xl_sheet <- function(x, ...) {
         autofilter <- c(0L, 0L, as.integer(last_row), ncols - 1L)
     }
     protect <- .resolve_protect(el$protect)
-    if (!is.na(el$comment_author)) comment_author <- el$comment_author
-    show_comments <- isTRUE(el$show_comments) || show_comments
+    comment_author <- el$comment_author
+    show_comments <- isTRUE(el$show_comments)
     # auto column widths (for columns the user did not size explicitly)
     if (isTRUE(el$auto_colwidth)) {
       for (i in seq_len(ncols)) {

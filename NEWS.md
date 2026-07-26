@@ -33,8 +33,9 @@
   set of comment options (author, visibility, box size/position) and reuses the
   format engine for styling — only the fill background color and font
   name/size/family are supported, and any other format property triggers a
-  warning. `xl_sheet()` and `xl_properties()` gain `comment_author` and
-  `show_comments`, with the author cascading workbook -> sheet -> comment.
+  warning. `xl_sheet()` gains `comment_author` and `show_comments` (comment
+  defaults are worksheet-scoped); a comment's own `author` overrides the sheet
+  default.
 
 * Writing a cell that unlocks (`locked = FALSE`) or hides (`hidden = TRUE`) a
   cell on a worksheet that is not protected now warns, since the cell locking

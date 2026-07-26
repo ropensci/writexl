@@ -26,9 +26,7 @@ xl_properties(
   datetime_format = xl_num_format("yyyy-mm-dd HH:mm:ss UTC"),
   date_col_width = 20,
   datetime_col_width = 20,
-  header_row_height = 15,
-  comment_author = NA,
-  show_comments = FALSE
+  header_row_height = 15
 )
 }
 \arguments{
@@ -61,11 +59,6 @@ underlined).}
 `POSIXct` columns.}
 
 \item{header_row_height}{Height (in points) of the header row.}
-
-\item{comment_author}{Default author for cell comments across the workbook
-(a sheet's or a comment's own `author` overrides it).}
-
-\item{show_comments}{If `TRUE`, comments are initially shown on every sheet.}
 }
 \value{
 An `xl_properties` object.

@@ -60,8 +60,7 @@ password. A named list gives fine-grained control, e.g.
 [xl_protection()] only has an effect on a protected sheet.}
 
 \item{comment_author}{Default author for this sheet's cell comments (a
-per-comment `author` overrides it; falls back to the workbook
-`comment_author`).}
+per-comment `author` overrides it).}
 
 \item{show_comments}{If `TRUE`, all comments on the sheet are initially
 shown (individual comments can still be forced via `xl_comment(visible=)`).}

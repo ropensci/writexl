@@ -200,13 +200,11 @@ d$x <- xl_cell_general(value = 1234.5, comment = note)
 path <- write_xlsx(d, tempfile(fileext = ".xlsx"))
 ```
 
-A default author for a whole sheet or workbook, and showing all comments, are
-set on `xl_sheet()` / `xl_properties()`; the author cascades workbook → sheet →
-per-comment:
+A default author, and showing all of a sheet's comments at once, are set on
+`xl_sheet()` (comment defaults are worksheet-scoped in Excel). A comment's own
+`author` overrides the sheet default, and `visible` overrides `show_comments`:
 
 ```{r}
-wb <- xl_workbook(
-  list(Data = xl_sheet(df, comment_author = "QA", show_comments = TRUE))
-)
-path <- write_xlsx(wb, tempfile(fileext = ".xlsx"))
+sheet <- xl_sheet(df, comment_author = "QA", show_comments = TRUE)
+path <- write_xlsx(list(Data = sheet), tempfile(fileext = ".xlsx"))
 ```
