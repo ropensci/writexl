@@ -43,9 +43,13 @@
 #'   [xl_num_format()] and [xl_protection()], combined with [xl_format()] or
 #'   `+`.  When a cell's value is a date/time and its format sets no number
 #'   format, the default date/time number format is applied automatically.
+#' @param comment Cell comments (notes): a character vector of comment text
+#'   (one per cell, recycled; `NA` for no comment), a single [xl_comment()]
+#'   (recycled to every cell), or a list mixing strings / `xl_comment` / `NA`
+#'   per cell.  `NULL` for no comments.
 #' @return An object of class `c("xl_cell_general", "xl_cell")`, which is a
 #'   list of length `n` where each element is a named list with fields
-#'   `value`, `formula`, `hyperlink`, and `format`.
+#'   `value`, `formula`, `hyperlink`, `format`, and `comment`.
 #'
 #' @family writexl
 #' @seealso [xl_formula()], [xl_hyperlink()], [write_xlsx()]
@@ -76,12 +80,13 @@
 #' df$formula_col <- xl_formula("=A1*2")   # backward-compatible shorthand
 #' df$cell_col    <- xl_cell_general(value = 99L)  # all rows get 99
 xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
-                            format = NULL) {
+                            format = NULL, comment = NULL) {
 
   # 0a. Require at least one content argument --------------------------------
-  if (is.null(value) && is.null(formula) && is.null(hyperlink))
-    stop("At least one of 'value', 'formula', or 'hyperlink' must be provided. ",
-         "Use value = NA for an explicit empty cell.", call. = FALSE)
+  if (is.null(value) && is.null(formula) && is.null(hyperlink) &&
+      is.null(comment))
+    stop("At least one of 'value', 'formula', 'hyperlink', or 'comment' must ",
+         "be provided. Use value = NA for an explicit empty cell.", call. = FALSE)
 
   # 0b. Pre-normalise hyperlink: a named list with 'url' is a single hyperlink
   #     spec, not a list of multiple hyperlinks.  Wrap it so length() = 1.
@@ -90,10 +95,15 @@ xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
   }
 
   # 1. Determine output length n -------------------------------------------
+  # A single xl_comment counts as one comment (not its number of fields).
+  comment_n <- if (is.null(comment)) 0L
+               else if (is_xl_comment(comment)) 1L
+               else length(comment)
   n <- max(c(
     if (!is.null(value))     length(value)     else 0L,
     if (!is.null(formula))   length(formula)   else 0L,
-    if (!is.null(hyperlink)) length(hyperlink) else 0L
+    if (!is.null(hyperlink)) length(hyperlink) else 0L,
+    comment_n
   ))
 
   # 2. Normalise value to a list of length n --------------------------------
@@ -155,13 +165,29 @@ xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
          call. = FALSE)
   }
 
+  # 5b. Normalise comment to a list of length n -----------------------------
+  # Each element is NULL (no comment) or a C-ready comment payload.  A
+  # character vector gives per-cell text with default options; a single
+  # xl_comment recycles to every cell; a list mixes strings/xl_comment/NA.
+  comment_list <- if (is.null(comment)) {
+    vector("list", n)
+  } else if (is_xl_comment(comment)) {
+    rep(list(unclass(comment)), n)
+  } else if (is.character(comment) || is.list(comment)) {
+    rep_len(lapply(comment, .comment_payload), n)
+  } else {
+    stop("`comment` must be a character vector, an xl_comment, or a list of ",
+         "strings/xl_comment objects", call. = FALSE)
+  }
+
   # 6. Build per-cell records -----------------------------------------------
   cells <- lapply(seq_len(n), function(i) {
     list(
       value     = value_list[[i]],
       formula   = formula_vec[[i]],
       hyperlink = hyperlink_list[[i]],
-      format    = format_list[[i]]
+      format    = format_list[[i]],
+      comment   = comment_list[[i]]
     )
   })
 
@@ -228,6 +254,9 @@ print.xl_cell_general <- function(x, max = 10L, ...) {
 
     if (is_xl_format(cell[["format"]]))
       parts <- c(parts, "format=<set>")
+
+    if (!is.null(cell[["comment"]]))
+      parts <- c(parts, "comment=<set>")
 
     cat(sprintf("  [%d] %s\n", i,
                 if (length(parts)) paste(parts, collapse = ", ")

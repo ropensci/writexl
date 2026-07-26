@@ -4,7 +4,13 @@
 \alias{xl_cell_general}
 \title{General cell objects for Excel writing}
 \usage{
-xl_cell_general(value = NULL, formula = NULL, hyperlink = NULL, format = NULL)
+xl_cell_general(
+  value = NULL,
+  formula = NULL,
+  hyperlink = NULL,
+  format = NULL,
+  comment = NULL
+)
 }
 \arguments{
 \item{value}{An atomic vector or a list of scalars, one per cell. Use `NA`
@@ -40,11 +46,16 @@ Build formats with [xl_font()], [xl_fill()], [xl_border()], [xl_align()],
 [xl_num_format()] and [xl_protection()], combined with [xl_format()] or
 `+`.  When a cell's value is a date/time and its format sets no number
 format, the default date/time number format is applied automatically.}
+
+\item{comment}{Cell comments (notes): a character vector of comment text
+(one per cell, recycled; `NA` for no comment), a single [xl_comment()]
+(recycled to every cell), or a list mixing strings / `xl_comment` / `NA`
+per cell.  `NULL` for no comments.}
 }
 \value{
 An object of class `c("xl_cell_general", "xl_cell")`, which is a
   list of length `n` where each element is a named list with fields
-  `value`, `formula`, `hyperlink`, and `format`.
+  `value`, `formula`, `hyperlink`, `format`, and `comment`.
 }
 \description{
 `xl_cell_general` creates a vector of cell objects, each optionally
