@@ -239,5 +239,34 @@ normalize_df <- function(df){
     getNamespace("bit64")
     df[[i]] <- as.double(df[[i]])
   }
+  .check_supported_columns(df)
   df
+}
+
+# Whether a column can be written at all.  This mirrors get_type() in
+# src/write_xlsx.c: anything backed by a character, integer, double or logical
+# vector is writable (a classed column such as Date, POSIXct or difftime is
+# written from its underlying values), and xl_cell_general carries its own
+# writer.  Everything else -- complex, raw, a plain list column -- has no
+# representation in xlsx.
+.is_supported_column <- function(x){
+  if(inherits(x, "xl_cell_general"))
+    return(TRUE)
+  is.character(x) || is.integer(x) || is.double(x) || is.logical(x)
+}
+
+# Fail loudly on column types writexl cannot represent, rather than silently
+# writing the underlying values (or nothing at all).
+.check_supported_columns <- function(df){
+  bad <- which(!vapply(df, .is_supported_column, logical(1)))
+  if(!length(bad))
+    return(invisible(NULL))
+  detail <- vapply(bad, function(i){
+    cls <- paste(class(df[[i]]), collapse = "/")
+    ty <- typeof(df[[i]])
+    sprintf("'%s' (column %d): %s", names(df)[i], i,
+            if(identical(cls, ty)) cls else sprintf("%s (%s)", cls, ty))
+  }, character(1))
+  stop("writexl cannot write column(s) of these types:\n  ",
+       paste(detail, collapse = "\n  "), call. = FALSE)
 }
