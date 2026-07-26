@@ -1,5 +1,12 @@
 comment: false
 
+# Vendored third-party C code (libxlsxwriter and its bundled dependencies).
+# Also excluded via .covrignore; this is a Codecov-side backstop in case any
+# vendored path still reaches the uploaded report.
+ignore:
+  - "src/libxlsxwriter"
+  - "src/libxlsxwriter/**/*"
+
 coverage:
   status:
     project:

@@ -1,0 +1,5 @@
+# Vendored third-party C code: libxlsxwriter and its bundled dependencies
+# (minizip, md5, tmpfileplus, emyg_dtoa). writexl neither maintains nor
+# tests this code, so it should not count toward writexl's coverage.
+# src/write_xlsx.c is writexl's own C code and is deliberately NOT listed.
+src/libxlsxwriter
