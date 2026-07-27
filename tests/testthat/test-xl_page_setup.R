@@ -226,3 +226,121 @@ test_that("header and footer do not disturb the cells", {
     header = "&Ctitle", footer = "&Rpage &P", header_margin = 0.4))))
   expect_equal(as.data.frame(readxl::read_xlsx(p)), df)
 })
+
+# ── Print area and repeat rows/columns ───────────────────────────────────────
+#
+# These write defined names into workbook.xml, not into the worksheet part.
+
+defined_names <- function(page, df = data.frame(x = 1:30)) {
+  wb <- xlsx_part(write_tmp(list(D = xl_sheet(df, page = page))),
+                  "xl/workbook.xml", raw = TRUE)
+  m <- regmatches(wb, regexpr("<definedNames>.*</definedNames>", wb))
+  if (!length(m)) NA_character_ else m
+}
+
+test_that("print_area becomes a Print_Area defined name", {
+  expect_match(defined_names(xl_page_setup(print_area = "A1:B20")),
+               "_xlnm.Print_Area", fixed = TRUE)
+  expect_match(defined_names(xl_page_setup(print_area = "A1:B20")),
+               "D!$A$1:$B$20", fixed = TRUE)
+})
+
+test_that("print_area accepts a data-frame-relative spec", {
+  df <- data.frame(a = 1:5, b = 1:5, cc = 1:5)
+  x <- defined_names(xl_page_setup(print_area = list(rows = 1:3, cols = c("a", "b"))),
+                     df = df)
+  # rows 1:3 are data rows, so sheet rows 2:4 with the header
+  expect_match(x, "D!$A$2:$B$4", fixed = TRUE)
+})
+
+test_that("repeat_rows and repeat_cols become Print_Titles", {
+  # a count repeats that many sheet rows, starting at the header
+  expect_match(defined_names(xl_page_setup(repeat_rows = 1)),
+               "D!$1:$1", fixed = TRUE)
+  expect_match(defined_names(xl_page_setup(repeat_rows = 2)),
+               "D!$1:$2", fixed = TRUE)
+  expect_match(defined_names(xl_page_setup(repeat_cols = 1)),
+               "D!$A:$A", fixed = TRUE)
+  # a range string works too
+  expect_match(defined_names(xl_page_setup(repeat_rows = "1:2")),
+               "D!$1:$2", fixed = TRUE)
+  expect_match(defined_names(xl_page_setup(repeat_cols = "A:B")),
+               "D!$A:$B", fixed = TRUE)
+  # both together
+  expect_match(defined_names(xl_page_setup(repeat_rows = 1, repeat_cols = "A:A")),
+               "_xlnm.Print_Titles", fixed = TRUE)
+})
+
+test_that("repeat arguments reject the wrong kind of range", {
+  expect_error(xl_page_setup(repeat_rows = "A:B"), "row range")
+  expect_error(xl_page_setup(repeat_cols = "1:2"), "column range")
+  expect_error(xl_page_setup(repeat_rows = 0), "repeat_rows")
+  expect_error(xl_page_setup(repeat_rows = list(1)), "count or range string")
+})
+
+test_that("a print area outside the data still resolves", {
+  # a print area is a sheet range, not restricted to the written cells
+  expect_match(defined_names(xl_page_setup(print_area = "A1:Z100")),
+               "D!$A$1:$Z$100", fixed = TRUE)
+})
+
+# ── Page breaks ───────────────────────────────────────────────────────────────
+
+breaks_xml <- function(page, df = data.frame(x = 1:30)) page_xml(page, df)
+
+test_that("page breaks are written 0-based, one before the named row", {
+  # h_breaks = 21 means the new page starts at row 21, which is 0-based 20
+  x <- breaks_xml(xl_page_setup(h_breaks = c(11, 21)))
+  expect_match(x, '<brk id="10"', fixed = TRUE)
+  expect_match(x, '<brk id="20"', fixed = TRUE)
+  expect_match(x, 'manualBreakCount="2"', fixed = TRUE)
+})
+
+test_that("vertical breaks accept numbers and column letters", {
+  expect_match(breaks_xml(xl_page_setup(v_breaks = 2)), '<colBreaks', fixed = TRUE)
+  expect_match(breaks_xml(xl_page_setup(v_breaks = 2)), '<brk id="1"', fixed = TRUE)
+  # column "C" is the third column, so a break before it is 0-based 2
+  expect_match(breaks_xml(xl_page_setup(v_breaks = "C")), '<brk id="2"',
+               fixed = TRUE)
+})
+
+test_that("breaks are sorted and deduplicated", {
+  x <- breaks_xml(xl_page_setup(h_breaks = c(21, 11, 21)))
+  expect_match(x, 'manualBreakCount="2"', fixed = TRUE)
+  # sorted: 10 must appear before 20
+  expect_lt(regexpr('<brk id="10"', x, fixed = TRUE),
+            regexpr('<brk id="20"', x, fixed = TRUE))
+})
+
+test_that("a break at position 1 is rejected", {
+  # 0-based 0 terminates libxlsxwriter's array, so this would silently drop
+  # every break rather than being merely useless
+  expect_error(xl_page_setup(h_breaks = 1), "2 or greater")
+  expect_error(xl_page_setup(v_breaks = 1), "2 or greater")
+  expect_error(xl_page_setup(h_breaks = c(5, 1)), "2 or greater")
+})
+
+test_that("the break count is capped at Excel's limit", {
+  expect_s3_class(xl_page_setup(h_breaks = 2:1024), "xl_page_setup")   # 1023
+  expect_error(xl_page_setup(h_breaks = 2:1025), "at most 1023")
+})
+
+test_that("breaks are validated", {
+  expect_error(xl_page_setup(h_breaks = "row 5"), "numeric vector")
+  expect_error(xl_page_setup(h_breaks = c(5, NA)), "numeric vector")
+})
+
+test_that("combining breaks with fit_to warns", {
+  # Excel ignores manual breaks when fit-to-page is on
+  expect_warning(xl_page_setup(h_breaks = 10, fit_to = c(1, 0)),
+                 "ignores manual page breaks")
+  expect_silent(xl_page_setup(h_breaks = 10))
+})
+
+test_that("print area and breaks together leave the cells alone", {
+  skip_if_not_installed("readxl")
+  df <- data.frame(a = 1:10, stringsAsFactors = FALSE)
+  p <- write_tmp(list(D = xl_sheet(df, page = xl_page_setup(
+    print_area = "A1:A11", repeat_rows = 1, h_breaks = 6))))
+  expect_equal(as.data.frame(readxl::read_xlsx(p)), df)
+})

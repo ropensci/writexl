@@ -20,7 +20,12 @@ xl_page_setup(
   first_page = NA,
   across = NA,
   black_and_white = NA,
-  row_col_headers = NA
+  row_col_headers = NA,
+  print_area = NULL,
+  repeat_rows = NA,
+  repeat_cols = NA,
+  h_breaks = NULL,
+  v_breaks = NULL
 )
 }
 \arguments{
@@ -66,6 +71,25 @@ than normal view.}
 \item{black_and_white}{Logical; print without colour.}
 
 \item{row_col_headers}{Logical; print the row numbers and column letters.}
+
+\item{print_area}{The range to print: an Excel range string such as
+`"A1:F50"`, or a `list(rows = , cols = )` spec naming data rows and
+columns, as elsewhere in writexl.}
+
+\item{repeat_rows, repeat_cols}{Rows/columns to repeat at the top or left of
+  every printed page.  Either a count (`repeat_rows = 1` repeats the first
+  sheet row, which is the header when `col_names = TRUE`) or a range string
+  (`"1:2"`, `"A:B"`).
+
+  Note these count *sheet* rows from 1 with the header included, unlike
+  [xl_row_spec()], which indexes data rows --- repeating the header row is
+  the usual reason to use this, and data-row numbering could not name it.}
+
+\item{h_breaks, v_breaks}{Manual page breaks: 1-based sheet positions at which
+a new page starts, so `h_breaks = 21` breaks between rows 20 and 21.
+`v_breaks` also accepts column letters.  Positions must be 2 or greater,
+and at most 1023 breaks are allowed.  Excel ignores manual breaks when
+`fit_to` is set, which warns.}
 }
 \value{
 An `xl_page_setup` object.

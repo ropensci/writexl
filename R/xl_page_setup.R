@@ -9,6 +9,60 @@
 # into the per-sheet plan and is applied before any row is written.
 # -----------------------------------------------------------------------------
 
+# Excel's limit on page breaks per worksheet (LXW_BREAKS_MAX in worksheet.h).
+.BREAKS_MAX <- 1023L
+
+# Resolve `repeat_rows` / `repeat_cols` to the 0-based c(first, last) pair
+# libxlsxwriter wants.
+#
+# These are *sheet* rows and columns, counted from 1 with the header row
+# included -- unlike xl_row_spec(), which indexes data rows.  That is
+# deliberate: repeating the header row on every printed page is the whole point
+# of the feature, and data-row numbering could not name it.
+.resolve_repeat <- function(x, arg, kind) {
+  if (.is_unset(x)) return(NULL)
+  if (is.numeric(x) && length(x) == 1L) {
+    n <- .val_int(x, arg, min = 1)
+    return(c(0L, as.integer(n) - 1L))
+  }
+  if (is.character(x) && length(x) == 1L) {
+    ok <- if (kind == "row") grepl("^[$]?[0-9]+:[$]?[0-9]+$", x)
+          else               grepl("^[$]?[A-Za-z]+:[$]?[A-Za-z]+$", x)
+    if (!ok)
+      stop(sprintf('`%s` must be a count, or a %s range like "%s"', arg,
+                   if (kind == "row") "row" else "column",
+                   if (kind == "row") "1:2" else "A:B"), call. = FALSE)
+    q <- .xl_resolve_range(x, arg = arg, df = NULL, allow_cell = FALSE)
+    return(if (kind == "row") c(q[1L], q[3L]) else c(q[2L], q[4L]))
+  }
+  stop(sprintf("`%s` must be a single count or range string", arg),
+       call. = FALSE)
+}
+
+# Resolve a page-break vector to the 0-based positions libxlsxwriter wants.
+#
+# A break "at" row N means the new page starts at row N, which is 0-based N-1.
+# Row/column 1 is therefore rejected: 0 is the array terminator in
+# libxlsxwriter, so a break there would silently truncate the whole list rather
+# than doing nothing visible.
+.resolve_breaks <- function(x, arg, kind) {
+  if (is.null(x) || (length(x) == 1L && !is.list(x) && is.na(x))) return(NULL)
+  if (is.character(x) && kind == "col") x <- .col_letters_to_index(x) + 1L
+  if (!is.numeric(x) || !length(x) || anyNA(x))
+    stop(sprintf("`%s` must be a numeric vector of 1-based %s positions", arg,
+                 if (kind == "row") "row" else "column"), call. = FALSE)
+  v <- sort(unique(as.integer(x)))
+  if (any(v < 2L))
+    stop(sprintf(paste0("`%s` positions must be 2 or greater: a break at %s 1 ",
+                        "would come before any content, and libxlsxwriter uses ",
+                        "0 to terminate the break list"), arg,
+                 if (kind == "row") "row" else "column"), call. = FALSE)
+  if (length(v) > .BREAKS_MAX)
+    stop(sprintf("`%s` may have at most %d breaks (got %d)", arg,
+                 .BREAKS_MAX, length(v)), call. = FALSE)
+  v - 1L
+}
+
 # Excel's paper types, from the table in worksheet.h.  Only the sizes worth
 # naming are here; the ~40 envelope and specialist types are reachable by
 # passing the index directly.
@@ -163,6 +217,22 @@
 #'   (Excel's "over, then down").
 #' @param black_and_white Logical; print without colour.
 #' @param row_col_headers Logical; print the row numbers and column letters.
+#' @param print_area The range to print: an Excel range string such as
+#'   `"A1:F50"`, or a `list(rows = , cols = )` spec naming data rows and
+#'   columns, as elsewhere in writexl.
+#' @param repeat_rows,repeat_cols Rows/columns to repeat at the top or left of
+#'   every printed page.  Either a count (`repeat_rows = 1` repeats the first
+#'   sheet row, which is the header when `col_names = TRUE`) or a range string
+#'   (`"1:2"`, `"A:B"`).
+#'
+#'   Note these count *sheet* rows from 1 with the header included, unlike
+#'   [xl_row_spec()], which indexes data rows --- repeating the header row is
+#'   the usual reason to use this, and data-row numbering could not name it.
+#' @param h_breaks,v_breaks Manual page breaks: 1-based sheet positions at which
+#'   a new page starts, so `h_breaks = 21` breaks between rows 20 and 21.
+#'   `v_breaks` also accepts column letters.  Positions must be 2 or greater,
+#'   and at most 1023 breaks are allowed.  Excel ignores manual breaks when
+#'   `fit_to` is set, which warns.
 #' @return An `xl_page_setup` object.
 #' @family writexl
 #' @seealso [xl_sheet], [write_xlsx]
@@ -185,7 +255,15 @@ xl_page_setup <- function(orientation = NA, paper = NA, margins = NULL,
                           header = NA, footer = NA,
                           header_margin = NA, footer_margin = NA,
                           page_view = NA, first_page = NA, across = NA,
-                          black_and_white = NA, row_col_headers = NA) {
+                          black_and_white = NA, row_col_headers = NA,
+                          print_area = NULL, repeat_rows = NA,
+                          repeat_cols = NA, h_breaks = NULL, v_breaks = NULL) {
+  if (!is.null(h_breaks) || !is.null(v_breaks)) {
+    fit <- .resolve_fit_to(fit_to)
+    if (!is.null(fit))
+      warning("Excel ignores manual page breaks when `fit_to` is set",
+              call. = FALSE)
+  }
   out <- .drop_null(list(
     orientation         = .val_enum(orientation, c("portrait", "landscape"),
                                     "orientation"),
@@ -203,7 +281,13 @@ xl_page_setup <- function(orientation = NA, paper = NA, margins = NULL,
     first_page          = .val_int(first_page, "first_page", min = 0),
     across              = .val_flag(across, "across"),
     black_and_white     = .val_flag(black_and_white, "black_and_white"),
-    row_col_headers     = .val_flag(row_col_headers, "row_col_headers")
+    row_col_headers     = .val_flag(row_col_headers, "row_col_headers"),
+    # the print area is resolved later, when the sheet's data frame is known
+    print_area          = print_area,
+    repeat_rows         = .resolve_repeat(repeat_rows, "repeat_rows", "row"),
+    repeat_cols         = .resolve_repeat(repeat_cols, "repeat_cols", "col"),
+    h_breaks            = .resolve_breaks(h_breaks, "h_breaks", "row"),
+    v_breaks            = .resolve_breaks(v_breaks, "v_breaks", "col")
   ))
   structure(out, class = "xl_page_setup")
 }
@@ -220,12 +304,20 @@ print.xl_page_setup <- function(x, ...) {
 
 # Flatten a page setup into the flat scalars C applies.  Margins and fit_to are
 # spread into individual keys so the C side only ever reads scalars.
-.page_setup_payload <- function(page) {
+.page_setup_payload <- function(page, df = NULL, header_offset = 1L) {
   if (is.null(page)) return(NULL)
   if (!inherits(page, "xl_page_setup"))
     stop("`page` must be an xl_page_setup object", call. = FALSE)
   p <- unclass(page)
   out <- list()
+  # The print area is the one setting that needs the sheet, so it is resolved
+  # here rather than in the constructor.
+  if (!is.null(p$print_area))
+    out$print_area <- .xl_resolve_range(p$print_area, arg = "print_area",
+                                        df = df, header_offset = header_offset,
+                                        allow_cell = FALSE)
+  for (k in c("repeat_rows", "repeat_cols", "h_breaks", "v_breaks"))
+    if (!is.null(p[[k]])) out[[k]] <- as.integer(p[[k]])
   if (!is.null(p$orientation))
     out$landscape <- as.integer(identical(p$orientation, "landscape"))
   if (!is.null(p$paper))  out$paper <- as.integer(p$paper)

@@ -336,6 +336,56 @@ static void apply_page_setup(cell_write_ctx *ctx, SEXP opts){
   if(payload_int(p, "across"))              worksheet_print_across(sheet);
   if(payload_int(p, "black_and_white"))     worksheet_print_black_and_white(sheet);
   if(payload_int(p, "row_col_headers"))     worksheet_print_row_col_headers(sheet);
+
+  /* Print area and repeat rows/columns.  These write defined names into
+     workbook.xml rather than anything in the worksheet part.  Both quads are
+     already 0-based, resolved on the R side. */
+  SEXP pa = list_get(p, "print_area");
+  if(pa != R_NilValue && Rf_length(pa) >= 4){
+    SEXP q = PROTECT(Rf_coerceVector(pa, INTSXP));
+    int *a = INTEGER(q);
+    assert_lxw(worksheet_print_area(sheet, (lxw_row_t) a[0], (lxw_col_t) a[1],
+                                    (lxw_row_t) a[2], (lxw_col_t) a[3]));
+    UNPROTECT(1);
+  }
+  SEXP rr = list_get(p, "repeat_rows");
+  if(rr != R_NilValue && Rf_length(rr) >= 2){
+    SEXP q = PROTECT(Rf_coerceVector(rr, INTSXP));
+    int *a = INTEGER(q);
+    assert_lxw(worksheet_repeat_rows(sheet, (lxw_row_t) a[0], (lxw_row_t) a[1]));
+    UNPROTECT(1);
+  }
+  SEXP rc = list_get(p, "repeat_cols");
+  if(rc != R_NilValue && Rf_length(rc) >= 2){
+    SEXP q = PROTECT(Rf_coerceVector(rc, INTSXP));
+    int *a = INTEGER(q);
+    assert_lxw(worksheet_repeat_columns(sheet, (lxw_col_t) a[0], (lxw_col_t) a[1]));
+    UNPROTECT(1);
+  }
+
+  /* Page breaks.  libxlsxwriter takes a zero-terminated array, so the buffer is
+     one longer than the break count and R has already guaranteed no value is
+     0 (which would end the list early). */
+  SEXP hb = list_get(p, "h_breaks");
+  if(hb != R_NilValue && Rf_length(hb) > 0){
+    SEXP q = PROTECT(Rf_coerceVector(hb, INTSXP));
+    R_xlen_t n = Rf_length(q);
+    lxw_row_t *b = (lxw_row_t *) R_alloc((size_t) n + 1, sizeof(lxw_row_t));
+    for(R_xlen_t k = 0; k < n; k++) b[k] = (lxw_row_t) INTEGER(q)[k];
+    b[n] = 0;
+    assert_lxw(worksheet_set_h_pagebreaks(sheet, b));
+    UNPROTECT(1);
+  }
+  SEXP vb = list_get(p, "v_breaks");
+  if(vb != R_NilValue && Rf_length(vb) > 0){
+    SEXP q = PROTECT(Rf_coerceVector(vb, INTSXP));
+    R_xlen_t n = Rf_length(q);
+    lxw_col_t *b = (lxw_col_t *) R_alloc((size_t) n + 1, sizeof(lxw_col_t));
+    for(R_xlen_t k = 0; k < n; k++) b[k] = (lxw_col_t) INTEGER(q)[k];
+    b[n] = 0;
+    assert_lxw(worksheet_set_v_pagebreaks(sheet, b));
+    UNPROTECT(1);
+  }
 }
 
 /* Apply per-sheet scalar options (freeze panes, gridlines, tab color, ...). */

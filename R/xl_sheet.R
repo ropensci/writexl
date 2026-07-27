@@ -416,7 +416,7 @@ print.xl_sheet <- function(x, ...) {
     }
     overlay <- c(overlay, .as_overlay_list(el$overlay))
     protect <- .resolve_protect(el$protect)
-    page_payload <- .page_setup_payload(el$page)
+    page_payload <- .page_setup_payload(el$page, df, header_offset)
     comment_author <- el$comment_author
     show_comments <- isTRUE(el$show_comments)
     # auto column widths (for columns the user did not size explicitly)
