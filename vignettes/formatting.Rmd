@@ -335,3 +335,29 @@ row, `8.43` one default-width column. writexl converts the cell reference for
 you using the sheet's actual row heights and column widths, so a split still
 lands where you asked on a sheet whose rows or columns have been resized. Pass
 `list(vertical = , horizontal = )` if you would rather give the units directly.
+
+## Merged cells
+
+`xl_merge()` merges a rectangle of cells into one, as Excel's "Merge and
+Centre" does. Pass one or a list of them as `xl_sheet(merge = )`.
+
+```{r}
+sheet <- xl_sheet(df, merge = xl_merge(
+  "A5:B5", "Total",
+  format = xl_align(horizontal = "center") + xl_font(bold = TRUE)
+))
+path <- write_xlsx(list(Data = sheet), tempfile(fileext = ".xlsx"))
+```
+
+A merged range holds a single value, so `xl_merge()` carries its own `text`
+rather than taking it from the data frame. Merges are applied after the sheet's
+rows are written, so merging over cells the data frame filled keeps only the
+merged text — exactly as merging in Excel discards everything but the top-left
+value.
+
+Excel has no single-cell merge, so a range covering one cell is an error.
+
+Because a merge writes back over rows already emitted, any merge turns off the
+memory-efficient row-streaming mode for the whole workbook. That is invisible
+apart from a slightly different internal string storage, but it does mean the
+whole sheet is held in memory while writing.
