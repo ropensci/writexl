@@ -303,6 +303,33 @@ static void apply_page_setup(cell_write_ctx *ctx, SEXP opts){
                            (uint16_t) payload_int(p, "fit_width"),
                            (uint16_t) payload_int(p, "fit_height"));
 
+  /* Header and footer.  The _opt form is only needed to carry a margin; the
+     image fields of lxw_header_footer_options are left for a later phase, and
+     R rejects an &G/&[Picture] placeholder so libxlsxwriter's own
+     placeholder/image count check cannot fire. */
+  const char *hdr = payload_str(p, "header");
+  if(hdr){
+    if(payload_has(p, "header_margin")){
+      lxw_header_footer_options o;
+      memset(&o, 0, sizeof(o));
+      o.margin = payload_dbl(p, "header_margin");
+      assert_lxw(worksheet_set_header_opt(sheet, hdr, &o));
+    } else {
+      assert_lxw(worksheet_set_header(sheet, hdr));
+    }
+  }
+  const char *ftr = payload_str(p, "footer");
+  if(ftr){
+    if(payload_has(p, "footer_margin")){
+      lxw_header_footer_options o;
+      memset(&o, 0, sizeof(o));
+      o.margin = payload_dbl(p, "footer_margin");
+      assert_lxw(worksheet_set_footer_opt(sheet, ftr, &o));
+    } else {
+      assert_lxw(worksheet_set_footer(sheet, ftr));
+    }
+  }
+
   if(payload_int(p, "center_horizontally")) worksheet_center_horizontally(sheet);
   if(payload_int(p, "center_vertically"))   worksheet_center_vertically(sheet);
   if(payload_int(p, "page_view"))           worksheet_set_page_view(sheet);

@@ -157,3 +157,72 @@ test_that("the print method runs", {
                 "xl_page_setup")
   expect_output(print(xl_page_setup()), "0 settings")
 })
+
+# ── Headers and footers ───────────────────────────────────────────────────────
+
+test_that("header and footer text is written with Excel's codes intact", {
+  x <- page_xml(xl_page_setup(header = "&LQ1 report&RPage &P of &N",
+                              footer = "&Cdraft"))
+  # the & codes survive, XML-escaped
+  expect_match(x, "<oddHeader>&amp;LQ1 report&amp;RPage &amp;P of &amp;N</oddHeader>",
+               fixed = TRUE)
+  expect_match(x, "<oddFooter>&amp;Cdraft</oddFooter>", fixed = TRUE)
+})
+
+test_that("a header or footer works without a margin", {
+  # no margin means the plain setter rather than the _opt form
+  x <- page_xml(xl_page_setup(header = "&Cplain"))
+  expect_match(x, "<oddHeader>&amp;Cplain</oddHeader>", fixed = TRUE)
+  expect_match(x, 'header="0.3"', fixed = TRUE)   # Excel's default retained
+})
+
+test_that("header and footer margins reach pageMargins", {
+  x <- page_xml(xl_page_setup(header = "&Ca", footer = "&Cb",
+                              header_margin = 0.5, footer_margin = 0.6))
+  expect_match(x, 'header="0.5"', fixed = TRUE)
+  expect_match(x, 'footer="0.6"', fixed = TRUE)
+})
+
+test_that("a header/footer margin must be greater than zero", {
+  # libxlsxwriter applies the margin only when it is > 0, so a zero would be
+  # silently ignored rather than doing what it says
+  expect_error(xl_page_setup(header_margin = 0), "greater than 0")
+  expect_error(xl_page_setup(footer_margin = 0), "greater than 0")
+  expect_error(xl_page_setup(header_margin = -1), "header_margin")
+})
+
+test_that("header and footer length is capped at 255 characters", {
+  ok <- strrep("x", 255)
+  expect_s3_class(xl_page_setup(header = ok), "xl_page_setup")
+  expect_error(xl_page_setup(header = strrep("x", 256)),
+               "at most 255 characters")
+  expect_error(xl_page_setup(footer = strrep("x", 256)),
+               "at most 255 characters")
+})
+
+test_that("the length limit counts characters, not bytes", {
+  # libxlsxwriter measures with lxw_utf8_strlen(); a 200-character string of
+  # 3-byte characters is well over 255 bytes but under the limit
+  s <- strrep("\u00e9", 200)
+  expect_gt(nchar(s, type = "bytes"), 255L)
+  expect_s3_class(xl_page_setup(header = s), "xl_page_setup")
+})
+
+test_that("image placeholders are rejected with a useful message", {
+  # libxlsxwriter would fail this with an opaque parameter-validation error,
+  # because a placeholder needs a matching image writexl cannot supply yet
+  expect_error(xl_page_setup(header = "&L&G"), "image placeholder")
+  expect_error(xl_page_setup(header = "&L&[Picture]"), "image placeholder")
+  expect_error(xl_page_setup(footer = "&C&G"), "image placeholder")
+  expect_error(xl_page_setup(header = "&L&G"), "not supported yet")
+  # a literal ampersand or an unrelated code is fine
+  expect_s3_class(xl_page_setup(header = "R&&D&Cmid"), "xl_page_setup")
+})
+
+test_that("header and footer do not disturb the cells", {
+  skip_if_not_installed("readxl")
+  df <- data.frame(a = 1:2, stringsAsFactors = FALSE)
+  p <- write_tmp(list(D = xl_sheet(df, page = xl_page_setup(
+    header = "&Ctitle", footer = "&Rpage &P", header_margin = 0.4))))
+  expect_equal(as.data.frame(readxl::read_xlsx(p)), df)
+})

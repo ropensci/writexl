@@ -49,10 +49,11 @@ output on the page.}
 Excel's own codes: `&L`, `&C`, `&R` start the left, centre and right
 sections, `&P` is the page number, `&N` the page count, `&D` the date, `&A`
 the sheet name, and `&&` a literal ampersand.  For example
-`"&LQ1 report&RPage &P of &N"`.}
+`"&LQ1 report&RPage &P of &N"`.  Image placeholders (`&G` /
+`&[Picture]`) are not supported yet and are rejected.}
 
 \item{header_margin, footer_margin}{Header/footer margin in inches (Excel's
-default is 0.3).}
+default is 0.3).  Must be greater than 0.}
 
 \item{page_view}{Logical; open the sheet in Excel's page-layout view rather
 than normal view.}

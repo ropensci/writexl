@@ -51,14 +51,35 @@
 }
 
 # Validate a header or footer string.  Excel's &-codes are passed through
-# untouched; only the length is our business.
+# untouched; the length and the image placeholders are our business.
 .check_header_footer <- function(x, arg) {
   if (.is_unset(x)) return(NULL)
   s <- .val_str(x, arg)
-  if (!is.null(s) && nchar(s, type = "chars") > .HEADER_FOOTER_MAX)
+  if (is.null(s)) return(NULL)
+  # libxlsxwriter measures this in UTF-8 characters, as nchar(type = "chars")
+  # does, and errors above the limit
+  if (nchar(s, type = "chars") > .HEADER_FOOTER_MAX)
     stop(sprintf("`%s` must be at most %d characters (got %d)", arg,
                  .HEADER_FOOTER_MAX, nchar(s, type = "chars")), call. = FALSE)
+  # An &G / &[Picture] placeholder needs a matching image, which writexl cannot
+  # supply yet.  libxlsxwriter would reject it with an opaque parameter-
+  # validation error, so say what is actually wrong.
+  if (grepl("&G", s, fixed = TRUE) || grepl("&[Picture]", s, fixed = TRUE))
+    stop(sprintf(paste0("`%s` contains an image placeholder (&G or &[Picture]),",
+                        " but header and footer images are not supported yet"),
+                 arg), call. = FALSE)
   s
+}
+
+# Validate a header/footer margin.  libxlsxwriter applies it only when it is
+# greater than zero (`if (options->margin > 0.0)`), so a zero would be silently
+# ignored rather than doing what it says.
+.check_hf_margin <- function(x, arg) {
+  v <- .val_num(x, arg, min = 0)
+  if (!is.null(v) && v <= 0)
+    stop(sprintf("`%s` must be greater than 0 (Excel's default is 0.3)", arg),
+         call. = FALSE)
+  v
 }
 
 # Normalise a margins argument to the four named sides.
@@ -131,9 +152,10 @@
 #'   Excel's own codes: `&L`, `&C`, `&R` start the left, centre and right
 #'   sections, `&P` is the page number, `&N` the page count, `&D` the date, `&A`
 #'   the sheet name, and `&&` a literal ampersand.  For example
-#'   `"&LQ1 report&RPage &P of &N"`.
+#'   `"&LQ1 report&RPage &P of &N"`.  Image placeholders (`&G` /
+#'   `&[Picture]`) are not supported yet and are rejected.
 #' @param header_margin,footer_margin Header/footer margin in inches (Excel's
-#'   default is 0.3).
+#'   default is 0.3).  Must be greater than 0.
 #' @param page_view Logical; open the sheet in Excel's page-layout view rather
 #'   than normal view.
 #' @param first_page The page number to start numbering from.
@@ -175,8 +197,8 @@ xl_page_setup <- function(orientation = NA, paper = NA, margins = NULL,
     center_vertically   = .val_flag(center_vertically, "center_vertically"),
     header              = .check_header_footer(header, "header"),
     footer              = .check_header_footer(footer, "footer"),
-    header_margin       = .val_num(header_margin, "header_margin", min = 0),
-    footer_margin       = .val_num(footer_margin, "footer_margin", min = 0),
+    header_margin       = .check_hf_margin(header_margin, "header_margin"),
+    footer_margin       = .check_hf_margin(footer_margin, "footer_margin"),
     page_view           = .val_flag(page_view, "page_view"),
     first_page          = .val_int(first_page, "first_page", min = 0),
     across              = .val_flag(across, "across"),
