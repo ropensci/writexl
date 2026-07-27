@@ -278,3 +278,60 @@ xl_page_setup(h_breaks = c(21, 41), v_breaks = "D")
 
 Excel ignores manual breaks when `fit_to` is set, and writexl warns if you ask
 for both.
+
+## Sheet tabs and the opening view
+
+`xl_sheet()` also controls the tab strip and what the user sees when the sheet
+opens.
+
+```{r}
+wb <- list(
+  Summary = xl_sheet(df, active = TRUE, selection = "B2"),
+  Detail  = xl_sheet(df, hide_zero = TRUE),
+  Working = xl_sheet(df, visible = FALSE)     # hidden tab
+)
+path <- write_xlsx(wb, tempfile(fileext = ".xlsx"))
+```
+
+`active` picks the tab Excel opens on, `selected` adds a tab to the selected
+group, `visible = FALSE` hides one, and `first_tab` chooses the leftmost tab in
+the strip.
+
+These are the only worksheet settings whose rules span the whole workbook, and
+writexl checks them before writing anything:
+
+* a hidden sheet cannot be active or selected;
+* at most one sheet may be active;
+* the first sheet cannot be hidden unless another is made active, because Excel
+  opens on the first sheet by default;
+* at least one sheet must stay visible, or Excel refuses to open the file.
+
+Each failure names the sheet at fault. libxlsxwriter enforces none of them, so
+without these checks a bad combination would produce a workbook that simply
+does not open.
+
+### Where the sheet is scrolled to
+
+`selection` sets the selected cell or range, and `top_left` the cell scrolled to
+the top-left of the window:
+
+```{r}
+xl_sheet(df, selection = "B2:D10", top_left = "A2")
+```
+
+### Freezing and splitting
+
+`freeze` locks rows and columns in place; `split` gives a movable divider with
+independent scroll bars instead. They are mutually exclusive.
+
+```{r}
+xl_sheet(df, freeze = "A2")   # keep the header row visible
+xl_sheet(df, split  = "B3")   # split above row 3 and left of column B
+```
+
+Note that libxlsxwriter positions a split by *distance*, in row-height and
+column-width units, rather than by row and column — `15` means one default-height
+row, `8.43` one default-width column. writexl converts the cell reference for
+you using the sheet's actual row heights and column widths, so a split still
+lands where you asked on a sheet whose rows or columns have been resized. Pass
+`list(vertical = , horizontal = )` if you would rather give the units directly.

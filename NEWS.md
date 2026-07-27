@@ -29,6 +29,13 @@
   and footers, print area, repeating heading rows/columns, manual page breaks,
   and the print options.
 
+* **Sheet tabs and the opening view** via `xl_sheet()`: which tab is active,
+  selected, hidden or leftmost; the selected cell and scroll position; hiding
+  zero values; right-to-left column order; and split panes alongside the
+  existing frozen panes. The workbook-wide visibility rules (only one active
+  sheet, no hidden-and-active sheet, at least one visible sheet) are checked
+  before writing, naming the sheet at fault.
+
 * `xl_properties(hyperlink_format = NULL)` writes hyperlinks with no styling at
   all, which was previously impossible.
 
