@@ -27,7 +27,8 @@ xl_sheet(
   right_to_left = NA,
   selection = NULL,
   top_left = NULL,
-  split = NULL
+  split = NULL,
+  merge = NULL
 )
 }
 \arguments{
@@ -123,6 +124,12 @@ sheet opens, as an Excel reference such as `"A5"`.}
   distance assuming default row heights, so on a sheet with resized rows or
   columns the divider is placed correctly but the anchor cell may be a row or
   two out.}
+
+\item{merge}{One [xl_merge()], or a list of them, merging rectangles of cells
+into single cells.  Merges are applied after the sheet's rows are written,
+so a merge over cells the data frame filled keeps only the merged text ---
+as merging in Excel does.  Any merge turns off the memory-efficient
+row-streaming mode, since it writes back over rows already emitted.}
 }
 \value{
 An `xl_sheet` object.
@@ -156,6 +163,7 @@ Other writexl:
 \code{\link[=xl_format]{xl_format()}},
 \code{\link{xl_format_groups}},
 \code{\link[=xl_formula]{xl_formula()}},
+\code{\link[=xl_merge]{xl_merge()}},
 \code{\link[=xl_page_setup]{xl_page_setup()}},
 \code{\link[=xl_properties]{xl_properties()}},
 \code{\link[=xl_rich_run]{xl_rich_run()}},

@@ -36,6 +36,10 @@
   sheet, no hidden-and-active sheet, at least one visible sheet) are checked
   before writing, naming the sheet at fault.
 
+* **Merged cells** via `xl_sheet(merge = xl_merge(...))`. A merged range holds
+  one value, so `xl_merge()` carries its own text; merging over cells the data
+  frame filled keeps only the merged text, as it does in Excel.
+
 * `xl_properties(hyperlink_format = NULL)` writes hyperlinks with no styling at
   all, which was previously impossible.
 

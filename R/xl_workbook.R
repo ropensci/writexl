@@ -188,7 +188,7 @@ print.xl_workbook <- function(x, ...) {
 # Resolve the constant-memory flag for a workbook, from the sheets it is about
 # to write.  Returns the C-side integer flag plus the reasons (if any) the mode
 # had to be turned off.
-.resolve_constant_memory <- function(dfs, props) {
+.resolve_constant_memory <- function(dfs, props, sheets = NULL) {
   reasons <- character(0)
   # A multi-cell array formula range is padded by libxlsxwriter, and it skips
   # that padding entirely when row streaming is on -- silently, returning
@@ -196,10 +196,18 @@ print.xl_workbook <- function(x, ...) {
   # .resolve_sheet_formats().
   n_array <- sum(vapply(dfs, function(df)
     length(attr(df, "writexl_array_multicell")), integer(1)))
+  n_merge <- if (is.null(sheets)) 0L else
+    sum(vapply(sheets, function(s) length(s$merges), integer(1)))
   if (n_array > 0L)
     reasons <- c(reasons, sprintf(
       paste0("%d multi-cell array formula range(s): libxlsxwriter only pads an ",
              "array range when row streaming is off"), n_array))
+  # Merges are applied after the sheet's rows so that Excel's own semantics
+  # hold, which means writing back over rows already flushed to disk.
+  if (n_merge > 0L)
+    reasons <- c(reasons, sprintf(
+      paste0("%d merged range(s): merges are applied after the rows are ",
+             "written, which row streaming does not allow"), n_merge))
   list(on = as.integer(!length(reasons)), reasons = reasons)
 }
 

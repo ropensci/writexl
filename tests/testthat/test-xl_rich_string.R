@@ -101,7 +101,7 @@ test_that("a rich string is stored in the shared table when streaming is off", {
   # the two storage forms are different code paths in libxlsxwriter, so both
   # need covering; nothing writexl writes turns streaming off on its own here
   local_mocked_bindings(
-    .resolve_constant_memory = function(dfs, props)
+    .resolve_constant_memory = function(dfs, props, ...)
       list(on = 0L, reasons = "forced off by test")
   )
   p <- rich_sheet(xl_rich_string("This is ",

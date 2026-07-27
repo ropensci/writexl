@@ -173,7 +173,7 @@ test_that("workbooks write the same content with constant memory on and off", {
   # mode off (worksheet tables, multi-cell array formulas) will rely on it.
   off_path <- local({
     local_mocked_bindings(
-      .resolve_constant_memory = function(elems, props)
+      .resolve_constant_memory = function(elems, props, ...)
         list(on = 0L, reasons = "forced off by test")
     )
     write_tmp(list(D = xl_sheet(df, autofilter = TRUE, freeze = "A2")))

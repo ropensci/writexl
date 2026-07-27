@@ -162,6 +162,11 @@ xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
 #'   the shared range parser, which rejects an inverted range.
 #' @param top_left The cell scrolled to the top-left of the window when the
 #'   sheet opens, as an Excel reference such as `"A5"`.
+#' @param merge One [xl_merge()], or a list of them, merging rectangles of cells
+#'   into single cells.  Merges are applied after the sheet's rows are written,
+#'   so a merge over cells the data frame filled keeps only the merged text ---
+#'   as merging in Excel does.  Any merge turns off the memory-efficient
+#'   row-streaming mode, since it writes back over rows already emitted.
 #' @param split Split the sheet into scrollable panes with a visible, movable
 #'   divider, given as the cell reference the split sits above and to the left
 #'   of --- `"B3"` splits above row 3 and left of column B.  Mutually exclusive
@@ -200,7 +205,8 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
                      comment_author = NA, show_comments = FALSE,
                      page = NULL, active = NA, selected = NA, visible = NA,
                      first_tab = NA, hide_zero = NA, right_to_left = NA,
-                     selection = NULL, top_left = NULL, split = NULL) {
+                     selection = NULL, top_left = NULL, split = NULL,
+                     merge = NULL) {
   if (!is.data.frame(data))
     stop("`data` must be a data frame", call. = FALSE)
   if (!is.logical(auto_colwidth) || length(auto_colwidth) != 1L || is.na(auto_colwidth))
@@ -236,7 +242,8 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
       right_to_left  = .val_flag(right_to_left, "right_to_left"),
       selection      = selection,
       top_left       = top_left,
-      split          = split
+      split          = split,
+      merge          = merge
     ),
     class = "xl_sheet"
   )
@@ -500,6 +507,8 @@ print.xl_sheet <- function(x, ...) {
                                  col_width)
   }
 
+  merges <- .resolve_merges(el, df, reg, header_offset, props)
+
   col_format_id <- vapply(col_fmt, function(f) .register_format(reg, f), integer(1))
 
   list(
@@ -515,6 +524,7 @@ print.xl_sheet <- function(x, ...) {
     comment_author = as.character(comment_author),
     show_comments = as.integer(show_comments),
     page = page_payload,
-    view = if (length(view)) view else NULL
+    view = if (length(view)) view else NULL,
+    merges = if (length(merges)) merges else NULL
   )
 }

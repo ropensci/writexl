@@ -433,6 +433,32 @@ static void apply_sheet_view(cell_write_ctx *ctx, SEXP opts){
   }
 }
 
+/*
+ * Merge each requested range.  Called after the sheet's rows have been written;
+ * see the call site for why.  Ranges are 0-based quads resolved in R, which has
+ * also rejected the single-cell case libxlsxwriter refuses.
+ */
+static void apply_merges(cell_write_ctx *ctx, SEXP opts){
+  SEXP ms = list_get(opts, "merges");
+  if(ms == R_NilValue || !Rf_isVectorList(ms)) return;
+  for(R_xlen_t k = 0; k < Rf_length(ms); k++){
+    SEXP m = VECTOR_ELT(ms, k);
+    SEXP rng = list_get(m, "range");
+    if(rng == R_NilValue || Rf_length(rng) < 4) continue;
+    SEXP q = PROTECT(Rf_coerceVector(rng, INTSXP));
+    int *a = INTEGER(q);
+    const char *txt = payload_str(m, "text");
+    int fid = payload_int(m, "format_id");
+    note_protection(ctx, fid);
+    /* a NULL string would be rejected, so an empty merge writes "" */
+    assert_lxw(worksheet_merge_range(ctx->sheet, (lxw_row_t) a[0],
+                                     (lxw_col_t) a[1], (lxw_row_t) a[2],
+                                     (lxw_col_t) a[3], txt ? txt : "",
+                                     ctx_format(ctx, fid)));
+    UNPROTECT(1);
+  }
+}
+
 /* Apply per-sheet scalar options (freeze panes, gridlines, tab color, ...). */
 static void apply_sheet_scalars(cell_write_ctx *ctx, SEXP opts){
   if(opts == R_NilValue) return;
@@ -1096,6 +1122,13 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
       }
       cursor++;
     }
+
+    /* Merges run after the rows.  worksheet_merge_range() writes the top-left
+       text and blanks the rest of the range, so doing it here means a merge
+       over cells the data frame filled keeps only the merged value -- exactly
+       what merging does in Excel.  Writing back over emitted rows is why any
+       merge turns constant memory off on the R side. */
+    apply_merges(&ctx, opts);
 
     if(warn_unlocked)
       Rf_warning("Worksheet '%s' uses cell protection formatting (locked = FALSE "
