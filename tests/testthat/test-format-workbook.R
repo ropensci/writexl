@@ -234,3 +234,45 @@ test_that("hyperlink_format rejects a non-format that is not NULL", {
                "must be an xl_format object or NULL")
   expect_s3_class(xl_properties(hyperlink_format = NULL), "xl_properties")
 })
+
+# ── Datetime custom properties ───────────────────────────────────────────────
+
+test_that("Date and POSIXct custom properties are written as datetimes", {
+  wb <- xl_workbook(data.frame(a = 1),
+                    properties = xl_properties(custom = list(
+                      Released = as.Date("2024-03-17"),
+                      Built    = as.POSIXct("2024-03-17 14:35:09", tz = "UTC")
+                    )))
+  cust <- xlsx_part(write_tmp(wb), "docProps/custom.xml", raw = TRUE)
+  # vt:filetime, not vt:lpwstr -- these used to be stringified
+  expect_match(cust, "<vt:filetime>2024-03-17T00:00:00Z</vt:filetime>",
+               fixed = TRUE)
+  expect_match(cust, "<vt:filetime>2024-03-17T14:35:09Z</vt:filetime>",
+               fixed = TRUE)
+  expect_false(grepl("<vt:lpwstr>2024-03-17", cust, fixed = TRUE))
+})
+
+test_that("a datetime custom property follows the workbook time zone rule", {
+  # one zone across the workbook: the zone is dropped and wall-clock written,
+  # exactly as for cells, rather than the property using a second policy
+  wb <- xl_workbook(
+    data.frame(t = as.POSIXct("2024-03-17 09:00:00", tz = "Australia/Perth")),
+    properties = xl_properties(custom = list(
+      Built = as.POSIXct("2024-03-17 14:35:09", tz = "Australia/Perth")))
+  )
+  cust <- xlsx_part(write_tmp(wb), "docProps/custom.xml", raw = TRUE)
+  expect_match(cust, "2024-03-17T14:35:09Z", fixed = TRUE)
+})
+
+test_that("the other custom property types are unaffected", {
+  wb <- xl_workbook(data.frame(a = 1),
+                    properties = xl_properties(custom = list(
+                      S = "txt", I = 3L, N = 9.5, B = TRUE,
+                      D = as.Date("2020-01-02"))))
+  cust <- xlsx_part(write_tmp(wb), "docProps/custom.xml", raw = TRUE)
+  expect_match(cust, "<vt:lpwstr>txt")
+  expect_match(cust, "<vt:i4>3")
+  expect_match(cust, "9.5")
+  expect_match(cust, "<vt:bool>true")
+  expect_match(cust, "<vt:filetime>2020-01-02T00:00:00Z", fixed = TRUE)
+})

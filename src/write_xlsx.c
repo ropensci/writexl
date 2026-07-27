@@ -745,6 +745,19 @@ static void apply_properties(lxw_workbook *wb, SEXP props){
         workbook_set_custom_property_number(wb, nm, Rf_asReal(val));
       else if(!strcmp(ty, "boolean"))
         workbook_set_custom_property_boolean(wb, nm, Rf_asLogical(val) == TRUE);
+      else if(!strcmp(ty, "datetime")){
+        /* broken out into fields on the R side, after the workbook-wide time
+           zone decision has been applied */
+        lxw_datetime dt;
+        memset(&dt, 0, sizeof(dt));
+        dt.year  = payload_int(val, "year");
+        dt.month = payload_int(val, "month");
+        dt.day   = payload_int(val, "day");
+        dt.hour  = payload_int(val, "hour");
+        dt.min   = payload_int(val, "min");
+        dt.sec   = payload_dbl(val, "sec");
+        workbook_set_custom_property_datetime(wb, nm, &dt);
+      }
     }
   }
 

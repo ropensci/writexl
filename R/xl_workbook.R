@@ -25,7 +25,9 @@
 #' @param title,subject,author,manager,company,category,keywords,comments,status,hyperlink_base
 #'   Document metadata strings (Excel's "Properties" dialog).
 #' @param custom A named list of custom document properties.  Values may be
-#'   character, integer, numeric, or logical.
+#'   character, integer, numeric, logical, `Date` or `POSIXct`.  A `Date` or
+#'   `POSIXct` is written as a real datetime property (not as text) and follows
+#'   the same workbook-wide time zone rule as datetime cells, described below.
 #' @param read_only Logical; mark the workbook read-only recommended.
 #' @param window_size Optional integer vector `c(width, height)` for the
 #'   workbook window size.
@@ -201,6 +203,21 @@ print.xl_workbook <- function(x, ...) {
   list(on = as.integer(!length(reasons)), reasons = reasons)
 }
 
+# Break a Date/POSIXct out into the fields lxw_datetime carries.  The value has
+# already been through .resolve_timezones() by this point, so a POSIXct holds
+# the wall-clock reading that is meant to reach the file and UTC is simply how
+# that reading is tagged.  A Date has no time of day and maps to midnight.
+.datetime_fields <- function(v) {
+  lt <- as.POSIXlt(v[1L], tz = "UTC")
+  is_date <- inherits(v, "Date")
+  list(year  = as.integer(lt$year + 1900L),
+       month = as.integer(lt$mon + 1L),
+       day   = as.integer(lt$mday),
+       hour  = if (is_date) 0L else as.integer(lt$hour),
+       min   = if (is_date) 0L else as.integer(lt$min),
+       sec   = if (is_date) 0    else as.numeric(lt$sec))
+}
+
 # Build the C-side document-properties payload from an xl_properties object.
 # `constant_memory` rides along here rather than as another .Call() argument so
 # the C entry point's signature stays put as features are added.
@@ -215,12 +232,18 @@ print.xl_workbook <- function(x, ...) {
   if (!is.null(props$custom) && length(props$custom)) {
     out$custom <- lapply(base::names(props$custom), function(nm) {
       v <- props$custom[[nm]]
-      type <- if (is.logical(v)) "boolean"
+      # Date/POSIXct first: neither satisfies is.numeric(), so without this they
+      # fall through to as.character() and are written as text.
+      type <- if (inherits(v, "Date") || inherits(v, "POSIXct")) "datetime"
+              else if (is.logical(v)) "boolean"
               else if (is.integer(v)) "integer"
               else if (is.numeric(v)) "number"
               else "string"
       list(name = nm, type = type,
-           value = if (type == "string") as.character(v) else v)
+           value = switch(type,
+                          datetime = .datetime_fields(v),
+                          string   = as.character(v),
+                          v))
     })
   }
   out$read_only <- as.integer(isTRUE(props$read_only))

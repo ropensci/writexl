@@ -100,9 +100,15 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
   }
 }
 
-# Every distinct time zone used by a POSIXct anywhere in the workbook.
-.collect_tzones <- function(dfs){
+# Every distinct time zone used by a POSIXct anywhere in the workbook.  Custom
+# document properties count: they are datetimes in the same workbook, and
+# writing them under a different rule than the cells would be incoherent.
+.collect_tzones <- function(dfs, props = NULL){
   out <- character(0)
+  if(!is.null(props$custom))
+    for(v in props$custom)
+      if(inherits(v, "POSIXct"))
+        out <- c(out, .tzone_of(v))
   for(df in dfs){
     for(col in df){
       if(inherits(col, "POSIXct")){
@@ -155,7 +161,7 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
 }
 
 .resolve_timezones <- function(dfs, props){
-  tzs <- .collect_tzones(dfs)
+  tzs <- .collect_tzones(dfs, props)
   if(length(tzs) > 1L){
     warning("The workbook contains datetimes in ", length(tzs),
             " different time zones (", paste(tzs, collapse = ", "),
@@ -164,6 +170,11 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
             "different behaviour.", call. = FALSE)
   } else if(length(tzs) == 1L){
     dfs <- lapply(dfs, .drop_tzones_sheet)
+    # custom document properties follow the same rule as the cells
+    if(!is.null(props$custom))
+      for(k in seq_along(props$custom))
+        if(inherits(props$custom[[k]], "POSIXct"))
+          props$custom[[k]] <- .drop_tzone(props$custom[[k]])
     # The default format labels datetimes "UTC"; that is no longer true once the
     # zone has been dropped.  Only replace it if the caller kept the default.
     if(identical(unclass(props$datetime_format),
