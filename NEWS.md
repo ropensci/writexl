@@ -2,129 +2,133 @@
 
 ## New features
 
-* Cell, worksheet, and workbook **formatting** is now supported, built on a
-  shared format engine:
+* `xl_cell_general()` writes a cell with any combination of value, formula,
+  hyperlink, format and comment, and supports mixed-type columns and recycling.
+  `xl_formula()` and `xl_hyperlink()` now return `xl_cell_general` objects and
+  remain backward compatible; `xl_hyperlink()` writes real URL hyperlinks, so
+  display text and tooltips are available.
 
-  * `xl_format()` and the group constructors `xl_font()`, `xl_fill()`,
-    `xl_border()`, `xl_align()`, `xl_num_format()` and `xl_protection()` build
-    reusable format objects; `xl_color()` normalizes R color names / hex /
-    integers. Formats combine property-by-property with `+`.
+* Cell, worksheet, and workbook **formatting** is now supported. `xl_format()`
+  and the group constructors `xl_font()`, `xl_fill()`, `xl_border()`,
+  `xl_align()`, `xl_num_format()` and `xl_protection()` build reusable format
+  objects that combine with `+`; `xl_sheet()` adds worksheet options (column and
+  row geometry, frozen panes, gridlines, tab color, zoom, automatic column
+  widths, autofilters, protection); `xl_workbook()` and `xl_properties()` set
+  document metadata and the workbook-wide formatting defaults.
 
-  * `xl_cell_general()` gains a `format` argument (a single format applied to
-    every cell, or a list of per-cell formats). `xl_formula()`,
-    `xl_hyperlink()` and `xl_hyperlink_cell()` also gain a `format` argument.
+* Cell **comments** (notes) via `xl_cell_general(comment =)` and `xl_comment()`.
 
-  * `xl_sheet()` wraps a data frame with worksheet options — column and row
-    specifications (`xl_col_spec()`, `xl_row_spec()`, which are themselves
-    `xl_format` subclasses), frozen panes, gridlines, tab color, zoom, default
-    row height, automatic column widths (`auto_colwidth`), autofilters, and
-    worksheet protection (with optional password and fine-grained options).
-    Pass it anywhere `write_xlsx()` accepts a data frame.
+* **Array and dynamic array formulas** via `xl_cell_general(array =, dynamic =,
+  array_range =)`.
 
-  * `xl_workbook()` and `xl_properties()` set workbook-level document metadata
-    (title, author, custom properties, ...), a few native settings (read-only
-    recommended, window size, defined names), and the formatting defaults
-    (default cell format, header style, hyperlink style, date/time formats),
-    all as overridable `xl_format` objects.
+* **Rich strings** — one cell whose text is split into differently formatted
+  runs — via `xl_rich_string()` and `xl_rich_run()`.
 
-* Cell **comments** (notes) are now supported. `xl_cell_general()` gains a
-  `comment` argument: a character vector of text (the easy default), a single
-  `xl_comment()` (recycled), or a per-cell list. `xl_comment()` exposes the full
-  set of comment options (author, visibility, box size/position) and reuses the
-  format engine for styling — only the fill background color and font
-  name/size/family are supported, and any other format property triggers a
-  warning. `xl_sheet()` gains `comment_author` and `show_comments` (comment
-  defaults are worksheet-scoped); a comment's own `author` overrides the sheet
-  default.
+* `xl_properties(hyperlink_format = NULL)` writes hyperlinks with no styling at
+  all, which was previously impossible.
 
-* Columns of a type writexl cannot represent (`complex`, `raw`, or a bare list
-  column) now raise an **error** naming the offending column, its position and
-  its type, instead of writing a warning and leaving the cells empty. Columns
-  that can be written are unaffected, including classed numeric columns such as
-  `difftime` (written from its underlying value) and the classes that are
-  coerced on the way out (`factor`, `hms`, `POSIXlt`, `integer64`).
+* Custom document properties may now be `Date` or `POSIXct`, and are written as
+  real datetime properties rather than as text.
 
-* Writing a cell that unlocks (`locked = FALSE`) or hides (`hidden = TRUE`) a
-  cell on a worksheet that is not protected now warns, since the cell locking
-  has no effect until the sheet is protected.
+* Columns of a type writexl cannot represent (`complex`, `raw`, a bare list
+  column) now raise an error naming the column, rather than warning and leaving
+  the cells empty.
 
-* See the new "Formatting and workbook properties" vignette.
+* `write_xlsx()` now errors informatively when a data frame exceeds the xlsx
+  column limit (16384) or row limit (1048576).
 
-* `xl_cell_general()` gains `array`, `dynamic` and `array_range`, for writing
-  **array and dynamic array formulas**. A `dynamic` formula is written to one
-  cell and spilled by Excel over as many cells as its result needs; `array`
-  writes the legacy Ctrl-Shift-Enter form. Either may carry a pre-calculated
-  numeric result via `value`. `array_range` declares a legacy array formula's
-  extent in the rare case it must be stated; it forces the workbook out of the
-  memory-efficient row-streaming mode, and must not overlap cells the sheet
-  writes itself.
+* Bundled libxlsxwriter updated to 1.2.4.
 
-* `xl_rich_string()` and `xl_rich_run()` write a **rich string**: one cell whose
-  text is split into runs, each in its own font. Run styling reuses
-  `xl_font()`; the other format groups do not apply to a run and warn if
-  supplied. A format on the cell itself continues to work as usual.
-
-* See the "Writing Special Cell Types" vignette for all three.
+* See the "Formatting and workbook properties" and "Writing Special Cell Types"
+  vignettes.
 
 ## Bug fixes
 
-* A cell with a format but no writable value no longer loses its format.
-  `xl_cell_general(value = NA, format = xl_fill(background = "yellow"))` wrote
-  nothing at all; it now writes a formatted blank cell. The same applies to
-  `NaN` and to every typed `NA`. Unformatted `NA`s still write no cell, since
-  Excel ignores blank cells that carry no format, and `NA` in a plain data frame
-  column is unchanged.
+* Fix installation on systems without GNU make, by replacing a GNU-specific
+  pattern rule in `src/Makevars` with a portable static library recipe
+  (#97).
 
-* An integer pre-calculated formula result is no longer dropped.
-  `xl_cell_general(formula = "=A1", value = 7L)` stored Excel's placeholder zero
-  instead of 7; only double values were recognised.
+* Fix a `strcpy()` buffer overflow in the internal `C_set_tempdir()`; a tempdir
+  path of 2048 bytes or more now errors informatively.
 
-* `POSIXct` columns are no longer silently converted to UTC. Excel has no
-  concept of a time zone, so writexl now decides once per workbook:
+* `POSIXct` columns are no longer silently converted to UTC. When every datetime
+  in the workbook shares one time zone, the zone is dropped and local
+  wall-clock time is written; when they differ, all are converted to UTC with a
+  warning. Code that relied on always getting the UTC instant will see shifted
+  values. See the formatting vignette.
 
-  * if every datetime in the workbook shares one time zone, the zone is dropped
-    and local wall-clock time is written -- `as.POSIXct("2025-12-01 01:00:00",
-    tz = "Australia/Perth")` now appears in Excel as `2025-12-01 01:00:00`
-    rather than `2025-11-30 17:00:00`. Daylight saving is handled per value.
-    The default `datetime_format` also loses its `" UTC"` suffix in this case,
-    since the value is no longer UTC;
-  * if the time zones differ, all datetimes are converted to UTC (as before)
-    and a warning is raised, because no single wall clock can represent them
-    all. Convert them yourself beforehand if you want something else.
+* `Date` values before 1900-03-01 were written one day too late, because the
+  `Date` writer did not compensate for Excel's phantom 1900-02-29. `Date` and
+  `POSIXct` now write identical serial numbers.
 
-  Datetimes inside [xl_cell_general()] cells are included in this survey.
-  Supplying your own `datetime_format` overrides the label either way. Code
-  that relied on the previous behaviour of always writing the UTC instant will
-  see shifted values when a non-UTC time zone is used throughout.
+* Sheet names are repaired properly: they are truncated to a genuine 31
+  characters (previously 29, despite the warning saying 31), characters Excel
+  forbids (`[ ] : * ? / \`) are replaced, edge apostrophes are stripped, and
+  duplicates created by either repair are resolved. A sheet named `"2024/Q1"`
+  previously produced a file Excel refused to open.
 
-* `Date` columns holding dates before 1900-03-01 were written one day too late.
-  Excel's 1900 date system wrongly treats 1900 as a leap year, and the `Date`
-  writer did not compensate for that phantom 1900-02-29 (the `POSIXct` writer
-  already did). As a result `1900-01-01` was written as `1900-01-02`, and
-  `1900-02-28` landed on the nonexistent serial 60 so readers such as `readxl`
-  returned `NA` with a warning about an "impossible 1900-02-29 datetime".
-  `Date` and `POSIXct` columns now write identical serial numbers. Dates from
-  1900-03-01 on, and all times written as `POSIXct`, are unaffected. Note
-  that dates before 1900-01-01 still have no valid Excel serial number.
+# writexl 1.5.4
 
-## Internal
+* Fix LTO build for bundled libxlsxwriter
 
-* The header, hyperlink, and date/time formats that were previously hard-coded
-  in C are now supplied from R as ordinary formats, so their defaults live in
-  `xl_properties()` and can be overridden.
+# writexl 1.5.3
 
-* All range addressing now goes through one resolver, which also accepts
-  absolute references and whole-column / whole-row forms. As a result
-  `xl_sheet(freeze =)` additionally accepts `"$A$2"`, and
-  `xl_sheet(autofilter =)` additionally accepts `"$A$1:$D$51"`, `"B:D"` and
-  `"2:10"`; every previously accepted spelling behaves exactly as before.
+* `write_xlsx()` now gives a warning if a column is of unsupported type
+* Fix crash in `write_xlsx()` for corrupted data frames
 
-* Range-scoped worksheet features are applied through a single sheet-overlay
-  stage that runs before rows are written (a requirement of the libxlsxwriter
-  constant-memory mode). The autofilter is its first user.
+# writexl 1.5.2
 
-* Whether the workbook is written in the libxlsxwriter constant-memory mode is
-  now resolved from the features the workbook actually uses, rather than being
-  hard-coded. It still always resolves to "on"; no feature yet requires it off.
-  The `writexl.constant_memory` option that briefly existed to override this has
-  been removed — the mode is not a user setting.
+* Fix parallel make; cleanup after build
+
+# writexl 1.5.0
+
+* Update libxlsxwriter from b0c76b33
+
+# writexl 1.4.2
+
+* Bugfix for NA timestamps
+
+# writexl 1.4.1
+
+* Fix strict-prototypes warnings
+
+# writexl 1.4.0
+
+* Update libxlsxwriter to 1.0.3
+
+# writexl 1.3.1
+
+* Fix a unit test in R-devel for timezone attribute comparisons
+
+# writexl 1.3
+
+* `write_xlsx()` gains option `use_zip64` for 4GB+ file support
+* libxlsxwriter error messages are printed to `REprintf` instead of `fprintf`
+* Handle overly long or duplicate sheet names
+* The help assistant only appears once per session
+
+# writexl 1.2
+
+* Update bundled libxlsxwriter 0.8.8
+* `xl_formula()` and `xl_hyperlink()` now correctly support `NA`
+* Oil clippy a bit
+
+# writexl 1.1
+
+* Update bundled libxlsxwriter 0.8.4
+* Do not write blank xlsx strings for `NA` and `""` character values
+* Coerce bit64 vectors to double with warning (xlsx does not have int64)
+
+# writexl 1.0
+
+* Save R `Date` types as proper datetime strings
+* Update vendored libxlsxwriter to 0.7.6
+
+# writexl 0.2
+
+* Add support for lists in `write_xlsx()` to create xlsx with multiple sheets
+* Automatically coerce columns of type `Date` and `hms` to strings
+
+# writexl 0.1
+
+* Initial CRAN release with clippy
