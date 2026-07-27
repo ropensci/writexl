@@ -31,3 +31,7 @@ src/libxlsxwriter/third_party/minizip/*
 !src/libxlsxwriter/third_party/minizip/ioapi.h
 !src/libxlsxwriter/third_party/minizip/zip.c
 !src/libxlsxwriter/third_party/minizip/zip.h
+*.tar.gz
+*.tgz
+*.Rcheck/
+.Ruserdata
