@@ -823,6 +823,12 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
     //create sheet
     const char * sheet_name = Rf_length(df_names) > s && Rf_length(STRING_ELT(df_names, s)) ? \
       Rf_translateCharUTF8(STRING_ELT(df_names, s)) : NULL;
+    /* .resolve_sheet_names() has already repaired the name on the R side.  This
+       is a backstop so an R-side regression cannot silently produce a workbook
+       Excel refuses to open; a NULL name is libxlsxwriter's own auto-naming and
+       is not ours to validate. */
+    if(sheet_name)
+      assert_lxw(workbook_validate_sheet_name(workbook, sheet_name));
     lxw_worksheet *sheet = workbook_add_worksheet(workbook, sheet_name);
     assert_that(sheet, "failed to create workbook");
 

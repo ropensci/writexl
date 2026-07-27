@@ -46,16 +46,7 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
   elems <- wb$sheets
   dfs <- lapply(elems, function(el) if(inherits(el, "xl_sheet")) el$data else el)
   dfs <- lapply(dfs, normalize_df)
-  names(dfs) <- names(elems)
-  if(any(nchar(names(dfs)) > 31)){
-    warning("Truncating sheet name(s) to 31 characters")
-    names(dfs) <- substring(names(dfs), 1, 29)
-  }
-  nm <- names(dfs)
-  if(length(unique(nm)) <  length(nm)){
-    warning("Deduplicating sheet names")
-    names(dfs) <- make.unique(substring(names(dfs), 1, 28), sep = "_")
-  }
+  names(dfs) <- .resolve_sheet_names(names(elems), length(dfs))
   stopifnot(is.character(path) && length(path))
   path <- normalizePath(path, mustWork = FALSE)
   # Excel has no concept of a time zone, so decide once, for the whole workbook,
