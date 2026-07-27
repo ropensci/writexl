@@ -18,7 +18,16 @@ xl_sheet(
   protect = FALSE,
   comment_author = NA,
   show_comments = FALSE,
-  page = NULL
+  page = NULL,
+  active = NA,
+  selected = NA,
+  visible = NA,
+  first_tab = NA,
+  hide_zero = NA,
+  right_to_left = NA,
+  selection = NULL,
+  top_left = NULL,
+  split = NULL
 )
 }
 \arguments{
@@ -69,6 +78,51 @@ shown (individual comments can still be forced via `xl_comment(visible=)`).}
 \item{page}{An [xl_page_setup()] describing how the sheet prints
 (orientation, paper size, margins, scaling, header and footer). Affects
 printing only, never the cell data.}
+
+\item{active}{Logical; make this the tab Excel opens on.  At most one sheet
+in a workbook may be active.}
+
+\item{selected}{Logical; include this tab in the selected group.  The active
+sheet is always selected.}
+
+\item{visible}{Logical; `FALSE` hides the sheet's tab.  A hidden sheet cannot
+be active or selected, the first sheet cannot be hidden unless another is
+made active, and at least one sheet must stay visible or Excel will not
+open the file.}
+
+\item{first_tab}{Logical; make this the leftmost visible tab in the tab
+strip.  This is independent of which sheet is active.}
+
+\item{hide_zero}{Logical; display zero values as blank cells.}
+
+\item{right_to_left}{Logical; order the columns right to left, for a sheet in
+a right-to-left language.}
+
+\item{selection}{The cell or range selected when the sheet opens, as an Excel
+  reference (`"B2"`, `"B2:D10"`) or a `list(rows = , cols = )` spec.
+
+  Excel also uses the order of a selection's corners to mark which cell in it
+  is active; writexl does not expose that, because ranges are normalised by
+  the shared range parser, which rejects an inverted range.}
+
+\item{top_left}{The cell scrolled to the top-left of the window when the
+sheet opens, as an Excel reference such as `"A5"`.}
+
+\item{split}{Split the sheet into scrollable panes with a visible, movable
+  divider, given as the cell reference the split sits above and to the left
+  of --- `"B3"` splits above row 3 and left of column B.  Mutually exclusive
+  with `freeze`, which does the same thing without the divider.
+
+  libxlsxwriter positions a split by distance, in row-height and
+  column-width units, not by row and column number.  writexl converts the
+  cell reference using the sheet's actual row heights and column widths, so
+  the split lands where you asked even after resizing.  Pass
+  `list(vertical = , horizontal = )` to give those units directly.
+
+  Note that libxlsxwriter derives the pane's scroll anchor back from that
+  distance assuming default row heights, so on a sheet with resized rows or
+  columns the divider is placed correctly but the anchor cell may be a row or
+  two out.}
 }
 \value{
 An `xl_sheet` object.

@@ -388,6 +388,51 @@ static void apply_page_setup(cell_write_ctx *ctx, SEXP opts){
   }
 }
 
+/*
+ * Apply the sheet's tab state.  The rules that make these mutually exclusive
+ * span the whole workbook and are checked in R by .resolve_sheet_visibility();
+ * libxlsxwriter enforces none of them, so by the time we get here the
+ * combination is known to be sane.
+ */
+static void apply_sheet_view(cell_write_ctx *ctx, SEXP opts){
+  SEXP v = list_get(opts, "view");
+  if(v == R_NilValue || !Rf_isVectorList(v)) return;
+  if(payload_int(v, "active"))    worksheet_activate(ctx->sheet);
+  if(payload_int(v, "selected"))  worksheet_select(ctx->sheet);
+  if(payload_has(v, "visible") && !payload_int(v, "visible"))
+    worksheet_hide(ctx->sheet);
+  if(payload_int(v, "first_tab")) worksheet_set_first_sheet(ctx->sheet);
+  if(payload_int(v, "hide_zero"))     worksheet_hide_zero(ctx->sheet);
+  if(payload_int(v, "right_to_left")) worksheet_right_to_left(ctx->sheet);
+
+  /* Selected range and scroll position, both 0-based quads from R. */
+  SEXP sel = list_get(v, "selection");
+  if(sel != R_NilValue && Rf_length(sel) >= 4){
+    SEXP q = PROTECT(Rf_coerceVector(sel, INTSXP));
+    int *a = INTEGER(q);
+    assert_lxw(worksheet_set_selection(ctx->sheet, (lxw_row_t) a[0],
+                                       (lxw_col_t) a[1], (lxw_row_t) a[2],
+                                       (lxw_col_t) a[3]));
+    UNPROTECT(1);
+  }
+  /* Split panes.  R has already converted the cell reference into
+     libxlsxwriter's row-height / column-width distances. */
+  SEXP sp = list_get(v, "split");
+  if(sp != R_NilValue && Rf_length(sp) >= 2){
+    SEXP q = PROTECT(Rf_coerceVector(sp, REALSXP));
+    worksheet_split_panes(ctx->sheet, REAL(q)[0], REAL(q)[1]);
+    UNPROTECT(1);
+  }
+
+  SEXP tl = list_get(v, "top_left");
+  if(tl != R_NilValue && Rf_length(tl) >= 2){
+    SEXP q = PROTECT(Rf_coerceVector(tl, INTSXP));
+    int *a = INTEGER(q);
+    worksheet_set_top_left_cell(ctx->sheet, (lxw_row_t) a[0], (lxw_col_t) a[1]);
+    UNPROTECT(1);
+  }
+}
+
 /* Apply per-sheet scalar options (freeze panes, gridlines, tab color, ...). */
 static void apply_sheet_scalars(cell_write_ctx *ctx, SEXP opts){
   if(opts == R_NilValue) return;
@@ -1037,6 +1082,7 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
     apply_columns(&ctx, opts, cols);
     apply_sheet_scalars(&ctx, opts);
     apply_page_setup(&ctx, opts);
+    apply_sheet_view(&ctx, opts);
     apply_sheet_overlays(&ctx, opts);
 
     // Need to iterate by row first for performance

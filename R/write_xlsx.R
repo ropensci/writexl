@@ -47,6 +47,9 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
   dfs <- lapply(elems, function(el) if(inherits(el, "xl_sheet")) el$data else el)
   dfs <- lapply(dfs, normalize_df)
   names(dfs) <- .resolve_sheet_names(names(elems), length(dfs))
+  # tab visibility is the one worksheet setting whose rules span the whole
+  # workbook, so it is checked here rather than per sheet
+  .resolve_sheet_visibility(elems, names(dfs))
   stopifnot(is.character(path) && length(path))
   path <- normalizePath(path, mustWork = FALSE)
   # Excel has no concept of a time zone, so decide once, for the whole workbook,
