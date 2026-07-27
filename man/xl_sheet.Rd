@@ -75,6 +75,12 @@ printing only, never the cell data.}
 \item{view}{An [xl_sheet_view()] describing the sheet's tab state and
 opening view (active/selected/hidden tab, selection, scroll position,
 zero display, direction, split panes).}
+
+\item{merge}{One [xl_merge()], or a list of them, merging rectangles of cells
+into single cells.  Merges are applied after the sheet's rows are written,
+so a merge over cells the data frame filled keeps only the merged text ---
+as merging in Excel does.  Any merge turns off the memory-efficient
+row-streaming mode, since it writes back over rows already emitted.}
 }
 \value{
 An `xl_sheet` object.

@@ -204,7 +204,7 @@ NULL
 
 #' @rdname xl_format_groups
 #' @export
-xl_font <- function(name = NA, size = NA, color = NA, bold = NA, italic = NA,
+xl_font <- function(bold = NA, italic = NA, color = NA, size = NA, name = NA,
                     underline = NA, strikeout = NA, script = NA, family = NA,
                     charset = NA, outline = NA, shadow = NA, condense = NA,
                     extend = NA, scheme = NA, theme = NA, color_indexed = NA,

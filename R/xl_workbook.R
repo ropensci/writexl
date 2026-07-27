@@ -135,8 +135,7 @@ print.xl_properties <- function(x, ...) {
 #'
 #' @param sheets A data frame, an [xl_sheet], or a (named) list of them.
 #' @param properties An [xl_properties] object.
-#' @param col_names Write column names as the header row?
-#' @param format_headers Apply the header format to the header row?
+#' @inheritParams write_xlsx
 #' @return An `xl_workbook` object.
 #' @family writexl
 #' @seealso [xl_properties], [xl_sheet], [write_xlsx]

@@ -1,3 +1,14 @@
+# Coerce a character-ish argument, accepting a factor, and fail with a message
+# that names the argument rather than stopifnot()'s expression dump.  Shared by
+# the three cell shorthands below, which all take a character vector first.
+.as_character_arg <- function(x, arg) {
+  if (is.factor(x)) x <- as.character(x)
+  if (!is.character(x))
+    stop(sprintf("`%s` must be a character vector (got %s)", arg,
+                 paste(class(x), collapse = "/")), call. = FALSE)
+  x
+}
+
 #' Excel Types
 #'
 #' Create special column types to write to a spreadsheet.
@@ -50,9 +61,7 @@
 #' # cleanup
 #' unlink(c('universities.xlsx', 'universities2.xlsx'))
 xl_formula <- function(x, format = NULL){
-  if(is.factor(x))
-    x <- as.character(x)
-  stopifnot(is.character(x))
+  x <- .as_character_arg(x, "x")
   if(!all(grepl("^=",x) | is.na(x)))
     stop("Formulas must start with '='")
   xl_cell_general(formula = x, format = format)
@@ -62,12 +71,13 @@ xl_formula <- function(x, format = NULL){
 #' @export
 #' @param url character vector of URLs.  Use `NA` to produce a blank cell.
 #' @param name character vector of friendly display names shown in the cell
+#'   instead of the URL.  This is the same idea as `value` in
+#'   [xl_hyperlink_cell()] and in [xl_cell_general()]; the names differ only
+#'   because `xl_hyperlink()` mirrors Excel's own `HYPERLINK()` argument
 #'   instead of the raw URL.  When `NULL`, the URL is shown.  Ignored for
 #'   `NA` URLs.
 xl_hyperlink <- function(url, name = NULL, format = NULL){
-  if(is.factor(url))
-    url <- as.character(url)
-  stopifnot(is.character(url))
+  url <- .as_character_arg(url, "url")
   fmlas <- if(!is.null(name)){
     paste0("=HYPERLINK(", dubquote(url), ",", dubquote(name), ")")
   } else {
@@ -80,13 +90,12 @@ xl_hyperlink <- function(url, name = NULL, format = NULL){
 #' @rdname xl_formula
 #' @export
 #' @param value character vector (or `NULL`) of display text shown in the
+#'   cell instead of the URL --- the same idea as `name` in [xl_hyperlink()]
 #'   cell.  For `xl_hyperlink_cell()`, when `NULL` the raw URL is shown.
 #'   Recycled to the length of `url`.  Automatically set to `NA` for cells
 #'   whose URL is `NA`.
 xl_hyperlink_cell <- function(url, value = NULL, format = NULL){
-  if(is.factor(url))
-    url <- as.character(url)
-  stopifnot(is.character(url))
+  url <- .as_character_arg(url, "url")
   if(is.null(value)){
     xl_cell_general(hyperlink = url, format = format)
   } else {

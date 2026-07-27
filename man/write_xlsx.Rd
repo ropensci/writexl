@@ -19,9 +19,11 @@ data frames / `xl_sheet`s that become the sheets in the xlsx}
 
 \item{path}{a file name to write to}
 
-\item{col_names}{write column names at the top of the file?}
+\item{col_names}{write column names as the header row at the top of the sheet?}
 
-\item{format_headers}{make the \code{col_names} in the xlsx centered and bold}
+\item{format_headers}{apply the workbook's header format to that header row?
+The default header format is bold and centered; change it with
+\code{\link{xl_properties}(header_format = )}.}
 
 \item{use_zip64}{use \href{https://en.wikipedia.org/wiki/Zip_(file_format)#ZIP64}{zip64}
 to enable support for 4GB+ xlsx files. Not all platforms can read this.}

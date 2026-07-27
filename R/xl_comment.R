@@ -60,7 +60,7 @@ is_xl_comment <- function(x) inherits(x, "xl_comment")
 #' xl_comment("Estimate", author = "Finance",
 #'            format = xl_font(name = "Arial", size = 10) +
 #'                     xl_fill(background = "lightyellow"))
-xl_comment <- function(text, format = NULL, author = NA, visible = NA,
+xl_comment <- function(text, author = NA, format = NULL, visible = NA,
                        width = NA, height = NA, x_scale = NA, y_scale = NA,
                        start_row = NA, start_col = NA, x_offset = NA,
                        y_offset = NA) {

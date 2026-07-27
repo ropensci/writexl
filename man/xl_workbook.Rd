@@ -16,9 +16,11 @@ xl_workbook(
 
 \item{properties}{An [xl_properties] object.}
 
-\item{col_names}{Write column names as the header row?}
+\item{col_names}{write column names as the header row at the top of the sheet?}
 
-\item{format_headers}{Apply the header format to the header row?}
+\item{format_headers}{apply the workbook's header format to that header row?
+The default header format is bold and centered; change it with
+\code{\link{xl_properties}(header_format = )}.}
 }
 \value{
 An `xl_workbook` object.

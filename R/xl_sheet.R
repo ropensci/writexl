@@ -147,6 +147,11 @@ xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
 #' @param page An [xl_page_setup()] describing how the sheet prints
 #'   (orientation, paper size, margins, scaling, header and footer). Affects
 #'   printing only, never the cell data.
+#' @param merge One [xl_merge()], or a list of them, merging rectangles of cells
+#'   into single cells.  Merges are applied after the sheet's rows are written,
+#'   so a merge over cells the data frame filled keeps only the merged text ---
+#'   as merging in Excel does.  Any merge turns off the memory-efficient
+#'   row-streaming mode, since it writes back over rows already emitted.
 #' @return An `xl_sheet` object.
 #' @family writexl
 #' @seealso [xl_col_spec], [xl_row_spec], [write_xlsx]

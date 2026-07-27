@@ -21,10 +21,14 @@ element) applied to the cells.  See [xl_format].}
 \item{url}{character vector of URLs.  Use `NA` to produce a blank cell.}
 
 \item{name}{character vector of friendly display names shown in the cell
+instead of the URL.  This is the same idea as `value` in
+[xl_hyperlink_cell()] and in [xl_cell_general()]; the names differ only
+because `xl_hyperlink()` mirrors Excel's own `HYPERLINK()` argument
 instead of the raw URL.  When `NULL`, the URL is shown.  Ignored for
 `NA` URLs.}
 
 \item{value}{character vector (or `NULL`) of display text shown in the
+cell instead of the URL --- the same idea as `name` in [xl_hyperlink()]
 cell.  For `xl_hyperlink_cell()`, when `NULL` the raw URL is shown.
 Recycled to the length of `url`.  Automatically set to `NA` for cells
 whose URL is `NA`.}
