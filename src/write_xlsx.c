@@ -415,6 +415,15 @@ static void apply_sheet_view(cell_write_ctx *ctx, SEXP opts){
                                        (lxw_col_t) a[3]));
     UNPROTECT(1);
   }
+  /* Split panes.  R has already converted the cell reference into
+     libxlsxwriter's row-height / column-width distances. */
+  SEXP sp = list_get(v, "split");
+  if(sp != R_NilValue && Rf_length(sp) >= 2){
+    SEXP q = PROTECT(Rf_coerceVector(sp, REALSXP));
+    worksheet_split_panes(ctx->sheet, REAL(q)[0], REAL(q)[1]);
+    UNPROTECT(1);
+  }
+
   SEXP tl = list_get(v, "top_left");
   if(tl != R_NilValue && Rf_length(tl) >= 2){
     SEXP q = PROTECT(Rf_coerceVector(tl, INTSXP));

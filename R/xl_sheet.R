@@ -162,6 +162,21 @@ xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
 #'   the shared range parser, which rejects an inverted range.
 #' @param top_left The cell scrolled to the top-left of the window when the
 #'   sheet opens, as an Excel reference such as `"A5"`.
+#' @param split Split the sheet into scrollable panes with a visible, movable
+#'   divider, given as the cell reference the split sits above and to the left
+#'   of --- `"B3"` splits above row 3 and left of column B.  Mutually exclusive
+#'   with `freeze`, which does the same thing without the divider.
+#'
+#'   libxlsxwriter positions a split by distance, in row-height and
+#'   column-width units, not by row and column number.  writexl converts the
+#'   cell reference using the sheet's actual row heights and column widths, so
+#'   the split lands where you asked even after resizing.  Pass
+#'   `list(vertical = , horizontal = )` to give those units directly.
+#'
+#'   Note that libxlsxwriter derives the pane's scroll anchor back from that
+#'   distance assuming default row heights, so on a sheet with resized rows or
+#'   columns the divider is placed correctly but the anchor cell may be a row or
+#'   two out.
 #' @param page An [xl_page_setup()] describing how the sheet prints
 #'   (orientation, paper size, margins, scaling, header and footer). Affects
 #'   printing only, never the cell data.
@@ -185,7 +200,7 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
                      comment_author = NA, show_comments = FALSE,
                      page = NULL, active = NA, selected = NA, visible = NA,
                      first_tab = NA, hide_zero = NA, right_to_left = NA,
-                     selection = NULL, top_left = NULL) {
+                     selection = NULL, top_left = NULL, split = NULL) {
   if (!is.data.frame(data))
     stop("`data` must be a data frame", call. = FALSE)
   if (!is.logical(auto_colwidth) || length(auto_colwidth) != 1L || is.na(auto_colwidth))
@@ -220,7 +235,8 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
       hide_zero      = .val_flag(hide_zero, "hide_zero"),
       right_to_left  = .val_flag(right_to_left, "right_to_left"),
       selection      = selection,
-      top_left       = top_left
+      top_left       = top_left,
+      split          = split
     ),
     class = "xl_sheet"
   )
@@ -470,6 +486,18 @@ print.xl_sheet <- function(x, ...) {
         col_width[i] <- .auto_col_width(df[[i]], header)
       }
     }
+  }
+
+  # The split is resolved last, because converting a cell reference into
+  # libxlsxwriter's units needs the sheet's final row heights and column widths
+  # (including any set by auto_colwidth just above).
+  if (inherits(el, "xl_sheet") && !is.null(el$split)) {
+    if (!is.null(el$freeze) && !(length(el$freeze) == 1L && is.na(el$freeze)))
+      stop("`split` and `freeze` cannot both be set: Excel supports frozen ",
+           "panes or a split, not both", call. = FALSE)
+    view$split <- .resolve_split(el$split, df, header_offset, props,
+                                 default_row_height, row_row, row_height,
+                                 col_width)
   }
 
   col_format_id <- vapply(col_fmt, function(f) .register_format(reg, f), integer(1))

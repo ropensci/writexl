@@ -181,3 +181,88 @@ test_that("the view scalars leave the cells alone", {
                                    selection = "A2", top_left = "A2")))
   expect_equal(as.data.frame(readxl::read_xlsx(p)), df)
 })
+
+# ── Split panes ───────────────────────────────────────────────────────────────
+#
+# worksheet_split_panes() positions the split by distance in row-height and
+# column-width units, not by row and column, so the interesting part is the
+# conversion.
+
+pane <- function(...) {
+  x <- xlsx_part(write_tmp(list(D = xl_sheet(data.frame(a = 1:5, b = 1:5,
+                                                        cc = 1:5), ...))),
+                 "xl/worksheets/sheet1.xml", raw = TRUE)
+  m <- regmatches(x, regexpr("<pane[^/]*/>", x))
+  if (!length(m)) NA_character_ else m
+}
+
+pane_num <- function(p, attr) {
+  m <- regmatches(p, regexec(sprintf('%s="([0-9.]+)"', attr), p))[[1L]]
+  if (length(m) == 2L) as.numeric(m[2L]) else 0
+}
+
+test_that("a split is placed from a cell reference", {
+  expect_match(pane(split = "B3"), "<pane ", fixed = TRUE)
+  # a split at B3 is below one header row plus one data row, and right of one
+  # column, so both distances are non-zero
+  expect_gt(pane_num(pane(split = "B3"), "ySplit"), 0)
+  expect_gt(pane_num(pane(split = "B3"), "xSplit"), 0)
+})
+
+test_that("a split on one axis only leaves the other unset", {
+  expect_equal(pane_num(pane(split = "A3"), "xSplit"), 0)
+  expect_gt(pane_num(pane(split = "A3"), "ySplit"), 0)
+  expect_equal(pane_num(pane(split = "B1"), "ySplit"), 0)
+  expect_gt(pane_num(pane(split = "B1"), "xSplit"), 0)
+})
+
+test_that("the split distance follows the sheet's real row heights", {
+  # this is the whole point of converting rather than assuming 15 per row:
+  # taller rows above the split must push it further down
+  base <- pane_num(pane(split = "A3"), "ySplit")
+  taller <- pane_num(pane(split = "A3", default_row_height = 30), "ySplit")
+  tallest <- pane_num(pane(split = "A3", rows = xl_row_spec(1, height = 45)),
+                      "ySplit")
+  expect_gt(taller, base)
+  expect_gt(tallest, taller)
+})
+
+test_that("the split distance follows the sheet's real column widths", {
+  base <- pane_num(pane(split = "B1"), "xSplit")
+  wider <- pane_num(pane(split = "B1", cols = xl_col_spec("a", width = 20)),
+                    "xSplit")
+  expect_gt(wider, base)
+})
+
+test_that("raw units can be given directly", {
+  p <- pane(split = list(vertical = 15, horizontal = 8.43))
+  expect_gt(pane_num(p, "ySplit"), 0)
+  expect_gt(pane_num(p, "xSplit"), 0)
+  # one axis only
+  expect_equal(pane_num(pane(split = list(vertical = 15)), "xSplit"), 0)
+})
+
+test_that("raw split units are validated", {
+  expect_error(write_tmp(list(D = xl_sheet(data.frame(x = 1),
+                                           split = list(vertical = -1)))),
+               "non-negative")
+  expect_error(write_tmp(list(D = xl_sheet(data.frame(x = 1),
+                                           split = list(sideways = 1)))),
+               "unknown `split`")
+})
+
+test_that("split and freeze cannot both be set", {
+  expect_error(write_tmp(list(D = xl_sheet(data.frame(x = 1:5),
+                                           split = "B2", freeze = "B2"))),
+               "cannot both be set")
+  # either alone is fine
+  expect_silent(write_tmp(list(D = xl_sheet(data.frame(x = 1:5), split = "B2"))))
+  expect_silent(write_tmp(list(D = xl_sheet(data.frame(x = 1:5), freeze = "B2"))))
+})
+
+test_that("a split leaves the cells alone", {
+  skip_if_not_installed("readxl")
+  df <- data.frame(a = 1:5, stringsAsFactors = FALSE)
+  p <- write_tmp(list(D = xl_sheet(df, split = "B3")))
+  expect_equal(as.data.frame(readxl::read_xlsx(p)), df)
+})

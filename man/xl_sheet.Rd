@@ -26,7 +26,8 @@ xl_sheet(
   hide_zero = NA,
   right_to_left = NA,
   selection = NULL,
-  top_left = NULL
+  top_left = NULL,
+  split = NULL
 )
 }
 \arguments{
@@ -106,6 +107,22 @@ a right-to-left language.}
 
 \item{top_left}{The cell scrolled to the top-left of the window when the
 sheet opens, as an Excel reference such as `"A5"`.}
+
+\item{split}{Split the sheet into scrollable panes with a visible, movable
+  divider, given as the cell reference the split sits above and to the left
+  of --- `"B3"` splits above row 3 and left of column B.  Mutually exclusive
+  with `freeze`, which does the same thing without the divider.
+
+  libxlsxwriter positions a split by distance, in row-height and
+  column-width units, not by row and column number.  writexl converts the
+  cell reference using the sheet's actual row heights and column widths, so
+  the split lands where you asked even after resizing.  Pass
+  `list(vertical = , horizontal = )` to give those units directly.
+
+  Note that libxlsxwriter derives the pane's scroll anchor back from that
+  distance assuming default row heights, so on a sheet with resized rows or
+  columns the divider is placed correctly but the anchor cell may be a row or
+  two out.}
 }
 \value{
 An `xl_sheet` object.
