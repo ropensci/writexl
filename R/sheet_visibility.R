@@ -21,12 +21,13 @@
 
 # One sheet's visibility settings, with absent ones as NA.
 .sheet_view_flags <- function(el) {
-  if (!inherits(el, "xl_sheet"))
+  vw <- .sheet_view_of(el)
+  if (is.null(vw))
     return(list(active = NA, selected = NA, visible = NA, first_tab = NA))
-  list(active    = el$active,
-       selected  = el$selected,
-       visible   = el$visible,
-       first_tab = el$first_tab)
+  list(active    = vw$active,
+       selected  = vw$selected,
+       visible   = vw$visible,
+       first_tab = vw$first_tab)
 }
 
 # A readable name for a sheet in an error message.
