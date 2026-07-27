@@ -471,3 +471,216 @@ test_that("xl_cell_general rejects value types writexl cannot write", {
   expect_s3_class(xl_cell_general(value = list(1, NULL)), "xl_cell_general")
   expect_s3_class(xl_cell_general(formula = "=1+1"), "xl_cell_general")
 })
+
+# ── Formatted blank cells ─────────────────────────────────────────────────────
+#
+# A cell with a format but no writable value must still exist, or the format is
+# silently lost.  Excel ignores blank cells that carry no format, so the
+# unformatted case must continue to write no cell at all.
+
+# The style index of one cell, or NA_character_ if the cell is absent.
+cell_style <- function(path, ref) {
+  w <- xlsx_part(path, "xl/worksheets/sheet1.xml", raw = TRUE)
+  m <- regmatches(w, regexec(sprintf('<c r="%s"([^>]*)>?', ref), w))[[1]]
+  if (!length(m)) return(NA_character_)
+  s <- regmatches(m[2L], regexec('s="([0-9]+)"', m[2L]))[[1]]
+  if (length(s) == 2L) s[2L] else ""
+}
+
+test_that("an NA value with a format writes a formatted blank cell", {
+  df <- data.frame(x = 1:2)
+  df$b <- xl_cell_general(value = c(NA, NA),
+                          format = xl_fill(background = "yellow"))
+  p <- write_tmp(df)
+
+  # the cell exists and carries a real (non-default) style
+  expect_false(is.na(cell_style(p, "B2")))
+  expect_true(nzchar(cell_style(p, "B2")))
+  expect_true(as.integer(cell_style(p, "B2")) > 0L)
+
+  # ... and it is genuinely blank: no value and no inline string
+  w <- xlsx_part(p, "xl/worksheets/sheet1.xml", raw = TRUE)
+  blank <- regmatches(w, regexec('<c r="B2"[^>]*/>', w))[[1]]
+  expect_length(blank, 1L)
+
+  # the fill really reached styles.xml
+  expect_match(xlsx_part(p, "xl/styles.xml", raw = TRUE), "FFFFFF00",
+               ignore.case = TRUE)
+})
+
+test_that("an NA value with no format writes no cell at all", {
+  df <- data.frame(x = 1:2)
+  df$b <- xl_cell_general(value = c(NA, NA))
+  expect_true(is.na(cell_style(write_tmp(df), "B2")))
+})
+
+test_that("every NA flavour with a format writes a formatted blank", {
+  fmt <- xl_fill(background = "yellow")
+  for (v in list(NA, NA_character_, NA_real_, NA_integer_, NaN,
+                 as.Date(NA), as.POSIXct(NA_real_, origin = "1970-01-01",
+                                         tz = "UTC"))) {
+    df <- data.frame(x = 1L)
+    df$b <- xl_cell_general(value = list(v), format = fmt)
+    lbl <- paste(class(v), collapse = "/")
+    expect_true(as.integer(cell_style(write_tmp(df), "B2")) > 0L, label = lbl)
+  }
+})
+
+test_that("a formatted blank survives alongside a comment on the same cell", {
+  df <- data.frame(x = 1L)
+  df$b <- xl_cell_general(value = NA, comment = "note",
+                          format = xl_fill(background = "yellow"))
+  p <- write_tmp(df)
+  expect_true(as.integer(cell_style(p, "B2")) > 0L)
+  expect_match(xlsx_part(p, "xl/comments1.xml", raw = TRUE), "note")
+})
+
+test_that("NA in a plain column is left alone even under a column format", {
+  # deliberate: Excel already applies the column format to empty cells, so
+  # plain columns keep writing no cell for an NA
+  sheet <- xl_sheet(data.frame(x = 1L, b = NA_character_),
+                    cols = xl_col_spec("b", format = xl_fill(background = "yellow")))
+  expect_true(is.na(cell_style(write_tmp(list(S = sheet)), "B2")))
+})
+
+# ── Array and dynamic formulas ────────────────────────────────────────────────
+
+# The <sheetData> section of a written sheet, as a single string.
+sheet_data <- function(path) {
+  w <- xlsx_part(path, "xl/worksheets/sheet1.xml", raw = TRUE)
+  substring(w, regexpr("<sheetData>", w, fixed = TRUE))
+}
+
+# A one-formula sheet: column A holds data, column B the formula cell.
+array_sheet <- function(...) {
+  df <- data.frame(x = 1:2)
+  df$f <- xl_cell_general(formula = c("=SUM(A1:A2)", NA), ...)
+  write_tmp(df)
+}
+
+test_that("a single-cell array formula is stored as an array over its own cell", {
+  s <- sheet_data(array_sheet(array = TRUE))
+  expect_match(s, '<f t="array" ref="B2">SUM(A1:A2)</f>', fixed = TRUE)
+})
+
+test_that("a single-cell dynamic formula is marked as one and adds metadata", {
+  p <- write_tmp(local({
+    df <- data.frame(x = 1:2)
+    df$f <- xl_cell_general(formula = c("=UNIQUE(A1:A2)", NA), dynamic = TRUE)
+    df
+  }))
+  # cm="1" on the cell is what marks a dynamic array for Excel ...
+  expect_match(sheet_data(p), '<c r="B2" cm="1">', fixed = TRUE)
+  # ... and it requires the metadata part, which a plain array formula omits
+  expect_false(is.null(xlsx_part(p, "xl/metadata.xml")))
+  expect_true(is.null(xlsx_part(array_sheet(array = TRUE), "xl/metadata.xml")))
+})
+
+test_that("a pre-calculated result is stored for double and integer alike", {
+  # the integer case used to fall through to the no-result writer, silently
+  # dropping the value and leaving Excel's placeholder zero behind
+  for (v in list(3, 3L)) {
+    s <- sheet_data(array_sheet(array = TRUE, value = list(v, NA)))
+    expect_match(s, '<f t="array" ref="B2">SUM(A1:A2)</f><v>3</v>',
+                 fixed = TRUE, label = typeof(v))
+  }
+  # ... and the same fix applies to a plain (non-array) formula
+  df <- data.frame(x = 1L)
+  df$f <- xl_cell_general(formula = "=A1", value = 7L)
+  expect_match(sheet_data(write_tmp(df)), "<v>7</v>", fixed = TRUE)
+})
+
+test_that("a declared multi-cell range is written and padded", {
+  df <- data.frame(x = 1:2)
+  df$f <- xl_cell_general(formula = c("=TRANSPOSE(A1:A2)", NA), array = TRUE,
+                          array_range = list("B2:D2", NA))
+  p <- write_tmp(df)
+  s <- sheet_data(p)
+  expect_match(s, 'ref="B2:D2"', fixed = TRUE)
+  # the cells beyond the anchor exist -- libxlsxwriter pads them
+  expect_match(s, '<c r="C2">', fixed = TRUE)
+  expect_match(s, '<c r="D2">', fixed = TRUE)
+})
+
+test_that("a multi-cell range turns row streaming off, and says why", {
+  df <- data.frame(x = 1:2)
+  df$f <- xl_cell_general(formula = c("=TRANSPOSE(A1:A2)", NA), array = TRUE,
+                          array_range = list("B2:D2", NA))
+  d <- .resolve_sheet_formats(df, .new_format_registry(), xl_properties(), 1L)
+  cm <- .resolve_constant_memory(list(d), xl_properties())
+  expect_equal(cm$on, 0L)
+  expect_length(cm$reasons, 1L)
+  expect_match(cm$reasons, "multi-cell array formula range")
+
+  # observable end to end: with streaming off, strings move to the shared table
+  expect_false(is.null(xlsx_part(write_tmp(df), "xl/sharedStrings.xml")))
+  # a single-cell array formula leaves streaming on
+  expect_true(is.null(xlsx_part(array_sheet(array = TRUE),
+                                "xl/sharedStrings.xml")))
+})
+
+test_that("array flags are inert on a cell with no formula", {
+  # recycling one TRUE across a column of mixed formula and value cells is
+  # normal, so a flag on a value-only cell must simply do nothing
+  df <- data.frame(x = 1:2)
+  df$f <- xl_cell_general(formula = c("=SUM(A1:A2)", NA),
+                          value = list(NA, 5), array = TRUE)
+  s <- sheet_data(write_tmp(df))
+  expect_match(s, 'ref="B2"', fixed = TRUE)
+  expect_match(s, '<c r="B3"><v>5</v></c>', fixed = TRUE)
+})
+
+test_that("array arguments are validated", {
+  # a flag that can never apply to anything
+  expect_error(xl_cell_general(value = 1, array = TRUE), "no `formula`")
+  expect_error(xl_cell_general(value = 1, dynamic = TRUE), "no `formula`")
+  # a range with nothing to apply to
+  expect_error(xl_cell_general(formula = "=A1", array_range = "A1:B2"),
+               "applies only to an `array` or `dynamic`")
+  # Excel stores no cached string result for an array formula
+  expect_error(xl_cell_general(formula = "=A1", value = "txt", array = TRUE),
+               "character `value`")
+  expect_error(xl_cell_general(formula = "=A1", value = "txt", dynamic = TRUE),
+               "character `value`")
+  # a character value is still fine for a plain formula
+  expect_s3_class(xl_cell_general(formula = "=A1", value = "txt"),
+                  "xl_cell_general")
+  # the flags are decisions, so NA is not a valid setting
+  expect_error(xl_cell_general(formula = "=A1", array = NA), "TRUE or FALSE")
+  expect_error(xl_cell_general(formula = "=A1", dynamic = NA), "TRUE or FALSE")
+  # an unusable range spelling
+  expect_error(xl_cell_general(formula = "=A1", array = TRUE,
+                               array_range = list(1L)),
+               "must be NA, an Excel range string")
+})
+
+test_that("a declared range must start at the cell holding the formula", {
+  df <- data.frame(x = 1:2)
+  df$f <- xl_cell_general(formula = c("=A1", NA), array = TRUE,
+                          array_range = list("C5:D6", NA))
+  expect_error(write_xlsx(df), "must start at the cell that holds the formula")
+})
+
+test_that("a declared range may not overlap cells the sheet writes itself", {
+  df <- data.frame(x = 1:3)
+  # B2:B4 is column B for all three data rows -- cells this sheet writes
+  df$f <- xl_cell_general(formula = c("=A1", NA, NA), array = TRUE,
+                          array_range = list("B2:B4", NA, NA))
+  expect_error(write_xlsx(df), "that the sheet writes itself")
+  expect_error(write_xlsx(df), "covers 3 cell", fixed = TRUE)
+  expect_error(write_xlsx(df), "spills automatically")
+})
+
+test_that("array_range accepts a data-frame-relative spec", {
+  df <- data.frame(x = 1:2)
+  # cols 2:3 does not exist in a 2-column frame, so name the range in A1 terms
+  # and check the list spelling on a frame wide enough to hold it
+  df$f <- xl_cell_general(formula = c("=A1", NA), array = TRUE)
+  expect_silent(write_xlsx(df))
+
+  wide <- data.frame(a = 1:2, b = 1:2, cc = 1:2)
+  wide$f <- xl_cell_general(formula = c("=A1", NA), array = TRUE,
+                            array_range = list(list(rows = 1, cols = 4), NA))
+  # a single-cell spec resolves to the anchor and needs no memory-mode change
+  expect_silent(write_xlsx(wide))
+})

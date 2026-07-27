@@ -70,10 +70,11 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
   reg <- .new_format_registry()
   header_id <- .register_format(reg, merge_xl_format(props$default_format,
                                                      props$header_format))
-  dfs <- lapply(dfs, .resolve_sheet_formats, reg = reg, props = props)
+  dfs <- lapply(dfs, .resolve_sheet_formats, reg = reg, props = props,
+                header_offset = header_offset)
   sheets <- Map(function(el, df) .resolve_sheet_plan(el, df, reg, header_offset, props),
                 elems, dfs)
-  cm <- .resolve_constant_memory(elems, props)
+  cm <- .resolve_constant_memory(dfs, props)
   ret <- .Call(C_write_data_frame_list, dfs, path, col_names, format_headers,
                use_zip64, reg$table, sheets, header_id,
                .properties_payload(props, cm$on))
@@ -182,23 +183,100 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
 }
 
 # Walk a sheet's xl_cell_general columns, register each cell's effective format
-# in the workbook registry, attach the resulting integer id vector, and flatten
-# each comment's xl_format into the flat fields C applies.
-.resolve_sheet_formats <- function(df, reg, props) {
+# in the workbook registry, attach the resulting integer id vector, flatten each
+# comment's xl_format into the flat fields C applies, and resolve each array
+# formula's range to the 0-based quad C writes it with.
+#
+# Multi-cell array ranges are collected on the returned data frame (attribute
+# "writexl_array_multicell") because they decide the workbook's constant-memory
+# flag -- see .resolve_constant_memory().
+.resolve_sheet_formats <- function(df, reg, props, header_offset = 1L) {
+  multicell <- list()
   for (j in seq_along(df)) {
     col <- df[[j]]
     if (!inherits(col, "xl_cell_general")) next
     recs <- unclass(col)
     ids <- vapply(recs, .resolve_cell_format_id, integer(1), reg = reg, props = props)
-    recs <- lapply(recs, function(rec) {
+    for (k in seq_along(recs)) {
+      rec <- recs[[k]]
       if (!is.null(rec$comment)) rec$comment <- .comment_c_payload(rec$comment)
-      rec
-    })
+      fm_set <- !is.null(rec$formula) && length(rec$formula) == 1L &&
+                !is.na(rec$formula)
+      if ((isTRUE(rec$array) || isTRUE(rec$dynamic)) && fm_set) {
+        anchor <- c((k - 1L) + as.integer(header_offset), j - 1L)
+        q <- .resolve_array_quad(rec$array_range, anchor, df, header_offset,
+                                 names(df)[j], k)
+        rec$array_quad <- q
+        if (q[3L] > q[1L] || q[4L] > q[2L]) {
+          .check_array_no_overlap(q, anchor, df, header_offset, names(df)[j], k)
+          multicell <- c(multicell, list(q))
+        }
+      }
+      # a rich string's runs each carry their own font, registered like any
+      # other format; C receives the parallel text / id vectors
+      if (is_xl_rich_string(rec$value)) {
+        rich <- .rich_string_c_payload(rec$value, reg, props)
+        rec$rich_text <- rich$rich_text
+        rec$rich_format_id <- rich$rich_format_id
+        rec$value <- NULL
+      }
+      # the unresolved user spec has served its purpose; keep the C payload tight
+      rec$array_range <- NULL
+      recs[[k]] <- rec
+    }
     col <- structure(recs, class = class(col))
     attr(col, "writexl_format_ids") <- ids
     df[[j]] <- col
   }
+  attr(df, "writexl_array_multicell") <- multicell
   df
+}
+
+# Resolve one array formula's range.  With no declared range the formula covers
+# only its own cell, which is the modern dynamic-array spelling: Excel spills
+# the result itself.  A declared range must start at the cell, because
+# libxlsxwriter writes the formula into the range's top-left corner -- were the
+# two allowed to differ the formula would land in a different cell than the one
+# the caller wrote it to.
+.resolve_array_quad <- function(spec, anchor, df, header_offset, colname, k) {
+  if (is.null(spec))
+    return(as.integer(c(anchor[1L], anchor[2L], anchor[1L], anchor[2L])))
+  arg <- sprintf('array_range (column "%s", cell %d)', colname, k)
+  q <- .xl_resolve_range(spec, arg = arg, df = df,
+                         header_offset = header_offset, allow_cell = TRUE)
+  if (q[1L] != anchor[1L] || q[2L] != anchor[2L])
+    stop(sprintf(paste0("`%s` must start at the cell that holds the formula ",
+                        "(row %d, column %d of the sheet, 1-based)"),
+                 arg, anchor[1L] + 1L, anchor[2L] + 1L), call. = FALSE)
+  q
+}
+
+# Refuse a multi-cell array range that overlaps cells the sheet writes itself.
+#
+# libxlsxwriter pads a multi-cell array range with formatted zeroes, which the
+# row loop would then overwrite (or which would overwrite the sheet's own
+# values, depending on ordering).  Rather than emit a file whose array range is
+# half data, require the range to spill into cells the sheet does not occupy.
+.check_array_no_overlap <- function(q, anchor, df, header_offset, colname, k) {
+  nrows <- nrow(df)
+  ncols <- length(df)
+  if (nrows < 1L || ncols < 1L) return(invisible(NULL))
+  # the sheet's own data rectangle, 0-based
+  first_row <- as.integer(header_offset)
+  last_row  <- first_row + nrows - 1L
+  r1 <- max(q[1L], first_row); r2 <- min(q[3L], last_row)
+  c1 <- max(q[2L], 0L);        c2 <- min(q[4L], ncols - 1L)
+  if (r2 < r1 || c2 < c1) return(invisible(NULL))
+  ncell <- (as.numeric(r2 - r1) + 1) * (as.numeric(c2 - c1) + 1)
+  if (ncell == 1 && r1 == anchor[1L] && c1 == anchor[2L])
+    return(invisible(NULL))
+  stop(sprintf(paste0(
+    'the `array_range` on column "%s", cell %d covers %.0f cell(s) that the ',
+    "sheet writes itself. A multi-cell array range must extend into cells the ",
+    "sheet does not occupy, because the range is padded on write and the two ",
+    "would overwrite each other. Either drop `array_range` (a single-cell ",
+    "dynamic formula spills automatically in modern Excel) or move the range ",
+    "beyond the data."), colname, k, ncell), call. = FALSE)
 }
 
 # Resolve one cell record's effective format to a registry id (0 = none),

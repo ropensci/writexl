@@ -275,6 +275,10 @@ print.xl_sheet <- function(x, ...) {
 
 # The string a general cell displays (hyperlink display / value / formula).
 .cell_display_string <- function(rec) {
+  # A rich string has been flattened to its runs before widths are measured, so
+  # the displayed text is the runs joined -- rec$value is gone by now.
+  if (!is.null(rec$rich_text))
+    return(paste(rec$rich_text, collapse = ""))
   v <- rec$value
   if (!is.null(v) && length(v) && !all(is.na(v)))
     return(format(v, trim = TRUE)[1L])

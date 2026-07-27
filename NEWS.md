@@ -50,7 +50,34 @@
 
 * See the new "Formatting and workbook properties" vignette.
 
+* `xl_cell_general()` gains `array`, `dynamic` and `array_range`, for writing
+  **array and dynamic array formulas**. A `dynamic` formula is written to one
+  cell and spilled by Excel over as many cells as its result needs; `array`
+  writes the legacy Ctrl-Shift-Enter form. Either may carry a pre-calculated
+  numeric result via `value`. `array_range` declares a legacy array formula's
+  extent in the rare case it must be stated; it forces the workbook out of the
+  memory-efficient row-streaming mode, and must not overlap cells the sheet
+  writes itself.
+
+* `xl_rich_string()` and `xl_rich_run()` write a **rich string**: one cell whose
+  text is split into runs, each in its own font. Run styling reuses
+  `xl_font()`; the other format groups do not apply to a run and warn if
+  supplied. A format on the cell itself continues to work as usual.
+
+* See the "Writing Special Cell Types" vignette for all three.
+
 ## Bug fixes
+
+* A cell with a format but no writable value no longer loses its format.
+  `xl_cell_general(value = NA, format = xl_fill(background = "yellow"))` wrote
+  nothing at all; it now writes a formatted blank cell. The same applies to
+  `NaN` and to every typed `NA`. Unformatted `NA`s still write no cell, since
+  Excel ignores blank cells that carry no format, and `NA` in a plain data frame
+  column is unchanged.
+
+* An integer pre-calculated formula result is no longer dropped.
+  `xl_cell_general(formula = "=A1", value = 7L)` stored Excel's placeholder zero
+  instead of 7; only double values were recognised.
 
 * `POSIXct` columns are no longer silently converted to UTC. Excel has no
   concept of a time zone, so writexl now decides once per workbook:

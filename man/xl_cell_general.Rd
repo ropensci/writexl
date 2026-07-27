@@ -9,7 +9,10 @@ xl_cell_general(
   formula = NULL,
   hyperlink = NULL,
   format = NULL,
-  comment = NULL
+  comment = NULL,
+  array = FALSE,
+  dynamic = FALSE,
+  array_range = NULL
 )
 }
 \arguments{
@@ -51,11 +54,34 @@ format, the default date/time number format is applied automatically.}
 (one per cell, recycled; `NA` for no comment), a single [xl_comment()]
 (recycled to every cell), or a list mixing strings / `xl_comment` / `NA`
 per cell.  `NULL` for no comments.}
+
+\item{array, dynamic}{Logical (one per cell, recycled): how the cell's
+`formula` is stored.  `array = TRUE` writes a legacy *array* (Ctrl-Shift-
+Enter) formula; `dynamic = TRUE` writes a modern *dynamic array* formula,
+which Excel spills over as many cells as the result needs.  Neither can
+carry a character `value`, because Excel stores no cached string result for
+an array formula.  On a cell that has no `formula` the flags are inert, so a
+single `array = TRUE` can be recycled across a column that mixes formula
+and value cells.}
+
+\item{array_range}{The range a legacy array formula covers, for the rare case
+  where it must be declared: an Excel range string (`"C2:C11"`) or a
+  `list(rows = , cols = )` spec, one per cell (`NA` for none). It must start
+  at the cell holding the formula, and must extend into cells the sheet does
+  not otherwise write --- the range is padded on write, so an overlap would
+  have the padding and the sheet's own values overwrite each other.
+
+  Leave it unset for almost everything: a single-cell `dynamic` formula
+  spills automatically in Excel 365 / 2021, and a single-cell `array` formula
+  is the right spelling for a `SUMPRODUCT`-style aggregate. Supplying it
+  forces the workbook out of the memory-efficient row-streaming mode, since
+  libxlsxwriter cannot pad an array range while streaming.}
 }
 \value{
 An object of class `c("xl_cell_general", "xl_cell")`, which is a
   list of length `n` where each element is a named list with fields
-  `value`, `formula`, `hyperlink`, `format`, and `comment`.
+  `value`, `formula`, `hyperlink`, `format`, `comment`, `array`, `dynamic`
+  and `array_range`.
 }
 \description{
 `xl_cell_general` creates a vector of cell objects, each optionally
@@ -108,6 +134,8 @@ Other writexl:
 \code{\link{xl_format_groups}},
 \code{\link[=xl_formula]{xl_formula()}},
 \code{\link[=xl_properties]{xl_properties()}},
+\code{\link[=xl_rich_run]{xl_rich_run()}},
+\code{\link[=xl_rich_string]{xl_rich_string()}},
 \code{\link[=xl_sheet]{xl_sheet()}},
 \code{\link[=xl_workbook]{xl_workbook()}}
 }
