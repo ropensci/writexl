@@ -259,6 +259,58 @@ static void apply_row(cell_write_ctx *ctx, SEXP opts, lxw_row_t wrow){
   }
 }
 
+/*
+ * Apply the page setup: how the sheet prints.  Every value is a scalar
+ * resolved on the R side, and every setter here is unconditional in
+ * libxlsxwriter, so an absent key simply means "leave Excel's default".
+ */
+static void apply_page_setup(cell_write_ctx *ctx, SEXP opts){
+  SEXP p = list_get(opts, "page");
+  if(p == R_NilValue || !Rf_isVectorList(p)) return;
+  lxw_worksheet *sheet = ctx->sheet;
+
+  if(payload_has(p, "landscape")){
+    if(payload_int(p, "landscape")) worksheet_set_landscape(sheet);
+    else                            worksheet_set_portrait(sheet);
+  }
+  if(payload_has(p, "scale"))
+    worksheet_set_print_scale(sheet, (uint16_t) payload_int(p, "scale"));
+  if(payload_has(p, "first_page"))
+    worksheet_set_start_page(sheet, (uint16_t) payload_int(p, "first_page"));
+
+  /* worksheet_set_start_page() is the one setter that does not raise
+     page_setup_changed, so a first_page on its own would emit no <pageSetup>
+     element at all and be silently dropped.  worksheet_set_paper() does raise
+     it, and paper size 0 ("printer default") writes no attribute, so it is a
+     harmless way to say "this sheet has a page setup".  Called for first_page
+     even when no paper was requested, and it doubles as the paper setter. */
+  if(payload_has(p, "paper") || payload_has(p, "first_page"))
+    worksheet_set_paper(sheet, (uint8_t) payload_int(p, "paper"));
+
+  /* Margins are all-or-nothing in libxlsxwriter: a negative value means "keep
+     Excel's default for this side", so an unset side passes -1 rather than 0. */
+  if(payload_has(p, "margin_left") || payload_has(p, "margin_right") ||
+     payload_has(p, "margin_top")  || payload_has(p, "margin_bottom")){
+    double l = payload_has(p, "margin_left")   ? payload_dbl(p, "margin_left")   : -1;
+    double r = payload_has(p, "margin_right")  ? payload_dbl(p, "margin_right")  : -1;
+    double t = payload_has(p, "margin_top")    ? payload_dbl(p, "margin_top")    : -1;
+    double b = payload_has(p, "margin_bottom") ? payload_dbl(p, "margin_bottom") : -1;
+    worksheet_set_margins(sheet, l, r, t, b);
+  }
+
+  if(payload_has(p, "fit_width") || payload_has(p, "fit_height"))
+    worksheet_fit_to_pages(sheet,
+                           (uint16_t) payload_int(p, "fit_width"),
+                           (uint16_t) payload_int(p, "fit_height"));
+
+  if(payload_int(p, "center_horizontally")) worksheet_center_horizontally(sheet);
+  if(payload_int(p, "center_vertically"))   worksheet_center_vertically(sheet);
+  if(payload_int(p, "page_view"))           worksheet_set_page_view(sheet);
+  if(payload_int(p, "across"))              worksheet_print_across(sheet);
+  if(payload_int(p, "black_and_white"))     worksheet_print_black_and_white(sheet);
+  if(payload_int(p, "row_col_headers"))     worksheet_print_row_col_headers(sheet);
+}
+
 /* Apply per-sheet scalar options (freeze panes, gridlines, tab color, ...). */
 static void apply_sheet_scalars(cell_write_ctx *ctx, SEXP opts){
   if(opts == R_NilValue) return;
@@ -907,6 +959,7 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
     // because constant_memory flushes each row as it is written.
     apply_columns(&ctx, opts, cols);
     apply_sheet_scalars(&ctx, opts);
+    apply_page_setup(&ctx, opts);
     apply_sheet_overlays(&ctx, opts);
 
     // Need to iterate by row first for performance
