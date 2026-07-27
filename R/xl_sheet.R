@@ -141,6 +141,9 @@ xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
 #'   per-comment `author` overrides it).
 #' @param show_comments If `TRUE`, all comments on the sheet are initially
 #'   shown (individual comments can still be forced via `xl_comment(visible=)`).
+#' @param page An [xl_page_setup()] describing how the sheet prints
+#'   (orientation, paper size, margins, scaling, header and footer). Affects
+#'   printing only, never the cell data.
 #' @return An `xl_sheet` object.
 #' @family writexl
 #' @seealso [xl_col_spec], [xl_row_spec], [write_xlsx]
@@ -158,7 +161,8 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
                      gridlines = NA, tab_color = NA, zoom = NA,
                      default_row_height = NA, auto_colwidth = FALSE,
                      autofilter = FALSE, protect = FALSE,
-                     comment_author = NA, show_comments = FALSE) {
+                     comment_author = NA, show_comments = FALSE,
+                     page = NULL) {
   if (!is.data.frame(data))
     stop("`data` must be a data frame", call. = FALSE)
   if (!is.logical(auto_colwidth) || length(auto_colwidth) != 1L || is.na(auto_colwidth))
@@ -184,7 +188,8 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
       autofilter = autofilter,
       protect    = protect,
       comment_author = comment_author,
-      show_comments  = show_comments
+      show_comments  = show_comments,
+      page           = page
     ),
     class = "xl_sheet"
   )
@@ -368,6 +373,7 @@ print.xl_sheet <- function(x, ...) {
   # author overrides the sheet default
   comment_author <- NA_character_
   show_comments <- FALSE
+  page_payload <- NULL
 
   if (inherits(el, "xl_sheet")) {
     # column specs
@@ -410,6 +416,7 @@ print.xl_sheet <- function(x, ...) {
     }
     overlay <- c(overlay, .as_overlay_list(el$overlay))
     protect <- .resolve_protect(el$protect)
+    page_payload <- .page_setup_payload(el$page, df, header_offset)
     comment_author <- el$comment_author
     show_comments <- isTRUE(el$show_comments)
     # auto column widths (for columns the user did not size explicitly)
@@ -435,6 +442,7 @@ print.xl_sheet <- function(x, ...) {
     overlay = overlay, protect = protect$flag,
     protect_password = protect$password, protect_options = protect$options,
     comment_author = as.character(comment_author),
-    show_comments = as.integer(show_comments)
+    show_comments = as.integer(show_comments),
+    page = page_payload
   )
 }

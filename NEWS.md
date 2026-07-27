@@ -24,6 +24,11 @@
 * **Rich strings** — one cell whose text is split into differently formatted
   runs — via `xl_rich_string()` and `xl_rich_run()`.
 
+* **Page setup and printing** via `xl_sheet(page = xl_page_setup(...))`:
+  orientation, paper size, margins, scaling and fit-to-pages, centring, headers
+  and footers, print area, repeating heading rows/columns, manual page breaks,
+  and the print options.
+
 * `xl_properties(hyperlink_format = NULL)` writes hyperlinks with no styling at
   all, which was previously impossible.
 

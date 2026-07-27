@@ -259,6 +259,135 @@ static void apply_row(cell_write_ctx *ctx, SEXP opts, lxw_row_t wrow){
   }
 }
 
+/*
+ * Apply the page setup: how the sheet prints.  Every value is a scalar
+ * resolved on the R side, and every setter here is unconditional in
+ * libxlsxwriter, so an absent key simply means "leave Excel's default".
+ */
+static void apply_page_setup(cell_write_ctx *ctx, SEXP opts){
+  SEXP p = list_get(opts, "page");
+  if(p == R_NilValue || !Rf_isVectorList(p)) return;
+  lxw_worksheet *sheet = ctx->sheet;
+
+  if(payload_has(p, "landscape")){
+    if(payload_int(p, "landscape")) worksheet_set_landscape(sheet);
+    else                            worksheet_set_portrait(sheet);
+  }
+  if(payload_has(p, "scale"))
+    worksheet_set_print_scale(sheet, (uint16_t) payload_int(p, "scale"));
+  if(payload_has(p, "first_page"))
+    worksheet_set_start_page(sheet, (uint16_t) payload_int(p, "first_page"));
+
+  /* worksheet_set_start_page() is the one setter that does not raise
+     page_setup_changed, so a first_page on its own would emit no <pageSetup>
+     element at all and be silently dropped.  worksheet_set_paper() does raise
+     it, and paper size 0 ("printer default") writes no attribute, so it is a
+     harmless way to say "this sheet has a page setup".  Called for first_page
+     even when no paper was requested, and it doubles as the paper setter. */
+  if(payload_has(p, "paper") || payload_has(p, "first_page"))
+    worksheet_set_paper(sheet, (uint8_t) payload_int(p, "paper"));
+
+  /* Margins are all-or-nothing in libxlsxwriter: a negative value means "keep
+     Excel's default for this side", so an unset side passes -1 rather than 0. */
+  if(payload_has(p, "margin_left") || payload_has(p, "margin_right") ||
+     payload_has(p, "margin_top")  || payload_has(p, "margin_bottom")){
+    double l = payload_has(p, "margin_left")   ? payload_dbl(p, "margin_left")   : -1;
+    double r = payload_has(p, "margin_right")  ? payload_dbl(p, "margin_right")  : -1;
+    double t = payload_has(p, "margin_top")    ? payload_dbl(p, "margin_top")    : -1;
+    double b = payload_has(p, "margin_bottom") ? payload_dbl(p, "margin_bottom") : -1;
+    worksheet_set_margins(sheet, l, r, t, b);
+  }
+
+  if(payload_has(p, "fit_width") || payload_has(p, "fit_height"))
+    worksheet_fit_to_pages(sheet,
+                           (uint16_t) payload_int(p, "fit_width"),
+                           (uint16_t) payload_int(p, "fit_height"));
+
+  /* Header and footer.  The _opt form is only needed to carry a margin; the
+     image fields of lxw_header_footer_options are left for a later phase, and
+     R rejects an &G/&[Picture] placeholder so libxlsxwriter's own
+     placeholder/image count check cannot fire. */
+  const char *hdr = payload_str(p, "header");
+  if(hdr){
+    if(payload_has(p, "header_margin")){
+      lxw_header_footer_options o;
+      memset(&o, 0, sizeof(o));
+      o.margin = payload_dbl(p, "header_margin");
+      assert_lxw(worksheet_set_header_opt(sheet, hdr, &o));
+    } else {
+      assert_lxw(worksheet_set_header(sheet, hdr));
+    }
+  }
+  const char *ftr = payload_str(p, "footer");
+  if(ftr){
+    if(payload_has(p, "footer_margin")){
+      lxw_header_footer_options o;
+      memset(&o, 0, sizeof(o));
+      o.margin = payload_dbl(p, "footer_margin");
+      assert_lxw(worksheet_set_footer_opt(sheet, ftr, &o));
+    } else {
+      assert_lxw(worksheet_set_footer(sheet, ftr));
+    }
+  }
+
+  if(payload_int(p, "center_horizontally")) worksheet_center_horizontally(sheet);
+  if(payload_int(p, "center_vertically"))   worksheet_center_vertically(sheet);
+  if(payload_int(p, "page_view"))           worksheet_set_page_view(sheet);
+  if(payload_int(p, "across"))              worksheet_print_across(sheet);
+  if(payload_int(p, "black_and_white"))     worksheet_print_black_and_white(sheet);
+  if(payload_int(p, "row_col_headers"))     worksheet_print_row_col_headers(sheet);
+
+  /* Print area and repeat rows/columns.  These write defined names into
+     workbook.xml rather than anything in the worksheet part.  Both quads are
+     already 0-based, resolved on the R side. */
+  SEXP pa = list_get(p, "print_area");
+  if(pa != R_NilValue && Rf_length(pa) >= 4){
+    SEXP q = PROTECT(Rf_coerceVector(pa, INTSXP));
+    int *a = INTEGER(q);
+    assert_lxw(worksheet_print_area(sheet, (lxw_row_t) a[0], (lxw_col_t) a[1],
+                                    (lxw_row_t) a[2], (lxw_col_t) a[3]));
+    UNPROTECT(1);
+  }
+  SEXP rr = list_get(p, "repeat_rows");
+  if(rr != R_NilValue && Rf_length(rr) >= 2){
+    SEXP q = PROTECT(Rf_coerceVector(rr, INTSXP));
+    int *a = INTEGER(q);
+    assert_lxw(worksheet_repeat_rows(sheet, (lxw_row_t) a[0], (lxw_row_t) a[1]));
+    UNPROTECT(1);
+  }
+  SEXP rc = list_get(p, "repeat_cols");
+  if(rc != R_NilValue && Rf_length(rc) >= 2){
+    SEXP q = PROTECT(Rf_coerceVector(rc, INTSXP));
+    int *a = INTEGER(q);
+    assert_lxw(worksheet_repeat_columns(sheet, (lxw_col_t) a[0], (lxw_col_t) a[1]));
+    UNPROTECT(1);
+  }
+
+  /* Page breaks.  libxlsxwriter takes a zero-terminated array, so the buffer is
+     one longer than the break count and R has already guaranteed no value is
+     0 (which would end the list early). */
+  SEXP hb = list_get(p, "h_breaks");
+  if(hb != R_NilValue && Rf_length(hb) > 0){
+    SEXP q = PROTECT(Rf_coerceVector(hb, INTSXP));
+    R_xlen_t n = Rf_length(q);
+    lxw_row_t *b = (lxw_row_t *) R_alloc((size_t) n + 1, sizeof(lxw_row_t));
+    for(R_xlen_t k = 0; k < n; k++) b[k] = (lxw_row_t) INTEGER(q)[k];
+    b[n] = 0;
+    assert_lxw(worksheet_set_h_pagebreaks(sheet, b));
+    UNPROTECT(1);
+  }
+  SEXP vb = list_get(p, "v_breaks");
+  if(vb != R_NilValue && Rf_length(vb) > 0){
+    SEXP q = PROTECT(Rf_coerceVector(vb, INTSXP));
+    R_xlen_t n = Rf_length(q);
+    lxw_col_t *b = (lxw_col_t *) R_alloc((size_t) n + 1, sizeof(lxw_col_t));
+    for(R_xlen_t k = 0; k < n; k++) b[k] = (lxw_col_t) INTEGER(q)[k];
+    b[n] = 0;
+    assert_lxw(worksheet_set_v_pagebreaks(sheet, b));
+    UNPROTECT(1);
+  }
+}
+
 /* Apply per-sheet scalar options (freeze panes, gridlines, tab color, ...). */
 static void apply_sheet_scalars(cell_write_ctx *ctx, SEXP opts){
   if(opts == R_NilValue) return;
@@ -907,6 +1036,7 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
     // because constant_memory flushes each row as it is written.
     apply_columns(&ctx, opts, cols);
     apply_sheet_scalars(&ctx, opts);
+    apply_page_setup(&ctx, opts);
     apply_sheet_overlays(&ctx, opts);
 
     // Need to iterate by row first for performance

@@ -208,3 +208,73 @@ A default author, and showing all of a sheet's comments at once, are set on
 sheet <- xl_sheet(df, comment_author = "QA", show_comments = TRUE)
 path <- write_xlsx(list(Data = sheet), tempfile(fileext = ".xlsx"))
 ```
+
+## Page setup and printing
+
+`xl_page_setup()` collects everything on Excel's "Page Layout" ribbon. Pass it
+as `xl_sheet(page = )`. None of it touches the cell data --- it changes only
+how the sheet prints and how it looks in page-break preview.
+
+```{r}
+sheet <- xl_sheet(df, page = xl_page_setup(
+  orientation = "landscape",
+  paper       = "A4",
+  margins     = c(left = 0.5, right = 0.5),
+  fit_to      = c(width = 1, height = 0),   # one page wide, any number tall
+  header      = "&LQuarterly report&RPage &P of &N"
+))
+path <- write_xlsx(list(Data = sheet), tempfile(fileext = ".xlsx"))
+```
+
+`margins` takes one value for all four sides, four values in the order left,
+right, top, bottom, or a named vector naming only the sides you care about.
+`paper` takes a friendly name or an Excel paper-type integer for the envelope
+and specialist sizes.
+
+`fit_to` scales the printout to a number of pages, where `0` means "as many as
+needed in that direction". `scale` sets a plain percentage instead; Excel
+ignores it when `fit_to` is set.
+
+### Headers and footers
+
+Header and footer text uses Excel's own codes: `&L`, `&C` and `&R` start the
+left, centre and right sections, `&P` is the page number, `&N` the page count,
+`&D` the date, `&A` the sheet name, and `&&` a literal ampersand. The whole
+string is limited to 255 characters.
+
+```{r}
+xl_page_setup(header = "&LDraft&CQ1&R&D", footer = "&CPage &P of &N")
+```
+
+Header and footer *images* are not supported yet, so an `&G` or `&[Picture]`
+placeholder is rejected.
+
+### Repeating headings and choosing what prints
+
+```{r}
+sheet <- xl_sheet(df, page = xl_page_setup(
+  print_area  = "A1:D50",
+  repeat_rows = 1,          # repeat the header row on every page
+  repeat_cols = "A:A"       # and the first column
+))
+```
+
+`print_area` takes any range writexl accepts, including a
+`list(rows = , cols = )` spec. `repeat_rows` and `repeat_cols` take either a
+count or a range string.
+
+Note that these count **sheet** rows from 1, with the header row included ---
+unlike `xl_row_spec()`, which indexes data rows. Repeating the header row is
+the usual reason to use them, so it has to be nameable.
+
+### Manual page breaks
+
+`h_breaks` and `v_breaks` give 1-based positions at which a new page starts, so
+`h_breaks = 21` breaks between rows 20 and 21.
+
+```{r}
+xl_page_setup(h_breaks = c(21, 41), v_breaks = "D")
+```
+
+Excel ignores manual breaks when `fit_to` is set, and writexl warns if you ask
+for both.

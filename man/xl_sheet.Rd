@@ -17,7 +17,8 @@ xl_sheet(
   autofilter = FALSE,
   protect = FALSE,
   comment_author = NA,
-  show_comments = FALSE
+  show_comments = FALSE,
+  page = NULL
 )
 }
 \arguments{
@@ -64,6 +65,10 @@ per-comment `author` overrides it).}
 
 \item{show_comments}{If `TRUE`, all comments on the sheet are initially
 shown (individual comments can still be forced via `xl_comment(visible=)`).}
+
+\item{page}{An [xl_page_setup()] describing how the sheet prints
+(orientation, paper size, margins, scaling, header and footer). Affects
+printing only, never the cell data.}
 }
 \value{
 An `xl_sheet` object.
@@ -97,6 +102,7 @@ Other writexl:
 \code{\link[=xl_format]{xl_format()}},
 \code{\link{xl_format_groups}},
 \code{\link[=xl_formula]{xl_formula()}},
+\code{\link[=xl_page_setup]{xl_page_setup()}},
 \code{\link[=xl_properties]{xl_properties()}},
 \code{\link[=xl_rich_run]{xl_rich_run()}},
 \code{\link[=xl_rich_string]{xl_rich_string()}},
