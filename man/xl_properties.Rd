@@ -50,7 +50,10 @@ none).}
 centered).}
 
 \item{hyperlink_format}{An [xl_format] for cell hyperlinks (default: blue,
-underlined).}
+underlined), or `NULL` for no hyperlink styling at all.  `NULL` is the only
+way to write an unstyled hyperlink: an empty `xl_format()` leaves the cell
+with no format, and Excel files written that way fall back to
+libxlsxwriter's own blue-underlined default.}
 
 \item{date_format, datetime_format}{[xl_format] number formats applied to
 `Date` / `POSIXct` values.}

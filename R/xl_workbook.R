@@ -36,7 +36,10 @@
 #' @param header_format An [xl_format] for the header row (default: bold,
 #'   centered).
 #' @param hyperlink_format An [xl_format] for cell hyperlinks (default: blue,
-#'   underlined).
+#'   underlined), or `NULL` for no hyperlink styling at all.  `NULL` is the only
+#'   way to write an unstyled hyperlink: an empty `xl_format()` leaves the cell
+#'   with no format, and Excel files written that way fall back to
+#'   libxlsxwriter's own blue-underlined default.
 #' @param date_format,datetime_format [xl_format] number formats applied to
 #'   `Date` / `POSIXct` values.
 #' @param date_col_width,datetime_col_width Default column width for `Date` /
@@ -72,11 +75,16 @@ xl_properties <- function(title = NA, subject = NA, author = NA, manager = NA,
                           date_col_width = 20, datetime_col_width = 20,
                           header_row_height = 15) {
   fmts <- list(default_format = default_format, header_format = header_format,
-               hyperlink_format = hyperlink_format, date_format = date_format,
-               datetime_format = datetime_format)
+               date_format = date_format, datetime_format = datetime_format)
   for (nm in names(fmts))
     if (!is_xl_format(fmts[[nm]]))
       stop(sprintf("`%s` must be an xl_format object", nm), call. = FALSE)
+  # NULL is meaningful for hyperlink_format alone: it opts out of hyperlink
+  # styling entirely.  An empty xl_format() cannot express that -- it is the
+  # neutral element of the cascade, and libxlsxwriter substitutes its own
+  # blue-underline format whenever no format reaches worksheet_write_url_opt().
+  if (!is.null(hyperlink_format) && !is_xl_format(hyperlink_format))
+    stop("`hyperlink_format` must be an xl_format object or NULL", call. = FALSE)
   for (nm in c("date_col_width", "datetime_col_width", "header_row_height")) {
     v <- get(nm)
     if (!is.numeric(v) || length(v) != 1L || is.na(v) || v < 0)
@@ -216,6 +224,10 @@ print.xl_workbook <- function(x, ...) {
     })
   }
   out$read_only <- as.integer(isTRUE(props$read_only))
+  # hyperlink_format = NULL opts out of hyperlink styling; without this
+  # libxlsxwriter substitutes its own blue-underline default whenever a cell
+  # reaches worksheet_write_url_opt() with no format.
+  out$unset_url_format <- as.integer(is.null(props$hyperlink_format))
   out$header_row_height <- as.numeric(props$header_row_height)
   out$constant_memory <- as.integer(constant_memory)
   if (!is.null(props$window_size))

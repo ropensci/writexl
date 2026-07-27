@@ -198,3 +198,39 @@ test_that("workbooks write the same content with constant memory on and off", {
   expect_null(xlsx_part(on_path, "xl/sharedStrings.xml"))
   expect_s3_class(xlsx_part(off_path, "xl/sharedStrings.xml"), "xml_document")
 })
+
+# ── Hyperlink styling opt-out ────────────────────────────────────────────────
+
+hyperlink_book <- function(hf) {
+  df <- data.frame(x = 1L)
+  df$h <- xl_hyperlink_cell("https://example.com")
+  write_tmp(xl_workbook(list(S = df),
+                        properties = xl_properties(hyperlink_format = hf)))
+}
+
+test_that("hyperlink_format = NULL writes an unstyled hyperlink", {
+  # libxlsxwriter substitutes its own blue-underline format whenever a cell
+  # reaches worksheet_write_url_opt() with none, so clearing that default is
+  # the only way to get an unstyled link
+  s <- xlsx_part(hyperlink_book(NULL), "xl/styles.xml", raw = TRUE)
+  expect_false(grepl("<u/>", s, fixed = TRUE))
+})
+
+test_that("an empty xl_format() is not the opt-out", {
+  # it is the neutral element of the cascade, so the default still applies
+  s <- xlsx_part(hyperlink_book(xl_format()), "xl/styles.xml", raw = TRUE)
+  expect_true(grepl("<u/>", s, fixed = TRUE))
+})
+
+test_that("the default hyperlink format is still blue and underlined", {
+  s <- xlsx_part(hyperlink_book(xl_properties()$hyperlink_format),
+                 "xl/styles.xml", raw = TRUE)
+  expect_true(grepl("<u/>", s, fixed = TRUE))
+  expect_match(s, "FF0000FF", ignore.case = TRUE)
+})
+
+test_that("hyperlink_format rejects a non-format that is not NULL", {
+  expect_error(xl_properties(hyperlink_format = "blue"),
+               "must be an xl_format object or NULL")
+  expect_s3_class(xl_properties(hyperlink_format = NULL), "xl_properties")
+})

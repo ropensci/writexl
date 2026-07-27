@@ -752,6 +752,12 @@ static void apply_properties(lxw_workbook *wb, SEXP props){
   if(opt_scalar_int(props, "read_only", 0))
     workbook_read_only_recommended(wb);
 
+  /* hyperlink styling opt-out.  worksheet_write_url_opt() falls back to the
+     workbook's default_url_format when it is handed a NULL format, so an
+     unstyled hyperlink is only reachable by clearing that default. */
+  if(opt_scalar_int(props, "unset_url_format", 0))
+    workbook_unset_default_url_format(wb);
+
   /* window size */
   SEXP ws = list_get(props, "window_size");
   if(ws != R_NilValue && Rf_length(ws) >= 2){
