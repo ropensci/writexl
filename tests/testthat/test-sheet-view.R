@@ -114,3 +114,70 @@ test_that("the flags are validated as logicals", {
   expect_error(xl_sheet(one(), visible = 1), "visible")
   expect_error(xl_sheet(one(), first_tab = c(TRUE, TRUE)), "first_tab")
 })
+
+# ── Zero display, direction, selection and scroll position ───────────────────
+
+view_xml <- function(...) {
+  xlsx_part(write_tmp(list(D = xl_sheet(data.frame(x = 1:5), ...))),
+            "xl/worksheets/sheet1.xml", raw = TRUE)
+}
+
+test_that("hide_zero and right_to_left reach sheetView", {
+  expect_match(view_xml(hide_zero = TRUE), 'showZeros="0"', fixed = TRUE)
+  expect_match(view_xml(right_to_left = TRUE), 'rightToLeft="1"', fixed = TRUE)
+  # FALSE is not TRUE: nothing is written
+  expect_false(grepl("showZeros", view_xml(hide_zero = FALSE), fixed = TRUE))
+})
+
+test_that("selection accepts a single cell and a range", {
+  expect_match(view_xml(selection = "B2"), 'sqref="B2"', fixed = TRUE)
+  x <- view_xml(selection = "B2:C4")
+  expect_match(x, 'sqref="B2:C4"', fixed = TRUE)
+  # the top-left corner becomes the active cell
+  expect_match(x, 'activeCell="B2"', fixed = TRUE)
+})
+
+test_that("selection accepts a data-frame-relative spec", {
+  df <- data.frame(a = 1:5, b = 1:5)
+  x <- xlsx_part(write_tmp(list(D = xl_sheet(df, selection = list(rows = 1:2,
+                                                                 cols = "a")))),
+                 "xl/worksheets/sheet1.xml", raw = TRUE)
+  # data rows 1:2 are sheet rows 2:3 once the header is counted
+  expect_match(x, 'sqref="A2:A3"', fixed = TRUE)
+})
+
+test_that("an inverted selection is rejected by the shared range parser", {
+  # Excel would read the corner order as naming the active cell; writexl gives
+  # that up in exchange for one strict range parser, and says so rather than
+  # silently normalising
+  expect_error(write_tmp(list(D = xl_sheet(data.frame(x = 1:5),
+                                           selection = "C4:B2"))),
+               "inverted")
+})
+
+test_that("top_left sets the scrolled-to cell", {
+  expect_match(view_xml(top_left = "A3"), 'topLeftCell="A3"', fixed = TRUE)
+  expect_match(view_xml(top_left = "C10"), 'topLeftCell="C10"', fixed = TRUE)
+})
+
+test_that("selection and top_left are independent", {
+  x <- view_xml(selection = "B2", top_left = "A3")
+  expect_match(x, 'topLeftCell="A3"', fixed = TRUE)
+  expect_match(x, 'sqref="B2"', fixed = TRUE)
+})
+
+test_that("the view scalars are validated", {
+  expect_error(xl_sheet(data.frame(x = 1), hide_zero = "yes"), "hide_zero")
+  expect_error(xl_sheet(data.frame(x = 1), right_to_left = 1), "right_to_left")
+  expect_error(write_tmp(list(D = xl_sheet(data.frame(x = 1),
+                                           selection = "not a range"))),
+               "selection")
+})
+
+test_that("the view scalars leave the cells alone", {
+  skip_if_not_installed("readxl")
+  df <- data.frame(a = 1:5, stringsAsFactors = FALSE)
+  p <- write_tmp(list(D = xl_sheet(df, hide_zero = TRUE, right_to_left = TRUE,
+                                   selection = "A2", top_left = "A2")))
+  expect_equal(as.data.frame(readxl::read_xlsx(p)), df)
+})

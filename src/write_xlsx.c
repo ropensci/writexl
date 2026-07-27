@@ -402,6 +402,26 @@ static void apply_sheet_view(cell_write_ctx *ctx, SEXP opts){
   if(payload_has(v, "visible") && !payload_int(v, "visible"))
     worksheet_hide(ctx->sheet);
   if(payload_int(v, "first_tab")) worksheet_set_first_sheet(ctx->sheet);
+  if(payload_int(v, "hide_zero"))     worksheet_hide_zero(ctx->sheet);
+  if(payload_int(v, "right_to_left")) worksheet_right_to_left(ctx->sheet);
+
+  /* Selected range and scroll position, both 0-based quads from R. */
+  SEXP sel = list_get(v, "selection");
+  if(sel != R_NilValue && Rf_length(sel) >= 4){
+    SEXP q = PROTECT(Rf_coerceVector(sel, INTSXP));
+    int *a = INTEGER(q);
+    assert_lxw(worksheet_set_selection(ctx->sheet, (lxw_row_t) a[0],
+                                       (lxw_col_t) a[1], (lxw_row_t) a[2],
+                                       (lxw_col_t) a[3]));
+    UNPROTECT(1);
+  }
+  SEXP tl = list_get(v, "top_left");
+  if(tl != R_NilValue && Rf_length(tl) >= 2){
+    SEXP q = PROTECT(Rf_coerceVector(tl, INTSXP));
+    int *a = INTEGER(q);
+    worksheet_set_top_left_cell(ctx->sheet, (lxw_row_t) a[0], (lxw_col_t) a[1]);
+    UNPROTECT(1);
+  }
 }
 
 /* Apply per-sheet scalar options (freeze panes, gridlines, tab color, ...). */

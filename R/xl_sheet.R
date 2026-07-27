@@ -151,6 +151,17 @@ xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
 #'   open the file.
 #' @param first_tab Logical; make this the leftmost visible tab in the tab
 #'   strip.  This is independent of which sheet is active.
+#' @param hide_zero Logical; display zero values as blank cells.
+#' @param right_to_left Logical; order the columns right to left, for a sheet in
+#'   a right-to-left language.
+#' @param selection The cell or range selected when the sheet opens, as an Excel
+#'   reference (`"B2"`, `"B2:D10"`) or a `list(rows = , cols = )` spec.
+#'
+#'   Excel also uses the order of a selection's corners to mark which cell in it
+#'   is active; writexl does not expose that, because ranges are normalised by
+#'   the shared range parser, which rejects an inverted range.
+#' @param top_left The cell scrolled to the top-left of the window when the
+#'   sheet opens, as an Excel reference such as `"A5"`.
 #' @param page An [xl_page_setup()] describing how the sheet prints
 #'   (orientation, paper size, margins, scaling, header and footer). Affects
 #'   printing only, never the cell data.
@@ -173,7 +184,8 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
                      autofilter = FALSE, protect = FALSE,
                      comment_author = NA, show_comments = FALSE,
                      page = NULL, active = NA, selected = NA, visible = NA,
-                     first_tab = NA) {
+                     first_tab = NA, hide_zero = NA, right_to_left = NA,
+                     selection = NULL, top_left = NULL) {
   if (!is.data.frame(data))
     stop("`data` must be a data frame", call. = FALSE)
   if (!is.logical(auto_colwidth) || length(auto_colwidth) != 1L || is.na(auto_colwidth))
@@ -204,7 +216,11 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
       active         = .val_flag(active, "active"),
       selected       = .val_flag(selected, "selected"),
       visible        = .val_flag(visible, "visible"),
-      first_tab      = .val_flag(first_tab, "first_tab")
+      first_tab      = .val_flag(first_tab, "first_tab"),
+      hide_zero      = .val_flag(hide_zero, "hide_zero"),
+      right_to_left  = .val_flag(right_to_left, "right_to_left"),
+      selection      = selection,
+      top_left       = top_left
     ),
     class = "xl_sheet"
   )
@@ -433,8 +449,17 @@ print.xl_sheet <- function(x, ...) {
     overlay <- c(overlay, .as_overlay_list(el$overlay))
     protect <- .resolve_protect(el$protect)
     page_payload <- .page_setup_payload(el$page, df, header_offset)
-    for (k in c("active", "selected", "visible", "first_tab"))
+    for (k in c("active", "selected", "visible", "first_tab", "hide_zero",
+                "right_to_left"))
       if (!is.null(el[[k]])) view[[k]] <- as.integer(isTRUE(el[[k]]))
+    if (!is.null(el$selection))
+      view$selection <- .xl_resolve_range(el$selection, arg = "selection",
+                                          df = df, header_offset = header_offset,
+                                          allow_cell = TRUE)
+    if (!is.null(el$top_left))
+      view$top_left <- .xl_resolve_range(el$top_left, arg = "top_left",
+                                         df = df, header_offset = header_offset,
+                                         allow_cell = TRUE)[1:2]
     comment_author <- el$comment_author
     show_comments <- isTRUE(el$show_comments)
     # auto column widths (for columns the user did not size explicitly)

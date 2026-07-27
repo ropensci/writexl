@@ -22,7 +22,11 @@ xl_sheet(
   active = NA,
   selected = NA,
   visible = NA,
-  first_tab = NA
+  first_tab = NA,
+  hide_zero = NA,
+  right_to_left = NA,
+  selection = NULL,
+  top_left = NULL
 )
 }
 \arguments{
@@ -87,6 +91,21 @@ open the file.}
 
 \item{first_tab}{Logical; make this the leftmost visible tab in the tab
 strip.  This is independent of which sheet is active.}
+
+\item{hide_zero}{Logical; display zero values as blank cells.}
+
+\item{right_to_left}{Logical; order the columns right to left, for a sheet in
+a right-to-left language.}
+
+\item{selection}{The cell or range selected when the sheet opens, as an Excel
+  reference (`"B2"`, `"B2:D10"`) or a `list(rows = , cols = )` spec.
+
+  Excel also uses the order of a selection's corners to mark which cell in it
+  is active; writexl does not expose that, because ranges are normalised by
+  the shared range parser, which rejects an inverted range.}
+
+\item{top_left}{The cell scrolled to the top-left of the window when the
+sheet opens, as an Excel reference such as `"A5"`.}
 }
 \value{
 An `xl_sheet` object.
