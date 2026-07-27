@@ -388,6 +388,22 @@ static void apply_page_setup(cell_write_ctx *ctx, SEXP opts){
   }
 }
 
+/*
+ * Apply the sheet's tab state.  The rules that make these mutually exclusive
+ * span the whole workbook and are checked in R by .resolve_sheet_visibility();
+ * libxlsxwriter enforces none of them, so by the time we get here the
+ * combination is known to be sane.
+ */
+static void apply_sheet_view(cell_write_ctx *ctx, SEXP opts){
+  SEXP v = list_get(opts, "view");
+  if(v == R_NilValue || !Rf_isVectorList(v)) return;
+  if(payload_int(v, "active"))    worksheet_activate(ctx->sheet);
+  if(payload_int(v, "selected"))  worksheet_select(ctx->sheet);
+  if(payload_has(v, "visible") && !payload_int(v, "visible"))
+    worksheet_hide(ctx->sheet);
+  if(payload_int(v, "first_tab")) worksheet_set_first_sheet(ctx->sheet);
+}
+
 /* Apply per-sheet scalar options (freeze panes, gridlines, tab color, ...). */
 static void apply_sheet_scalars(cell_write_ctx *ctx, SEXP opts){
   if(opts == R_NilValue) return;
@@ -1037,6 +1053,7 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
     apply_columns(&ctx, opts, cols);
     apply_sheet_scalars(&ctx, opts);
     apply_page_setup(&ctx, opts);
+    apply_sheet_view(&ctx, opts);
     apply_sheet_overlays(&ctx, opts);
 
     // Need to iterate by row first for performance

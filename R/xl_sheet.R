@@ -141,6 +141,16 @@ xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
 #'   per-comment `author` overrides it).
 #' @param show_comments If `TRUE`, all comments on the sheet are initially
 #'   shown (individual comments can still be forced via `xl_comment(visible=)`).
+#' @param active Logical; make this the tab Excel opens on.  At most one sheet
+#'   in a workbook may be active.
+#' @param selected Logical; include this tab in the selected group.  The active
+#'   sheet is always selected.
+#' @param visible Logical; `FALSE` hides the sheet's tab.  A hidden sheet cannot
+#'   be active or selected, the first sheet cannot be hidden unless another is
+#'   made active, and at least one sheet must stay visible or Excel will not
+#'   open the file.
+#' @param first_tab Logical; make this the leftmost visible tab in the tab
+#'   strip.  This is independent of which sheet is active.
 #' @param page An [xl_page_setup()] describing how the sheet prints
 #'   (orientation, paper size, margins, scaling, header and footer). Affects
 #'   printing only, never the cell data.
@@ -162,7 +172,8 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
                      default_row_height = NA, auto_colwidth = FALSE,
                      autofilter = FALSE, protect = FALSE,
                      comment_author = NA, show_comments = FALSE,
-                     page = NULL) {
+                     page = NULL, active = NA, selected = NA, visible = NA,
+                     first_tab = NA) {
   if (!is.data.frame(data))
     stop("`data` must be a data frame", call. = FALSE)
   if (!is.logical(auto_colwidth) || length(auto_colwidth) != 1L || is.na(auto_colwidth))
@@ -189,7 +200,11 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
       protect    = protect,
       comment_author = comment_author,
       show_comments  = show_comments,
-      page           = page
+      page           = page,
+      active         = .val_flag(active, "active"),
+      selected       = .val_flag(selected, "selected"),
+      visible        = .val_flag(visible, "visible"),
+      first_tab      = .val_flag(first_tab, "first_tab")
     ),
     class = "xl_sheet"
   )
@@ -374,6 +389,7 @@ print.xl_sheet <- function(x, ...) {
   comment_author <- NA_character_
   show_comments <- FALSE
   page_payload <- NULL
+  view <- list()
 
   if (inherits(el, "xl_sheet")) {
     # column specs
@@ -417,6 +433,8 @@ print.xl_sheet <- function(x, ...) {
     overlay <- c(overlay, .as_overlay_list(el$overlay))
     protect <- .resolve_protect(el$protect)
     page_payload <- .page_setup_payload(el$page, df, header_offset)
+    for (k in c("active", "selected", "visible", "first_tab"))
+      if (!is.null(el[[k]])) view[[k]] <- as.integer(isTRUE(el[[k]]))
     comment_author <- el$comment_author
     show_comments <- isTRUE(el$show_comments)
     # auto column widths (for columns the user did not size explicitly)
@@ -443,6 +461,7 @@ print.xl_sheet <- function(x, ...) {
     protect_password = protect$password, protect_options = protect$options,
     comment_author = as.character(comment_author),
     show_comments = as.integer(show_comments),
-    page = page_payload
+    page = page_payload,
+    view = if (length(view)) view else NULL
   )
 }

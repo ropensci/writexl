@@ -18,7 +18,11 @@ xl_sheet(
   protect = FALSE,
   comment_author = NA,
   show_comments = FALSE,
-  page = NULL
+  page = NULL,
+  active = NA,
+  selected = NA,
+  visible = NA,
+  first_tab = NA
 )
 }
 \arguments{
@@ -69,6 +73,20 @@ shown (individual comments can still be forced via `xl_comment(visible=)`).}
 \item{page}{An [xl_page_setup()] describing how the sheet prints
 (orientation, paper size, margins, scaling, header and footer). Affects
 printing only, never the cell data.}
+
+\item{active}{Logical; make this the tab Excel opens on.  At most one sheet
+in a workbook may be active.}
+
+\item{selected}{Logical; include this tab in the selected group.  The active
+sheet is always selected.}
+
+\item{visible}{Logical; `FALSE` hides the sheet's tab.  A hidden sheet cannot
+be active or selected, the first sheet cannot be hidden unless another is
+made active, and at least one sheet must stay visible or Excel will not
+open the file.}
+
+\item{first_tab}{Logical; make this the leftmost visible tab in the tab
+strip.  This is independent of which sheet is active.}
 }
 \value{
 An `xl_sheet` object.
