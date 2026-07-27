@@ -25,7 +25,9 @@
 #' @param title,subject,author,manager,company,category,keywords,comments,status,hyperlink_base
 #'   Document metadata strings (Excel's "Properties" dialog).
 #' @param custom A named list of custom document properties.  Values may be
-#'   character, integer, numeric, or logical.
+#'   character, integer, numeric, logical, `Date` or `POSIXct`.  A `Date` or
+#'   `POSIXct` is written as a real datetime property (not as text) and follows
+#'   the same workbook-wide time zone rule as datetime cells, described below.
 #' @param read_only Logical; mark the workbook read-only recommended.
 #' @param window_size Optional integer vector `c(width, height)` for the
 #'   workbook window size.
@@ -36,7 +38,10 @@
 #' @param header_format An [xl_format] for the header row (default: bold,
 #'   centered).
 #' @param hyperlink_format An [xl_format] for cell hyperlinks (default: blue,
-#'   underlined).
+#'   underlined), or `NULL` for no hyperlink styling at all.  `NULL` is the only
+#'   way to write an unstyled hyperlink: an empty `xl_format()` leaves the cell
+#'   with no format, and Excel files written that way fall back to
+#'   libxlsxwriter's own blue-underlined default.
 #' @param date_format,datetime_format [xl_format] number formats applied to
 #'   `Date` / `POSIXct` values.
 #' @param date_col_width,datetime_col_width Default column width for `Date` /
@@ -72,11 +77,16 @@ xl_properties <- function(title = NA, subject = NA, author = NA, manager = NA,
                           date_col_width = 20, datetime_col_width = 20,
                           header_row_height = 15) {
   fmts <- list(default_format = default_format, header_format = header_format,
-               hyperlink_format = hyperlink_format, date_format = date_format,
-               datetime_format = datetime_format)
+               date_format = date_format, datetime_format = datetime_format)
   for (nm in names(fmts))
     if (!is_xl_format(fmts[[nm]]))
       stop(sprintf("`%s` must be an xl_format object", nm), call. = FALSE)
+  # NULL is meaningful for hyperlink_format alone: it opts out of hyperlink
+  # styling entirely.  An empty xl_format() cannot express that -- it is the
+  # neutral element of the cascade, and libxlsxwriter substitutes its own
+  # blue-underline format whenever no format reaches worksheet_write_url_opt().
+  if (!is.null(hyperlink_format) && !is_xl_format(hyperlink_format))
+    stop("`hyperlink_format` must be an xl_format object or NULL", call. = FALSE)
   for (nm in c("date_col_width", "datetime_col_width", "header_row_height")) {
     v <- get(nm)
     if (!is.numeric(v) || length(v) != 1L || is.na(v) || v < 0)
@@ -193,6 +203,21 @@ print.xl_workbook <- function(x, ...) {
   list(on = as.integer(!length(reasons)), reasons = reasons)
 }
 
+# Break a Date/POSIXct out into the fields lxw_datetime carries.  The value has
+# already been through .resolve_timezones() by this point, so a POSIXct holds
+# the wall-clock reading that is meant to reach the file and UTC is simply how
+# that reading is tagged.  A Date has no time of day and maps to midnight.
+.datetime_fields <- function(v) {
+  lt <- as.POSIXlt(v[1L], tz = "UTC")
+  is_date <- inherits(v, "Date")
+  list(year  = as.integer(lt$year + 1900L),
+       month = as.integer(lt$mon + 1L),
+       day   = as.integer(lt$mday),
+       hour  = if (is_date) 0L else as.integer(lt$hour),
+       min   = if (is_date) 0L else as.integer(lt$min),
+       sec   = if (is_date) 0    else as.numeric(lt$sec))
+}
+
 # Build the C-side document-properties payload from an xl_properties object.
 # `constant_memory` rides along here rather than as another .Call() argument so
 # the C entry point's signature stays put as features are added.
@@ -207,15 +232,25 @@ print.xl_workbook <- function(x, ...) {
   if (!is.null(props$custom) && length(props$custom)) {
     out$custom <- lapply(base::names(props$custom), function(nm) {
       v <- props$custom[[nm]]
-      type <- if (is.logical(v)) "boolean"
+      # Date/POSIXct first: neither satisfies is.numeric(), so without this they
+      # fall through to as.character() and are written as text.
+      type <- if (inherits(v, "Date") || inherits(v, "POSIXct")) "datetime"
+              else if (is.logical(v)) "boolean"
               else if (is.integer(v)) "integer"
               else if (is.numeric(v)) "number"
               else "string"
       list(name = nm, type = type,
-           value = if (type == "string") as.character(v) else v)
+           value = switch(type,
+                          datetime = .datetime_fields(v),
+                          string   = as.character(v),
+                          v))
     })
   }
   out$read_only <- as.integer(isTRUE(props$read_only))
+  # hyperlink_format = NULL opts out of hyperlink styling; without this
+  # libxlsxwriter substitutes its own blue-underline default whenever a cell
+  # reaches worksheet_write_url_opt() with no format.
+  out$unset_url_format <- as.integer(is.null(props$hyperlink_format))
   out$header_row_height <- as.numeric(props$header_row_height)
   out$constant_memory <- as.integer(constant_memory)
   if (!is.null(props$window_size))

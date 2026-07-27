@@ -745,12 +745,31 @@ static void apply_properties(lxw_workbook *wb, SEXP props){
         workbook_set_custom_property_number(wb, nm, Rf_asReal(val));
       else if(!strcmp(ty, "boolean"))
         workbook_set_custom_property_boolean(wb, nm, Rf_asLogical(val) == TRUE);
+      else if(!strcmp(ty, "datetime")){
+        /* broken out into fields on the R side, after the workbook-wide time
+           zone decision has been applied */
+        lxw_datetime dt;
+        memset(&dt, 0, sizeof(dt));
+        dt.year  = payload_int(val, "year");
+        dt.month = payload_int(val, "month");
+        dt.day   = payload_int(val, "day");
+        dt.hour  = payload_int(val, "hour");
+        dt.min   = payload_int(val, "min");
+        dt.sec   = payload_dbl(val, "sec");
+        workbook_set_custom_property_datetime(wb, nm, &dt);
+      }
     }
   }
 
   /* read-only recommended */
   if(opt_scalar_int(props, "read_only", 0))
     workbook_read_only_recommended(wb);
+
+  /* hyperlink styling opt-out.  worksheet_write_url_opt() falls back to the
+     workbook's default_url_format when it is handed a NULL format, so an
+     unstyled hyperlink is only reachable by clearing that default. */
+  if(opt_scalar_int(props, "unset_url_format", 0))
+    workbook_unset_default_url_format(wb);
 
   /* window size */
   SEXP ws = list_get(props, "window_size");
@@ -823,6 +842,12 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
     //create sheet
     const char * sheet_name = Rf_length(df_names) > s && Rf_length(STRING_ELT(df_names, s)) ? \
       Rf_translateCharUTF8(STRING_ELT(df_names, s)) : NULL;
+    /* .resolve_sheet_names() has already repaired the name on the R side.  This
+       is a backstop so an R-side regression cannot silently produce a workbook
+       Excel refuses to open; a NULL name is libxlsxwriter's own auto-naming and
+       is not ours to validate. */
+    if(sheet_name)
+      assert_lxw(workbook_validate_sheet_name(workbook, sheet_name));
     lxw_worksheet *sheet = workbook_add_worksheet(workbook, sheet_name);
     assert_that(sheet, "failed to create workbook");
 

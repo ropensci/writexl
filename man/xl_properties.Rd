@@ -33,7 +33,9 @@ xl_properties(
 \item{title, subject, author, manager, company, category, keywords, comments, status, hyperlink_base}{Document metadata strings (Excel's "Properties" dialog).}
 
 \item{custom}{A named list of custom document properties.  Values may be
-character, integer, numeric, or logical.}
+character, integer, numeric, logical, `Date` or `POSIXct`.  A `Date` or
+`POSIXct` is written as a real datetime property (not as text) and follows
+the same workbook-wide time zone rule as datetime cells, described below.}
 
 \item{read_only}{Logical; mark the workbook read-only recommended.}
 
@@ -50,7 +52,10 @@ none).}
 centered).}
 
 \item{hyperlink_format}{An [xl_format] for cell hyperlinks (default: blue,
-underlined).}
+underlined), or `NULL` for no hyperlink styling at all.  `NULL` is the only
+way to write an unstyled hyperlink: an empty `xl_format()` leaves the cell
+with no format, and Excel files written that way fall back to
+libxlsxwriter's own blue-underlined default.}
 
 \item{date_format, datetime_format}{[xl_format] number formats applied to
 `Date` / `POSIXct` values.}
