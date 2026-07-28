@@ -687,6 +687,76 @@ static void filter_rule(SEXP p, const char *crit_key, const char *num_key,
 }
 
 /*
+ * Add the worksheet tables.  Applied after the row loop, beside the merges,
+ * because worksheet_add_table() writes cells of its own: a header string per
+ * column and, with a total row, the total cells.  Running it before the rows
+ * would let the row loop overwrite them and lose any header format.
+ *
+ * Every column of the range carries a header from R -- the data frame's own
+ * column name unless the caller overrode it -- because libxlsxwriter would
+ * otherwise default them to "Column 1", "Column 2", ... and Excel rejects a
+ * file whose table definition and header cells disagree.
+ */
+static void apply_tables(cell_write_ctx *ctx, SEXP opts){
+  SEXP ts = list_get(opts, "tables");
+  if(ts == R_NilValue || !Rf_isVectorList(ts)) return;
+  for(R_xlen_t k = 0; k < Rf_length(ts); k++){
+    SEXP t = VECTOR_ELT(ts, k);
+    int r[4];
+    if(!overlay_range(t, "range", r))
+      Rf_errorcall(R_NilValue, "Error in writexl: table needs a length-4 range");
+
+    lxw_table_options o = {0};
+    o.name           = (char *) payload_str(t, "name");
+    o.style_type     = (uint8_t) payload_int(t, "style_type");
+    o.style_type_number = (uint8_t) payload_int(t, "style_number");
+    /* R sends the positive sense of each flag; libxlsxwriter wants the
+       negative one for three of them. */
+    o.no_header_row  = (uint8_t) !payload_int(t, "header_row");
+    o.no_autofilter  = (uint8_t) !payload_int(t, "autofilter");
+    o.no_banded_rows = (uint8_t) !payload_int(t, "banded_rows");
+    o.banded_columns = (uint8_t) payload_int(t, "banded_columns");
+    o.first_column   = (uint8_t) payload_int(t, "first_column");
+    o.last_column    = (uint8_t) payload_int(t, "last_column");
+    o.total_row      = (uint8_t) payload_int(t, "total_row");
+
+    SEXP cols = list_get(t, "columns");
+    R_xlen_t ncols = (cols != R_NilValue && Rf_isVectorList(cols))
+                     ? Rf_length(cols) : 0;
+    lxw_table_column *entries = NULL;
+    lxw_table_column **colptr = NULL;
+    if(ncols > 0){
+      entries = (lxw_table_column *) R_alloc((size_t) ncols, sizeof(lxw_table_column));
+      colptr  = (lxw_table_column **) R_alloc((size_t) ncols + 1, sizeof(lxw_table_column *));
+      memset(entries, 0, (size_t) ncols * sizeof(lxw_table_column));
+      for(R_xlen_t i = 0; i < ncols; i++){
+        SEXP c = VECTOR_ELT(cols, i);
+        entries[i].header        = (char *) payload_str(c, "header");
+        entries[i].formula       = (char *) payload_str(c, "formula");
+        entries[i].total_string  = (char *) payload_str(c, "total_string");
+        entries[i].total_function = (uint8_t) payload_int(c, "total_function");
+        if(payload_has(c, "format_id")){
+          int fid = payload_int(c, "format_id");
+          note_protection(ctx, fid);
+          entries[i].format = ctx_format(ctx, fid);
+        }
+        if(payload_has(c, "header_format_id")){
+          int hid = payload_int(c, "header_format_id");
+          note_protection(ctx, hid);
+          entries[i].header_format = ctx_format(ctx, hid);
+        }
+        colptr[i] = &entries[i];
+      }
+      colptr[ncols] = NULL;
+      o.columns = colptr;
+    }
+
+    assert_lxw(worksheet_add_table(ctx->sheet, (lxw_row_t) r[0], (lxw_col_t) r[1],
+                                   (lxw_row_t) r[2], (lxw_col_t) r[3], &o));
+  }
+}
+
+/*
  * Apply one column's autofilter criteria.  The rows this excludes are hidden
  * on the R side, because Excel stores the criteria and the hidden rows
  * independently and applies neither when the file is opened.
@@ -1340,6 +1410,7 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
        what merging does in Excel.  Writing back over emitted rows is why any
        merge turns constant memory off on the R side. */
     apply_merges(&ctx, opts);
+    apply_tables(&ctx, opts);
 
     if(warn_unlocked)
       Rf_warning("Worksheet '%s' uses cell protection formatting (locked = FALSE "

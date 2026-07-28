@@ -168,6 +168,147 @@ test_that("flag arguments are validated", {
   expect_error(xl_table(name = c("a", "b")), "single string, NULL or NA")
 })
 
+# ── What reaches the file ─────────────────────────────────────────────────────
+
+sdf <- data.frame(fruit = c("apple", "banana", "cherry"), qty = c(5, 150, 300),
+                  stringsAsFactors = FALSE)
+
+# The table part for a sheet built with `...` passed to xl_sheet().
+table_xml <- function(..., df = sdf) {
+  p <- write_tmp(list(Sales = xl_sheet(df, ...)))
+  xlsx_part(p, "xl/tables/table1.xml", raw = TRUE)
+}
+
+# The text a header cell actually shows, resolved through the shared strings.
+header_text <- function(..., df = sdf) {
+  p <- write_tmp(list(Sales = xl_sheet(df, ...)))
+  w <- xlsx_part(p, "xl/worksheets/sheet1.xml", raw = TRUE)
+  ss <- xlsx_part(p, "xl/sharedStrings.xml", raw = TRUE)
+  strings <- regmatches(ss, gregexpr("<t>[^<]*</t>", ss))[[1L]]
+  strings <- sub("</t>$", "", sub("^<t>", "", strings))
+  row1 <- regmatches(w, regexpr('<row r="1".*?</row>', w))
+  idx <- as.integer(sub(".*<v>([0-9]+)</v>.*", "\\1",
+                        regmatches(row1, gregexpr("<v>[0-9]+</v>", row1))[[1L]]))
+  strings[idx + 1L]
+}
+
+test_that("a table's columns take the data frame's column names", {
+  # the whole point of the commit: _write_table_column_data() would otherwise
+  # default these to "Column 1", "Column 2", and Excel rejects a file whose
+  # table definition and header cells disagree
+  x <- table_xml(table = xl_table())
+  expect_match(x, '<tableColumn id="1" name="fruit"/>', fixed = TRUE)
+  expect_match(x, '<tableColumn id="2" name="qty"/>', fixed = TRUE)
+  expect_no_match(x, "Column 1", fixed = TRUE)
+  # and the header cells say the same thing, which is what Excel checks
+  expect_equal(header_text(table = xl_table()), c("fruit", "qty"))
+})
+
+test_that("an overridden header reaches both the definition and the cell", {
+  x <- table_xml(table = xl_table(columns = xl_table_column("qty",
+                                                            header = "Quantity")))
+  expect_match(x, 'name="Quantity"', fixed = TRUE)
+  expect_equal(header_text(table = xl_table(
+    columns = xl_table_column("qty", header = "Quantity"))),
+    c("fruit", "Quantity"))
+})
+
+test_that("the range defaults to the sheet's used range", {
+  expect_match(table_xml(table = xl_table()), 'ref="A1:B4"', fixed = TRUE)
+  # a total row extends it by one, and the autofilter stays on the data only
+  x <- table_xml(table = xl_table(total_row = TRUE))
+  expect_match(x, 'ref="A1:B5"', fixed = TRUE)
+  expect_match(x, '<autoFilter ref="A1:B4"/>', fixed = TRUE)
+  expect_match(x, 'totalsRowCount="1"', fixed = TRUE)
+})
+
+test_that("total functions and labels are written", {
+  x <- table_xml(table = xl_table(total_row = TRUE, columns = list(
+    xl_table_column("fruit", total_label = "Total"),
+    xl_table_column("qty", total = "sum"))))
+  expect_match(x, 'totalsRowLabel="Total"', fixed = TRUE)
+  expect_match(x, 'totalsRowFunction="sum"', fixed = TRUE)
+})
+
+test_that("a column carrying only a total label does not confuse the total", {
+  # regression: `$total` partial-matches `total_label` once NULLs are dropped,
+  # so a label-only column looked up the label in the function table and errored
+  x <- table_xml(table = xl_table(total_row = TRUE,
+                                  columns = xl_table_column("fruit",
+                                                            total_label = "Total")))
+  expect_match(x, 'totalsRowLabel="Total"', fixed = TRUE)
+  expect_no_match(x, "totalsRowFunction", fixed = TRUE)
+})
+
+test_that("style, banding and highlight flags are written", {
+  expect_match(table_xml(table = xl_table(style = "dark 3")),
+               'name="TableStyleDark3"', fixed = TRUE)
+  # "none" (Light 0) is written as a tableStyleInfo with no name at all, not
+  # as a style called TableStyleLight0
+  x0 <- table_xml(table = xl_table(style = "none"))
+  expect_match(x0, "<tableStyleInfo showFirstColumn", fixed = TRUE)
+  expect_no_match(x0, "TableStyle", fixed = TRUE)
+  x <- table_xml(table = xl_table(first_column = TRUE, banded_columns = TRUE,
+                                  banded_rows = FALSE))
+  expect_match(x, 'showFirstColumn="1"', fixed = TRUE)
+  expect_match(x, 'showColumnStripes="1"', fixed = TRUE)
+  expect_match(x, 'showRowStripes="0"', fixed = TRUE)
+})
+
+test_that("turning off the header row removes the autofilter too", {
+  x <- table_xml(table = xl_table(header_row = FALSE))
+  expect_match(x, 'headerRowCount="0"', fixed = TRUE)
+  expect_no_match(x, "<autoFilter", fixed = TRUE)
+  # and the autofilter can be dropped on its own
+  expect_no_match(table_xml(table = xl_table(autofilter = FALSE)),
+                  "<autoFilter", fixed = TRUE)
+})
+
+test_that("a column formula is written as a calculated column", {
+  d <- sdf
+  d$double <- NA_real_
+  x <- table_xml(df = d, table = xl_table(
+    name = "Sales",
+    columns = xl_table_column("double",
+                              formula = "=Sales[[#This Row],[qty]]*2")))
+  expect_match(x, "<calculatedColumnFormula>", fixed = TRUE)
+  expect_match(x, "Sales[[#This Row],[qty]]*2", fixed = TRUE)
+})
+
+test_that("a table turns off constant memory", {
+  # worksheet_add_table() returns LXW_ERROR_FEATURE_NOT_SUPPORTED in optimize
+  # mode, so this is a hard requirement rather than a preference
+  cm <- .resolve_constant_memory(list(D = sdf), list(),
+                                 list(list(tables = list(1))))
+  expect_equal(cm$on, 0L)
+  expect_match(cm$reasons, "does not support tables while row streaming")
+  expect_equal(.resolve_constant_memory(list(D = sdf), list(),
+                                        list(list(tables = NULL)))$on, 1L)
+})
+
+test_that("a table needs a data row", {
+  expect_error(write_tmp(list(D = xl_sheet(sdf[0, ], table = xl_table()))),
+               "at least one data row")
+  # one data row plus a total row still leaves one non-total row
+  expect_silent(write_tmp(list(D = xl_sheet(sdf[1, , drop = FALSE],
+                                            table = xl_table(total_row = TRUE)))))
+})
+
+test_that("two tables on one sheet both reach the file", {
+  p <- write_tmp(list(Sales = xl_sheet(sdf, table = list(
+    xl_table(range = "A1:A4"), xl_table(range = "B1:B4")))))
+  expect_match(xlsx_part(p, "xl/tables/table1.xml", raw = TRUE),
+               'ref="A1:A4"', fixed = TRUE)
+  expect_match(xlsx_part(p, "xl/tables/table2.xml", raw = TRUE),
+               'ref="B1:B4"', fixed = TRUE)
+})
+
+test_that("a column outside the table's range is refused", {
+  expect_error(write_tmp(list(D = xl_sheet(sdf, table = xl_table(
+    range = "A1:A4", columns = xl_table_column("qty"))))),
+    'outside the table\'s range')
+})
+
 # ── Name resolution across the workbook ───────────────────────────────────────
 
 tdf <- data.frame(a = 1:2)

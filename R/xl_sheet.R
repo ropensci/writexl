@@ -556,6 +556,7 @@ print.xl_sheet <- function(x, ...) {
   }
 
   merges <- .resolve_merges(el, df, reg, header_offset, props)
+  tables <- .resolve_tables(el, df, reg, header_offset, props, table_names)
   overlay <- c(overlay, .resolve_validations(el, df, header_offset),
               .resolve_conditionals(el, df, reg, header_offset, props),
               .resolve_ignore_errors(el, df, header_offset))
@@ -577,6 +578,7 @@ print.xl_sheet <- function(x, ...) {
     page = page_payload,
     view = if (length(view)) view else NULL,
     merges = if (length(merges)) merges else NULL,
-    outline = .resolve_outline(el)
+    outline = .resolve_outline(el),
+    tables = if (length(tables)) tables else NULL
   )
 }

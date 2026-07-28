@@ -207,6 +207,14 @@ print.xl_workbook <- function(x, ...) {
     reasons <- c(reasons, sprintf(
       paste0("%d merged range(s): merges are applied after the rows are ",
              "written, which row streaming does not allow"), n_merge))
+  # worksheet_add_table() refuses in optimize mode outright, returning
+  # LXW_ERROR_FEATURE_NOT_SUPPORTED rather than quietly doing nothing
+  n_table <- if (is.null(sheets)) 0L else
+    sum(vapply(sheets, function(s) length(s$tables), integer(1)))
+  if (n_table > 0L)
+    reasons <- c(reasons, sprintf(
+      paste0("%d worksheet table(s): libxlsxwriter does not support tables ",
+             "while row streaming"), n_table))
   list(on = as.integer(!length(reasons)), reasons = reasons)
 }
 

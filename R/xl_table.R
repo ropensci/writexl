@@ -130,9 +130,11 @@ xl_table_column <- function(col, header = NULL, formula = NULL, total = NULL,
 #' @export
 print.xl_table_column <- function(x, ...) {
   p <- unclass(x)
-  cat(sprintf("<xl_table_column: %s%s%s>\n", p$col,
-              if (!is.null(p$formula)) " formula" else "",
-              if (!is.null(p$total)) paste0(" total=", p$total) else ""))
+  # `[[` not `$`: see .table_columns_payload() -- `$total` would partial-match
+  # `total_label` on a column that only carries a label
+  cat(sprintf("<xl_table_column: %s%s%s>\n", p[["col"]],
+              if (!is.null(p[["formula"]])) " formula" else "",
+              if (!is.null(p[["total"]])) paste0(" total=", p[["total"]]) else ""))
   invisible(x)
 }
 
@@ -212,8 +214,10 @@ xl_table <- function(range = NULL, name = NULL, style = "medium 9",
   tot <- flag(total_row, "total_row")
 
   if (!tot) {
+    # `[[` not `$`: `$total` partial-matches `total_label` once the NULLs are
+    # dropped, so the two conditions would not be independent
     bad <- vapply(cols, function(cc)
-      !is.null(cc$total) || !is.null(cc$total_label), logical(1))
+      !is.null(cc[["total"]]) || !is.null(cc[["total_label"]]), logical(1))
     if (any(bad))
       stop(sprintf(paste0("column %s gives a total, but the table has no total ",
                           "row; set `total_row = TRUE`"),
@@ -346,6 +350,94 @@ print.xl_table <- function(x, ...) {
     out[[i]] <- nms
   }
   out
+}
+
+# --- The C payload -----------------------------------------------------------
+#
+# Every column of the table's range gets an entry, whether or not the caller
+# named it, because _write_table_column_data() writes a header string for each
+# one and defaults it to "Column 1", "Column 2", ...  Sending the data frame's
+# own names through is what keeps the table definition and the header cells in
+# agreement, which is the difference between a file Excel opens and one it
+# offers to repair.
+.resolve_tables <- function(el, df, reg, header_offset, props, table_names) {
+  if (!inherits(el, "xl_sheet")) return(list())
+  ts <- .table_list(el$table)
+  if (!length(ts)) return(list())
+  if (nrow(df) < 1L)
+    stop("a table needs at least one data row", call. = FALSE)
+
+  lapply(seq_along(ts), function(i) {
+    p <- unclass(ts[[i]])
+    rng <- if (is.null(p$range)) {
+      last_row <- (nrow(df) - 1L) + header_offset + as.integer(p$total_row)
+      c(0L, 0L, as.integer(last_row), length(df) - 1L)
+    } else {
+      .xl_resolve_range(p$range, arg = "table range", df = df,
+                        header_offset = header_offset, allow_cell = FALSE)
+    }
+    # libxlsxwriter counts the header row but not the total row as data
+    non_header <- rng[3L] - rng[1L] - as.integer(p$total_row) +
+      as.integer(!p$header_row)
+    if (non_header < 1L)
+      stop("a table needs at least one row that is not the header or the ",
+           "total row", call. = FALSE)
+
+    cols <- .table_columns_payload(p, df, rng, reg, props)
+    out <- list(range = as.integer(rng),
+                style_type = p$style_type, style_number = p$style_number,
+                header_row = as.integer(p$header_row),
+                autofilter = as.integer(p$autofilter),
+                banded_rows = as.integer(p$banded_rows),
+                banded_columns = as.integer(p$banded_columns),
+                first_column = as.integer(p$first_column),
+                last_column = as.integer(p$last_column),
+                total_row = as.integer(p$total_row),
+                columns = cols)
+    nm <- if (i <= length(table_names)) table_names[[i]] else NA_character_
+    if (!is.na(nm)) out$name <- nm
+    out
+  })
+}
+
+# One entry per column of the range, with the caller's overrides merged over
+# the data frame's column names.
+.table_columns_payload <- function(p, df, rng, reg, props) {
+  first <- rng[2L] + 1L                    # 1-based data frame column
+  n <- rng[4L] - rng[2L] + 1L
+  specs <- vector("list", n)
+  for (cc in p$columns) {
+    q <- unclass(cc)
+    idx <- .resolve_col_index(q$col, names(df), "table column")
+    k <- idx - first + 1L
+    if (length(k) != 1L || k < 1L || k > n)
+      stop(sprintf("table column \"%s\" is outside the table's range",
+                   as.character(q$col)), call. = FALSE)
+    specs[[k]] <- q
+  }
+  # `[[` throughout, never `$`: these lists have had their NULLs dropped, and
+  # `$` partial-matches, so on a column carrying only `total_label` a `$total`
+  # would quietly return the label and a `$format` would return the header
+  # format.  Both are silent wrong answers rather than errors.
+  lapply(seq_len(n), function(k) {
+    q <- specs[[k]]
+    dfcol <- first + k - 1L
+    default_header <- if (dfcol <= length(df)) names(df)[dfcol]
+                      else sprintf("Column %d", k)
+    hdr <- q[["header"]]
+    ent <- list(header = if (!is.null(hdr)) hdr else default_header)
+    if (!is.null(q[["formula"]]))     ent$formula <- q[["formula"]]
+    if (!is.null(q[["total"]]))
+      ent$total_function <- unname(.LXW_TABLE_FUNCTION[[q[["total"]]]])
+    if (!is.null(q[["total_label"]])) ent$total_string <- q[["total_label"]]
+    if (!is.null(q[["format"]]))
+      ent$format_id <- .register_format(reg,
+        merge_xl_format(props$default_format, q[["format"]]))
+    if (!is.null(q[["header_format"]]))
+      ent$header_format_id <- .register_format(reg,
+        merge_xl_format(props$default_format, q[["header_format"]]))
+    ent
+  })
 }
 
 # Normalise one column spec or a list of them.
