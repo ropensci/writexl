@@ -197,6 +197,10 @@ xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
 #' @param outline An [xl_outline()] controlling how the grouping symbols
 #'   created by `level` in [xl_col_spec()] / [xl_row_spec()] are drawn.  It
 #'   changes their display only, never which rows are grouped.
+#' @param table One [xl_table()], or a list of them, turning a range into an
+#'   Excel table --- a named, styled block with banded rows, a filter dropdown
+#'   and an optional total row.  Any table turns off the memory-efficient
+#'   row-streaming mode, which libxlsxwriter refuses to combine with tables.
 #' @param ignore_errors A named list turning off the green error triangle Excel
 #'   shows in cells it believes are wrong.  Each name is an error type and each
 #'   value a range, e.g. `list(number_stored_as_text = "A2:A99")`.  Types:
@@ -223,7 +227,8 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
                      comment_author = NA, show_comments = FALSE,
                      page = NULL, view = NULL, merge = NULL,
                      validation = NULL, conditional = NULL,
-                     filter = NULL, outline = NULL, ignore_errors = NULL) {
+                     filter = NULL, outline = NULL, ignore_errors = NULL,
+                     table = NULL) {
   if (!is.data.frame(data))
     stop("`data` must be a data frame", call. = FALSE)
   if (!is.logical(auto_colwidth) || length(auto_colwidth) != 1L || is.na(auto_colwidth))
@@ -257,7 +262,8 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
       conditional    = conditional,
       filter         = filter,
       outline        = outline,
-      ignore_errors  = ignore_errors
+      ignore_errors  = ignore_errors,
+      table          = table
     ),
     class = "xl_sheet"
   )
@@ -408,7 +414,10 @@ print.xl_sheet <- function(x, ...) {
 }
 
 # Build the per-sheet plan (column/row/scalar options) that C applies.
-.resolve_sheet_plan <- function(el, df, reg, header_offset, props) {
+# `table_names` carries this sheet's tables' workbook-resolved names, since
+# uniqueness is settled across sheets rather than within one.
+.resolve_sheet_plan <- function(el, df, reg, header_offset, props,
+                                table_names = character(0)) {
   ncols  <- length(df)
   cnames <- names(df)
 

@@ -25,7 +25,8 @@ xl_sheet(
   conditional = NULL,
   filter = NULL,
   outline = NULL,
-  ignore_errors = NULL
+  ignore_errors = NULL,
+  table = NULL
 )
 }
 \arguments{
@@ -111,6 +112,11 @@ value a range, e.g. `list(number_stored_as_text = "A2:A99")`.  Types:
 `number_stored_as_text`, `eval_error`, `formula_differs`, `formula_range`,
 `formula_unlocked`, `empty_cell_reference`, `list_data_validation`,
 `calculated_column`, `two_digit_text_year`.}
+
+\item{table}{One [xl_table()], or a list of them, turning a range into an
+Excel table --- a named, styled block with banded rows, a filter dropdown
+and an optional total row.  Any table turns off the memory-efficient
+row-streaming mode, which libxlsxwriter refuses to combine with tables.}
 }
 \value{
 An `xl_sheet` object.

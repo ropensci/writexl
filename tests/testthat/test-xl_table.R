@@ -168,6 +168,93 @@ test_that("flag arguments are validated", {
   expect_error(xl_table(name = c("a", "b")), "single string, NULL or NA")
 })
 
+# ── Name resolution across the workbook ───────────────────────────────────────
+
+tdf <- data.frame(a = 1:2)
+tsheet <- function(x) xl_sheet(tdf, table = x)
+resolved <- function(elems) .resolve_table_names(elems, names(elems))
+
+test_that("a sheet name is sanitized into a usable table name", {
+  expect_equal(.sanitize_table_name("Sales"), "Sales")
+  expect_equal(.sanitize_table_name("My Sheet"), "My_Sheet")   # space is legal
+  expect_equal(.sanitize_table_name("a-b/c"), "a_b_c")         # in a sheet name
+  expect_equal(.sanitize_table_name("Q1.data"), "Q1.data")     # "." is allowed
+  expect_equal(.sanitize_table_name(""), "Table")
+  # the three reserved shapes get cleared rather than passed through
+  expect_equal(.sanitize_table_name("2024"), "T_2024")
+  expect_equal(.sanitize_table_name("A1"), "A1_tbl")
+  expect_equal(.sanitize_table_name("C"), "C_tbl")
+  # whatever comes out must itself be a legal table name
+  for (s in c("Sales", "My Sheet", "a-b/c", "", "2024", "A1", "C", "R"))
+    expect_silent(.check_table_name(.sanitize_table_name(s)))
+})
+
+test_that("an unnamed table takes its name from the sheet", {
+  expect_equal(resolved(list(Sales = tsheet(xl_table()))), list("Sales"))
+  expect_equal(resolved(list(`My Sheet` = tsheet(xl_table()))),
+               list("My_Sheet"))
+})
+
+test_that("generated names do not collide", {
+  # regression: comparing an original-case name against a folded set let every
+  # generated name through, so two tables on one sheet both came out "Sales"
+  expect_equal(resolved(list(Sales = tsheet(list(xl_table(), xl_table())))),
+               list(c("Sales", "Sales_2")))
+  # ... including against an explicit name, which is a fixed point
+  expect_equal(
+    resolved(list(Sales = tsheet(list(xl_table(name = "Sales"), xl_table())))),
+    list(c("Sales", "Sales_2")))
+  # and case must not hide a collision, since Excel folds table names
+  expect_equal(
+    resolved(list(Sales = tsheet(list(xl_table(name = "sales"), xl_table())))),
+    list(c("sales", "Sales_2")))
+})
+
+test_that("name = NA is left for Excel to number", {
+  expect_equal(resolved(list(Sales = tsheet(xl_table(name = NA)))),
+               list(NA_character_))
+  # and it does not take part in uniqueness, having no name to collide
+  expect_equal(
+    resolved(list(S = tsheet(list(xl_table(name = NA), xl_table())))),
+    list(c(NA, "S")))
+})
+
+test_that("a duplicate explicit name is refused, naming both sheets", {
+  # libxlsxwriter never checks this, and Excel repairs the file
+  expect_error(
+    resolved(list(A = tsheet(xl_table(name = "Totals")),
+                  B = tsheet(xl_table(name = "Totals")))),
+    'both named "Totals" \\(on sheet "A" and sheet "B"\\)')
+  # Excel compares case-insensitively, so this is the same collision
+  expect_error(
+    resolved(list(A = tsheet(xl_table(name = "Totals")),
+                  B = tsheet(xl_table(name = "totals")))),
+    "unique across the workbook")
+  # the same name twice on one sheet is caught too
+  expect_error(
+    resolved(list(A = tsheet(list(xl_table(name = "T"), xl_table(name = "T"))))),
+    "unique across the workbook")
+})
+
+test_that("a workbook with no tables resolves to nothing", {
+  expect_equal(resolved(list(A = xl_sheet(tdf), B = xl_sheet(tdf))),
+               list(character(0), character(0)))
+})
+
+test_that("duplicate table names are caught when writing", {
+  expect_error(
+    write_tmp(list(A = tsheet(xl_table(name = "Totals")),
+                   B = tsheet(xl_table(name = "Totals")))),
+    "unique across the workbook")
+})
+
+test_that("tables normalise from one or a list", {
+  expect_error(write_tmp(list(A = xl_sheet(tdf, table = "t"))),
+               "must be an xl_table object")
+  expect_error(write_tmp(list(A = xl_sheet(tdf, table = list(xl_table(), "t")))),
+               "`table\\[\\[2\\]\\]` must be an xl_table object")
+})
+
 test_that("the print methods run", {
   expect_output(print(xl_table(name = "Sales")), "Sales")
   expect_output(print(xl_table()), "unnamed")

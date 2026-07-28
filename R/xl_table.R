@@ -251,6 +251,103 @@ print.xl_table <- function(x, ...) {
   invisible(x)
 }
 
+# Normalise one table or a list of them.
+.table_list <- function(table, arg = "table") {
+  if (is.null(table)) return(list())
+  ts <- if (inherits(table, "xl_table")) list(table) else table
+  if (!is.list(ts))
+    stop(sprintf("`%s` must be an xl_table object or a list of them", arg),
+         call. = FALSE)
+  for (i in seq_along(ts))
+    if (!inherits(ts[[i]], "xl_table"))
+      stop(sprintf("`%s[[%d]]` must be an xl_table object", arg, i),
+           call. = FALSE)
+  ts
+}
+
+# --- Table names, resolved across the whole workbook -------------------------
+#
+# Excel requires table names to be unique workbook-wide, and libxlsxwriter never
+# checks that -- two tables sharing a name reach the file and Excel offers to
+# repair it.  Uniqueness therefore cannot be settled inside xl_table(), which
+# sees one table; it is settled here, where the sheets are assembled, next to
+# the sheet-name dedupe that has the same shape.
+
+# Turn any string into something Excel will accept as a table name.
+.sanitize_table_name <- function(x) {
+  chars <- strsplit(x, "", fixed = TRUE)[[1L]]
+  chars[chars %in% .TABLE_NAME_BAD_CHARS] <- "_"
+  out <- paste(chars, collapse = "")
+  if (!nzchar(out)) out <- "Table"
+  if (grepl("^[0-9]", out)) out <- paste0("T_", out)
+  # a bare C/R or a cell-reference lookalike is reserved; suffixing clears both
+  if (toupper(out) %in% c("C", "R") || grepl("^[A-Za-z]{1,3}[0-9]+$", out))
+    out <- paste0(out, "_tbl")
+  if (nchar(out) > 250L) out <- substr(out, 1L, 250L)
+  out
+}
+
+# Append _2, _3, ... until the name is free.  Excel compares table names
+# case-insensitively, so "Sales" collides with "sales" and the comparison has
+# to be folded on both sides -- folding only the stored set silently lets every
+# generated name through.
+.unique_table_name <- function(base, taken) {
+  taken <- tolower(taken)
+  if (!tolower(base) %in% taken) return(base)
+  i <- 2L
+  repeat {
+    cand <- paste0(base, "_", i)
+    if (!tolower(cand) %in% taken) return(cand)
+    i <- i + 1L
+  }
+}
+
+# Resolve every table's name across the workbook.  Returns one character vector
+# per sheet, NA meaning "write no name and let Excel number it".
+.resolve_table_names <- function(elems, sheet_names) {
+  tabs <- lapply(elems, function(el)
+    if (inherits(el, "xl_sheet")) .table_list(el$table) else list())
+  if (!length(unlist(tabs, recursive = FALSE))) return(rep(list(character(0)), length(elems)))
+
+  # explicit names first: they are fixed points, so a collision between two of
+  # them cannot be resolved by renaming either one
+  explicit <- list()
+  for (i in seq_along(tabs)) {
+    for (k in seq_along(tabs[[i]])) {
+      nm <- unclass(tabs[[i]][[k]])$name
+      if (is.null(nm) || is.na(nm)) next
+      prev <- explicit[[tolower(nm)]]
+      if (!is.null(prev))
+        stop(sprintf(paste0("two tables are both named \"%s\" (on sheet \"%s\" ",
+                            "and sheet \"%s\"); Excel requires table names to ",
+                            "be unique across the workbook"),
+                     nm, prev, sheet_names[i]), call. = FALSE)
+      explicit[[tolower(nm)]] <- sheet_names[i]
+    }
+  }
+
+  taken <- names(explicit)
+  out <- vector("list", length(elems))
+  for (i in seq_along(tabs)) {
+    nms <- character(length(tabs[[i]]))
+    base <- .sanitize_table_name(sheet_names[i])
+    for (k in seq_along(tabs[[i]])) {
+      nm <- unclass(tabs[[i]][[k]])$name
+      if (is.null(nm)) {
+        gen <- .unique_table_name(base, taken)
+        taken <- c(taken, tolower(gen))
+        nms[k] <- gen
+      } else if (is.na(nm)) {
+        nms[k] <- NA_character_
+      } else {
+        nms[k] <- nm
+      }
+    }
+    out[[i]] <- nms
+  }
+  out
+}
+
 # Normalise one column spec or a list of them.
 .table_column_list <- function(columns, arg = "columns") {
   if (is.null(columns)) return(list())
