@@ -178,7 +178,10 @@
     m <- !is.na(cells$txt) & .filter_text_match(cells$txt, value)
     keep <- if (criteria == "==") m else !m
   }
-  keep & !cells$blank
+  # A blank is not equal to anything, so "!=" keeps it -- measured; every other
+  # comparison excludes it.  Excel's own "non-blanks" is written as != " " and
+  # would be caught by this, but it never reaches here: it is handled above.
+  if (criteria == "!=") keep else keep & !cells$blank
 }
 
 .filter_keep_rules <- function(cells, p) {
@@ -240,8 +243,9 @@
 #' wildcard changes the form, and so the rule.
 #'
 #' Blank means an empty cell or an empty string; `"non-blanks"` is its exact
-#' complement.  A mixed-type column built with [xl_cell_general()] is matched
-#' cell by cell, each by its own type.
+#' complement.  Blanks are excluded by every comparison except `"!="`, which
+#' keeps them --- a blank is not equal to anything.  A mixed-type column built
+#' with [xl_cell_general()] is matched cell by cell, each by its own type.
 #'
 #' @section Limitations:
 #' A value list matches displayed text, which writexl can only predict for the

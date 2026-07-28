@@ -512,7 +512,9 @@ text column.
 
 The rest is more predictable: text comparison is case-insensitive, `*` and `?`
 are wildcards, and **blank** covers an empty cell as well as an empty string,
-with `"non-blanks"` its exact complement.
+with `"non-blanks"` its exact complement. Blanks are dropped by every
+comparison save one — `"!="` keeps them, since a blank is not equal to
+anything.
 
 ```{r}
 xl_filter("fruit", "==", "ap*")                  # wildcard, case-insensitive

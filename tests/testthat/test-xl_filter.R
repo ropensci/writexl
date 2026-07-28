@@ -69,6 +69,47 @@ test_that("a wildcard turns the same criteria into a typed comparison", {
   expect_equal(kept(num, xl_filter("q", "==", "10")), 1L)
 })
 
+test_that("a text comparison leaves number cells alone", {
+  # the mirror of the numeric case: a number is not text, so it never equals a
+  # text value -- which makes "!=" true for it
+  num <- data.frame(q = c(10, 20, 100))
+  expect_equal(kept(num, xl_filter("q", "!=", "a*")), c(1L, 2L, 3L))
+  txt <- data.frame(f = c("apple", "banana", "cherry"), stringsAsFactors = FALSE)
+  expect_equal(kept(txt, xl_filter("f", "!=", "a*")), c(2L, 3L))
+})
+
+test_that("a blank survives != but no other comparison", {
+  # a blank is not equal to anything, so "!=" keeps it.  This is the one place
+  # blanks are not silently excluded, and it is easy to get backwards.
+  df <- data.frame(v = c("a", NA, "b"), stringsAsFactors = FALSE)
+  expect_equal(kept(df, xl_filter("v", "!=", "a")), c(2L, 3L))
+  # every other comparison drops it
+  n <- data.frame(q = c(5, NA, 300))
+  expect_equal(kept(n, xl_filter("q", ">", 1)), c(1L, 3L))
+  expect_equal(kept(n, xl_filter("q", "==", 5)), 1L)
+  # "non-blanks" is written as != " " but must still exclude blanks
+  expect_equal(kept(df, xl_filter("v", "non-blanks")), c(1L, 3L))
+})
+
+test_that("== or == collapses into a two-value list", {
+  # libxlsxwriter writes this as <filters> with both values, not a custom
+  # filter, so it matches displayed text
+  df <- data.frame(f = c("apple", "banana", "cherry"), stringsAsFactors = FALSE)
+  f <- xl_filter("f", "==", "apple", "==", "cherry", and_or = "or")
+  expect_equal(kept(df, f), c(1L, 3L))
+  w <- xlsx_part(write_tmp(list(D = xl_sheet(df, filter = f))),
+                 "xl/worksheets/sheet1.xml", raw = TRUE)
+  expect_match(w, '<filter val="apple"/><filter val="cherry"/>', fixed = TRUE)
+})
+
+test_that("a value list matches a text cell that looks numeric", {
+  # the mirror of the numeric column case: val="10" matches the string "10"
+  # just as it matches the number 10
+  df <- data.frame(t = c("10", "20", "abc"), stringsAsFactors = FALSE)
+  expect_equal(kept(df, xl_filter("t", "==", 10)), 1L)
+  expect_equal(kept(df, xl_filter("t", "==", "10")), 1L)
+})
+
 test_that("a custom filter compares numerically when its value is a number", {
   # val="10" is parsed as a number even when it was given as a string
   num <- data.frame(q = c(10, 20, 100, 15))
