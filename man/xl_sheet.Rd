@@ -20,7 +20,8 @@ xl_sheet(
   show_comments = FALSE,
   page = NULL,
   view = NULL,
-  merge = NULL
+  merge = NULL,
+  validation = NULL
 )
 }
 \arguments{
@@ -81,6 +82,10 @@ into single cells.  Merges are applied after the sheet's rows are written,
 so a merge over cells the data frame filled keeps only the merged text ---
 as merging in Excel does.  Any merge turns off the memory-efficient
 row-streaming mode, since it writes back over rows already emitted.}
+
+\item{validation}{One [xl_validation()], or a list of them, restricting what
+may be typed into a range --- a dropdown, a numeric or date bound, a text
+length limit or a custom formula.}
 }
 \value{
 An `xl_sheet` object.
@@ -120,6 +125,7 @@ Other writexl:
 \code{\link[=xl_rich_run]{xl_rich_run()}},
 \code{\link[=xl_rich_string]{xl_rich_string()}},
 \code{\link[=xl_sheet_view]{xl_sheet_view()}},
+\code{\link[=xl_validation]{xl_validation()}},
 \code{\link[=xl_workbook]{xl_workbook()}}
 }
 \concept{writexl}

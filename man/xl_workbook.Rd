@@ -58,6 +58,7 @@ Other writexl:
 \code{\link[=xl_rich_run]{xl_rich_run()}},
 \code{\link[=xl_rich_string]{xl_rich_string()}},
 \code{\link[=xl_sheet]{xl_sheet()}},
-\code{\link[=xl_sheet_view]{xl_sheet_view()}}
+\code{\link[=xl_sheet_view]{xl_sheet_view()}},
+\code{\link[=xl_validation]{xl_validation()}}
 }
 \concept{writexl}

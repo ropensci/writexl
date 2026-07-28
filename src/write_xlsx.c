@@ -531,6 +531,76 @@ static int overlay_range(SEXP p, const char *key, int *out){
   return 1;
 }
 
+/* Read a datetime broken out into fields on the R side into an lxw_datetime. */
+static void payload_datetime(SEXP p, const char *key, lxw_datetime *dt){
+  SEXP v = list_get(p, key);
+  if(v == R_NilValue) return;
+  dt->year  = payload_int(v, "year");
+  dt->month = payload_int(v, "month");
+  dt->day   = payload_int(v, "day");
+  dt->hour  = payload_int(v, "hour");
+  dt->min   = payload_int(v, "min");
+  dt->sec   = payload_dbl(v, "sec");
+}
+
+/*
+ * Build and apply one lxw_data_validation.  Every field arrives resolved from
+ * R -- enums as integers, limits already sorted into the number / formula /
+ * datetime slot each belongs in -- so this is a faithful applier only.
+ *
+ * The three "on by default" toggles are only sent when the caller set them, so
+ * an absent key must leave libxlsxwriter's default alone rather than writing 0.
+ */
+static void apply_validation(cell_write_ctx *ctx, SEXP p, int *r){
+  lxw_data_validation v;
+  memset(&v, 0, sizeof(v));
+  v.validate = (uint8_t) payload_int(p, "validate");
+  v.criteria = (uint8_t) payload_int(p, "criteria");
+  if(payload_has(p, "error_type"))
+    v.error_type = (uint8_t) payload_int(p, "error_type");
+
+  /* lxw_validation_boolean is DEFAULT/OFF/ON, and the memset above already
+     leaves DEFAULT, which libxlsxwriter reads as "on" for all four of these.
+     R sends OFF or ON explicitly when the caller set one. */
+  v.ignore_blank = (uint8_t) payload_int(p, "ignore_blank");
+  v.show_input   = (uint8_t) payload_int(p, "show_input");
+  v.show_error   = (uint8_t) payload_int(p, "show_error");
+  v.dropdown     = (uint8_t) payload_int(p, "dropdown");
+
+  if(payload_has(p, "value_number"))   v.value_number   = payload_dbl(p, "value_number");
+  if(payload_has(p, "minimum_number")) v.minimum_number = payload_dbl(p, "minimum_number");
+  if(payload_has(p, "maximum_number")) v.maximum_number = payload_dbl(p, "maximum_number");
+
+  v.value_formula   = payload_str(p, "value_formula");
+  v.minimum_formula = payload_str(p, "minimum_formula");
+  v.maximum_formula = payload_str(p, "maximum_formula");
+
+  payload_datetime(p, "value_datetime",   &v.value_datetime);
+  payload_datetime(p, "minimum_datetime", &v.minimum_datetime);
+  payload_datetime(p, "maximum_datetime", &v.maximum_datetime);
+
+  v.input_title   = payload_str(p, "input_title");
+  v.input_message = payload_str(p, "input_message");
+  v.error_title   = payload_str(p, "error_title");
+  v.error_message = payload_str(p, "error_message");
+
+  /* A dropdown's choices become a NULL-terminated char* array, which
+     libxlsxwriter joins into the CSV formula Excel stores. */
+  SEXP lst = list_get(p, "value_list");
+  if(lst != R_NilValue && TYPEOF(lst) == STRSXP && Rf_length(lst) > 0){
+    R_xlen_t n = Rf_length(lst);
+    const char **items = (const char **) R_alloc((size_t) n + 1, sizeof(char *));
+    for(R_xlen_t k = 0; k < n; k++)
+      items[k] = Rf_translateCharUTF8(STRING_ELT(lst, k));
+    items[n] = NULL;
+    v.value_list = items;
+  }
+
+  assert_lxw(worksheet_data_validation_range(ctx->sheet, (lxw_row_t) r[0],
+                                             (lxw_col_t) r[1], (lxw_row_t) r[2],
+                                             (lxw_col_t) r[3], &v));
+}
+
 static void apply_overlay(cell_write_ctx *ctx, SEXP p){
   const char *kind = payload_str(p, "kind");
   bail_if(kind == NULL, "sheet overlay payload is missing a 'kind'");
@@ -541,6 +611,11 @@ static void apply_overlay(cell_write_ctx *ctx, SEXP p){
     if(r[0] >= 0 && r[2] >= r[0] && r[3] >= r[1])
       assert_lxw(worksheet_autofilter(ctx->sheet, (lxw_row_t) r[0], (lxw_col_t) r[1],
                                       (lxw_row_t) r[2], (lxw_col_t) r[3]));
+  } else if(strcmp(kind, "validation") == 0){
+    int r[4];
+    bail_if(!overlay_range(p, "range", r),
+            "validation overlay needs a length-4 range");
+    apply_validation(ctx, p, r);
   } else {
     Rf_errorcall(R_NilValue,
                  "Error in writexl: unknown sheet overlay kind '%s'", kind);

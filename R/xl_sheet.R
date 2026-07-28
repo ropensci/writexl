@@ -152,6 +152,9 @@ xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
 #'   so a merge over cells the data frame filled keeps only the merged text ---
 #'   as merging in Excel does.  Any merge turns off the memory-efficient
 #'   row-streaming mode, since it writes back over rows already emitted.
+#' @param validation One [xl_validation()], or a list of them, restricting what
+#'   may be typed into a range --- a dropdown, a numeric or date bound, a text
+#'   length limit or a custom formula.
 #' @return An `xl_sheet` object.
 #' @family writexl
 #' @seealso [xl_col_spec], [xl_row_spec], [write_xlsx]
@@ -170,7 +173,8 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
                      default_row_height = NA, auto_colwidth = FALSE,
                      autofilter = FALSE, protect = FALSE,
                      comment_author = NA, show_comments = FALSE,
-                     page = NULL, view = NULL, merge = NULL) {
+                     page = NULL, view = NULL, merge = NULL,
+                     validation = NULL) {
   if (!is.data.frame(data))
     stop("`data` must be a data frame", call. = FALSE)
   if (!is.logical(auto_colwidth) || length(auto_colwidth) != 1L || is.na(auto_colwidth))
@@ -199,7 +203,8 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
       show_comments  = show_comments,
       page           = page,
       view           = view,
-      merge          = merge
+      merge          = merge,
+      validation     = validation
     ),
     class = "xl_sheet"
   )
@@ -467,6 +472,7 @@ print.xl_sheet <- function(x, ...) {
   }
 
   merges <- .resolve_merges(el, df, reg, header_offset, props)
+  overlay <- c(overlay, .resolve_validations(el, df, header_offset))
 
   col_format_id <- vapply(col_fmt, function(f) .register_format(reg, f), integer(1))
 

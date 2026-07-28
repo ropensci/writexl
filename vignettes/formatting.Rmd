@@ -361,3 +361,40 @@ Because a merge writes back over rows already emitted, any merge turns off the
 memory-efficient row-streaming mode for the whole workbook. That is invisible
 apart from a slightly different internal string storage, but it does mean the
 whole sheet is held in memory while writing.
+
+## Data validation
+
+`xl_validation()` restricts what may be typed into a range, and pairs with
+`xl_sheet(validation = )`.
+
+```{r}
+sheet <- xl_sheet(df, validation = list(
+  xl_validation("A2:A4", type = "integer", min = 1, max = 10,
+                error_message = "Enter a whole number from 1 to 10"),
+  xl_validation("B2:B4", list = c("open", "high", "close"))
+))
+path <- write_xlsx(list(Data = sheet), tempfile(fileext = ".xlsx"))
+```
+
+Excel has seventeen internal validation types; writexl exposes five kinds ---
+`"integer"`, `"decimal"`, `"date"`, `"time"` and `"length"` --- plus `list`,
+`"custom"` and `"any"`, and works out the rest from what you pass. A limit that
+is a string beginning `"="` is a formula, and a `Date` or `POSIXct` is a
+date/time bound:
+
+```{r}
+xl_validation("C2:C4", type = "integer", criteria = ">", value = "=$Z$1")
+xl_validation("D2:D4", type = "date", criteria = ">=",
+              value = as.Date("2024-01-01"))
+```
+
+`criteria` is required for the five comparison kinds and must be omitted for
+`list`, `"custom"` and `"any"`, which carry their own meaning. Giving both
+`min` and `max` implies `"between"`, so the criteria can be left out there too.
+
+`input_title` / `input_message` show a tooltip when the cell is selected, and
+`error_title` / `error_message` appear on a bad entry; `error_type` chooses
+whether Excel refuses the entry (`"stop"`, the default) or merely warns. Excel
+limits titles to 32 characters and messages to 255, and a dropdown's choices to
+255 characters once joined by commas --- put longer lists in a range and pass a
+`"=..."` formula instead.
