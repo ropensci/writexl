@@ -680,3 +680,68 @@ two overlapping tables. Each error quotes the ranges involved.
 
 Any table also turns off the memory-efficient row-streaming mode, which
 libxlsxwriter refuses to combine with tables at all.
+
+## Images
+
+`xl_image()` places a picture on a sheet, anchored to a cell:
+
+```{r}
+logo <- system.file("help", "figures", "logo.png", package = "writexl")
+```
+```{r eval = nzchar(logo)}
+sheet <- xl_sheet(data.frame(product = c("a", "b")),
+                  image = xl_image(logo, at = "D2", scale = 0.5))
+path <- write_xlsx(list(Catalogue = sheet), tempfile(fileext = ".xlsx"))
+```
+
+The image can be a **file path**, a **raw vector** of encoded bytes, or an
+**in-memory picture** — a `raster`, a colour matrix, an RGB array, or a
+`nativeRaster`. Anything `rasterImage()` can draw can be written, so a plot
+never has to touch the disk:
+
+```{r eval = isTRUE(capabilities("png"))}
+card <- as.raster(matrix(c("red", "blue", "green", "gold"), nrow = 2))
+xl_image(card, at = "B2", scale = 20)
+```
+
+PNG, JPEG, GIF and BMP are supported, and the format is read from the file's own
+bytes rather than its extension, so a mislabelled `.png` is caught rather than
+misfiled. Encoding an in-memory picture uses R's PNG device, which is why
+`grDevices` and `graphics` are suggested packages; if they are unavailable the
+error tells you how to encode it yourself.
+
+`scale`, `offset` and `position` control size and placement, `description` and
+`decorative` set the alt text screen readers use, and `url` makes the image a
+hyperlink.
+
+### Headers, footers and backgrounds
+
+An image can also go in the printed header or footer, matched to a `&G`
+placeholder, or be tiled behind the cells as a screen watermark:
+
+```{r eval = nzchar(logo)}
+xl_page_setup(header = "&L&G&CQuarterly report",
+              header_image = list(left = logo))
+```
+
+A background is a display-only backdrop — Excel never prints it. Header and
+footer images appear only in Page Layout view and Print Preview, not in the
+normal grid.
+
+### Embedded images, and what cannot be combined
+
+`embed = TRUE` puts the image *inside* a cell, so it sizes with the cell — the
+Excel 365 "place in cell" feature. Older Excel shows `#VALUE!` in its place.
+
+Two combinations are refused, because libxlsxwriter miscounts them and Excel
+then repairs the file and drops the image:
+
+* an embedded image in a workbook that holds **any other** image;
+* a header/footer or background image on a sheet **before** one with an ordinary
+  floating image.
+
+Both errors name the sheets and the arrangement that works. Put the sheets with
+floating images first, and give embedded images a workbook of their own.
+
+Only embedded images cost the memory-efficient row-streaming mode; ordinary
+floating images leave it on, so a large sheet with a logo stays fast.

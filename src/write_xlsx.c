@@ -303,31 +303,37 @@ static void apply_page_setup(cell_write_ctx *ctx, SEXP opts){
                            (uint16_t) payload_int(p, "fit_width"),
                            (uint16_t) payload_int(p, "fit_height"));
 
-  /* Header and footer.  The _opt form is only needed to carry a margin; the
-     image fields of lxw_header_footer_options are left for a later phase, and
-     R rejects an &G/&[Picture] placeholder so libxlsxwriter's own
-     placeholder/image count check cannot fire. */
+  /* Header and footer.  The _opt form carries the margin and any images; R has
+     already checked that the &G/&[Picture] placeholders and the images agree
+     in number, so libxlsxwriter's own count check is a backstop rather than
+     the first line of defence. */
   const char *hdr = payload_str(p, "header");
   if(hdr){
-    if(payload_has(p, "header_margin")){
-      lxw_header_footer_options o;
-      memset(&o, 0, sizeof(o));
+    lxw_header_footer_options o;
+    memset(&o, 0, sizeof(o));
+    o.image_left   = (char *) payload_str(p, "header_image_left");
+    o.image_center = (char *) payload_str(p, "header_image_center");
+    o.image_right  = (char *) payload_str(p, "header_image_right");
+    if(payload_has(p, "header_margin"))
       o.margin = payload_dbl(p, "header_margin");
+    if(o.margin > 0.0 || o.image_left || o.image_center || o.image_right)
       assert_lxw(worksheet_set_header_opt(sheet, hdr, &o));
-    } else {
+    else
       assert_lxw(worksheet_set_header(sheet, hdr));
-    }
   }
   const char *ftr = payload_str(p, "footer");
   if(ftr){
-    if(payload_has(p, "footer_margin")){
-      lxw_header_footer_options o;
-      memset(&o, 0, sizeof(o));
+    lxw_header_footer_options o;
+    memset(&o, 0, sizeof(o));
+    o.image_left   = (char *) payload_str(p, "footer_image_left");
+    o.image_center = (char *) payload_str(p, "footer_image_center");
+    o.image_right  = (char *) payload_str(p, "footer_image_right");
+    if(payload_has(p, "footer_margin"))
       o.margin = payload_dbl(p, "footer_margin");
+    if(o.margin > 0.0 || o.image_left || o.image_center || o.image_right)
       assert_lxw(worksheet_set_footer_opt(sheet, ftr, &o));
-    } else {
+    else
       assert_lxw(worksheet_set_footer(sheet, ftr));
-    }
   }
 
   if(payload_int(p, "center_horizontally")) worksheet_center_horizontally(sheet);
@@ -468,6 +474,78 @@ static void apply_merges(cell_write_ctx *ctx, SEXP opts){
                                      (lxw_col_t) a[3], txt ? txt : "",
                                      ctx_format(ctx, fid)));
     UNPROTECT(1);
+  }
+}
+
+/*
+ * Place the sheet's images.  Applied after the row loop beside the merges and
+ * tables: an embedded image writes a cell, and a floating one anchors to a row
+ * whose height the row loop may still be setting.
+ *
+ * R sends either `filename` or `buffer`, which picks between the file and the
+ * _buffer variants.  Options are only filled in where R supplied them, so an
+ * unset field keeps libxlsxwriter's own default rather than a zero.
+ */
+/* The sheet's background image: a tiled screen backdrop, never printed. */
+static void apply_background(cell_write_ctx *ctx, SEXP opts){
+  SEXP bg = list_get(opts, "background");
+  if(bg == R_NilValue || !Rf_isVectorList(bg)) return;
+  SEXP buf = list_get(bg, "buffer");
+  if(buf != R_NilValue && TYPEOF(buf) == RAWSXP){
+    assert_lxw(worksheet_set_background_buffer(ctx->sheet,
+                                               (const unsigned char *) RAW(buf),
+                                               (size_t) Rf_xlength(buf)));
+  } else {
+    const char *file = payload_str(bg, "filename");
+    bail_if(file == NULL, "background has neither a filename nor a buffer");
+    assert_lxw(worksheet_set_background(ctx->sheet, file));
+  }
+}
+
+static void apply_images(cell_write_ctx *ctx, SEXP opts){
+  SEXP ims = list_get(opts, "images");
+  if(ims == R_NilValue || !Rf_isVectorList(ims)) return;
+  for(R_xlen_t k = 0; k < Rf_length(ims); k++){
+    SEXP im = VECTOR_ELT(ims, k);
+    lxw_row_t row = (lxw_row_t) payload_int(im, "row");
+    lxw_col_t col = (lxw_col_t) payload_int(im, "col");
+    int embed = payload_int(im, "embed");
+
+    lxw_image_options o = {0};
+    if(payload_has(im, "x_scale"))  o.x_scale  = payload_dbl(im, "x_scale");
+    if(payload_has(im, "y_scale"))  o.y_scale  = payload_dbl(im, "y_scale");
+    if(payload_has(im, "x_offset")) o.x_offset = payload_int(im, "x_offset");
+    if(payload_has(im, "y_offset")) o.y_offset = payload_int(im, "y_offset");
+    if(payload_has(im, "object_position"))
+      o.object_position = (uint8_t) payload_int(im, "object_position");
+    o.description = (char *) payload_str(im, "description");
+    o.url         = (char *) payload_str(im, "url");
+    o.tip         = (char *) payload_str(im, "tip");
+    if(payload_has(im, "decorative")) o.decorative = 1;
+    if(payload_has(im, "cell_format_id")){
+      int fid = payload_int(im, "cell_format_id");
+      note_protection(ctx, fid);
+      o.cell_format = ctx_format(ctx, fid);
+    }
+
+    SEXP buf = list_get(im, "buffer");
+    if(buf != R_NilValue && TYPEOF(buf) == RAWSXP){
+      const unsigned char *bytes = (const unsigned char *) RAW(buf);
+      size_t n = (size_t) Rf_xlength(buf);
+      if(embed)
+        assert_lxw(worksheet_embed_image_buffer_opt(ctx->sheet, row, col,
+                                                    bytes, n, &o));
+      else
+        assert_lxw(worksheet_insert_image_buffer_opt(ctx->sheet, row, col,
+                                                     bytes, n, &o));
+    } else {
+      const char *file = payload_str(im, "filename");
+      bail_if(file == NULL, "image payload has neither a filename nor a buffer");
+      if(embed)
+        assert_lxw(worksheet_embed_image_opt(ctx->sheet, row, col, file, &o));
+      else
+        assert_lxw(worksheet_insert_image_opt(ctx->sheet, row, col, file, &o));
+    }
   }
 }
 
@@ -1411,6 +1489,8 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
        merge turns constant memory off on the R side. */
     apply_merges(&ctx, opts);
     apply_tables(&ctx, opts);
+    apply_images(&ctx, opts);
+    apply_background(&ctx, opts);
 
     if(warn_unlocked)
       Rf_warning("Worksheet '%s' uses cell protection formatting (locked = FALSE "

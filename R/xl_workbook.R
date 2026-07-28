@@ -215,6 +215,19 @@ print.xl_workbook <- function(x, ...) {
     reasons <- c(reasons, sprintf(
       paste0("%d worksheet table(s): libxlsxwriter does not support tables ",
              "while row streaming"), n_table))
+  # An embedded image writes a cell, and worksheet_embed_image() checks the
+  # dimensions with the optimize guard active, so anchoring one above the
+  # streaming cursor fails.  A *floating* image is unaffected --
+  # worksheet_insert_image_opt() checks no dimensions at all -- so only the
+  # embedded ones cost streaming.
+  n_embed <- if (is.null(sheets)) 0L else
+    sum(vapply(sheets, function(s)
+      sum(vapply(s$images, function(i) as.integer(i$embed), integer(1)),
+          na.rm = TRUE), integer(1)))
+  if (n_embed > 0L)
+    reasons <- c(reasons, sprintf(
+      paste0("%d embedded image(s): an embedded image writes a cell, which ",
+             "row streaming does not allow above the current row"), n_embed))
   list(on = as.integer(!length(reasons)), reasons = reasons)
 }
 

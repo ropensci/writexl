@@ -26,7 +26,9 @@ xl_sheet(
   filter = NULL,
   outline = NULL,
   ignore_errors = NULL,
-  table = NULL
+  table = NULL,
+  image = NULL,
+  background = NULL
 )
 }
 \arguments{
@@ -117,6 +119,13 @@ value a range, e.g. `list(number_stored_as_text = "A2:A99")`.  Types:
 Excel table --- a named, styled block with banded rows, a filter dropdown
 and an optional total row.  Any table turns off the memory-efficient
 row-streaming mode, which libxlsxwriter refuses to combine with tables.}
+
+\item{image}{One [xl_image()], or a list of them, placing images on the
+sheet --- floating over the cells, or inside a cell with `embed = TRUE`.}
+
+\item{background}{An image tiled behind the sheet's cells, in any shape
+[xl_image()] accepts.  It is a screen backdrop only --- Excel never prints
+it.}
 }
 \value{
 An `xl_sheet` object.
@@ -153,6 +162,7 @@ Other writexl:
 \code{\link[=xl_format]{xl_format()}},
 \code{\link{xl_format_groups}},
 \code{\link[=xl_formula]{xl_formula()}},
+\code{\link[=xl_image]{xl_image()}},
 \code{\link[=xl_merge]{xl_merge()}},
 \code{\link[=xl_outline]{xl_outline()}},
 \code{\link[=xl_page_setup]{xl_page_setup()}},

@@ -56,6 +56,20 @@
   empty cell as well as an empty string. Mixed-type columns made with
   `xl_cell_general()` are matched cell by cell.
 
+* **Images** via `xl_sheet(image = xl_image(...))`, floating over the cells or,
+  with `embed = TRUE`, placed inside one. The image may be a file path, a raw
+  vector, or an in-memory picture — a `raster`, colour matrix, RGB array or
+  `nativeRaster` — so a plot never has to touch the disk. Scale, offset,
+  position, alt text and a hyperlink are all supported, and the format is read
+  from the file's own bytes rather than its extension. Also
+  `xl_sheet(background =)` for a tiled screen watermark, and images in printed
+  headers and footers via `xl_page_setup(header_image =, footer_image =)`.
+
+  Two combinations are refused, because libxlsxwriter miscounts them and Excel
+  repairs the file: an embedded image alongside any other image, and a
+  header/footer or background image on a sheet before one with a floating
+  image. Both errors name the sheets and the arrangement that works.
+
 * **Worksheet tables** via `xl_sheet(table = xl_table(...))`: a named, styled
   range with banded rows, a filter dropdown, an optional total row, and
   per-column headers, formats and formulas from `xl_table_column()`. Column

@@ -16,6 +16,8 @@ xl_page_setup(
   footer = NA,
   header_margin = NA,
   footer_margin = NA,
+  header_image = NULL,
+  footer_image = NULL,
   page_view = NA,
   first_page = NA,
   across = NA,
@@ -59,6 +61,13 @@ the sheet name, and `&&` a literal ampersand.  For example
 
 \item{header_margin, footer_margin}{Header/footer margin in inches (Excel's
 default is 0.3).  Must be greater than 0.}
+
+\item{header_image, footer_image}{Images to place in the header or footer,
+named by position: `list(left = , center = , right = )`.  Each may be a
+file path, a raw vector, or an in-memory image, exactly as [xl_image()]
+accepts.  Each image needs a matching `&G` placeholder in the
+corresponding section of `header`/`footer` --- `"&L&G"` puts one on the
+left --- and the counts must agree.}
 
 \item{page_view}{Logical; open the sheet in Excel's page-layout view rather
 than normal view.}
@@ -131,6 +140,7 @@ Other writexl:
 \code{\link[=xl_format]{xl_format()}},
 \code{\link{xl_format_groups}},
 \code{\link[=xl_formula]{xl_formula()}},
+\code{\link[=xl_image]{xl_image()}},
 \code{\link[=xl_merge]{xl_merge()}},
 \code{\link[=xl_outline]{xl_outline()}},
 \code{\link[=xl_properties]{xl_properties()}},

@@ -115,14 +115,75 @@
   if (nchar(s, type = "chars") > .HEADER_FOOTER_MAX)
     stop(sprintf("`%s` must be at most %d characters (got %d)", arg,
                  .HEADER_FOOTER_MAX, nchar(s, type = "chars")), call. = FALSE)
-  # An &G / &[Picture] placeholder needs a matching image, which writexl cannot
-  # supply yet.  libxlsxwriter would reject it with an opaque parameter-
-  # validation error, so say what is actually wrong.
-  if (grepl("&G", s, fixed = TRUE) || grepl("&[Picture]", s, fixed = TRUE))
-    stop(sprintf(paste0("`%s` contains an image placeholder (&G or &[Picture]),",
-                        " but header and footer images are not supported yet"),
-                 arg), call. = FALSE)
   s
+}
+
+# How many image placeholders a header/footer string carries.  Excel spells the
+# same thing two ways, and libxlsxwriter counts both.
+.hf_placeholders <- function(s) {
+  if (is.null(s)) return(0L)
+  n <- function(pat) length(gregexpr(pat, s, fixed = TRUE)[[1L]][
+    gregexpr(pat, s, fixed = TRUE)[[1L]] > 0L])
+  n("&G") + n("&[Picture]")
+}
+
+# The three positions a header/footer image can occupy.
+.HF_POSITIONS <- c("left", "center", "right")
+
+# Resolve a header/footer image argument to file paths.
+#
+# libxlsxwriter takes only filenames here -- lxw_header_footer_options has no
+# buffer form (upstream issue 384) -- so an in-memory image is written to a
+# temporary file, which lives as long as the session's tempdir.
+.resolve_hf_images <- function(x, arg) {
+  if (is.null(x) || (length(x) == 1L && !is.list(x) && is.na(x)))
+    return(NULL)
+  if (!is.list(x)) x <- as.list(x)
+  nms <- names(x)
+  if (is.null(nms) || any(!nzchar(nms)))
+    stop(sprintf(paste0("`%s` must be named by position, e.g. ",
+                        "list(left = \"logo.png\")"), arg), call. = FALSE)
+  bad <- setdiff(nms, .HF_POSITIONS)
+  if (length(bad))
+    stop(sprintf("`%s`: unknown position(s): %s. Use %s.", arg,
+                 paste(bad, collapse = ", "),
+                 paste(.HF_POSITIONS, collapse = ", ")), call. = FALSE)
+  if (anyDuplicated(nms))
+    stop(sprintf("`%s`: each position may be given only once", arg),
+         call. = FALSE)
+
+  out <- list()
+  for (pos in nms) {
+    img <- x[[pos]]
+    where <- sprintf("%s$%s", arg, pos)
+    if (.is_raster_like(img)) img <- .raster_to_png(img, where)
+    .check_image(img, where)
+    out[[pos]] <- if (is.raw(img)) {
+      p <- tempfile(fileext = ".img")
+      writeBin(img, p)
+      p
+    } else {
+      img
+    }
+  }
+  out
+}
+
+# libxlsxwriter requires the placeholder count to equal the image count, and
+# rejects a mismatch with a parameter-validation error that says nothing about
+# which side is short.  Checking here says which.
+.check_hf_images <- function(text, images, text_arg, image_arg) {
+  n_ph <- .hf_placeholders(text)
+  n_im <- length(images)
+  if (n_ph == n_im) return(invisible(NULL))
+  if (n_im > n_ph)
+    stop(sprintf(paste0("`%s` gives %d image(s) but `%s` has %d image ",
+                        "placeholder(s); add &G where each image should sit, ",
+                        "e.g. \"&L&G\" for a left image"),
+                 image_arg, n_im, text_arg, n_ph), call. = FALSE)
+  stop(sprintf(paste0("`%s` has %d image placeholder(s) (&G or &[Picture]) but ",
+                      "`%s` gives %d image(s)"),
+               text_arg, n_ph, image_arg, n_im), call. = FALSE)
 }
 
 # Validate a header/footer margin.  libxlsxwriter applies it only when it is
@@ -208,6 +269,12 @@
 #'   the sheet name, and `&&` a literal ampersand.  For example
 #'   `"&LQ1 report&RPage &P of &N"`.  Image placeholders (`&G` /
 #'   `&[Picture]`) are not supported yet and are rejected.
+#' @param header_image,footer_image Images to place in the header or footer,
+#'   named by position: `list(left = , center = , right = )`.  Each may be a
+#'   file path, a raw vector, or an in-memory image, exactly as [xl_image()]
+#'   accepts.  Each image needs a matching `&G` placeholder in the
+#'   corresponding section of `header`/`footer` --- `"&L&G"` puts one on the
+#'   left --- and the counts must agree.
 #' @param header_margin,footer_margin Header/footer margin in inches (Excel's
 #'   default is 0.3).  Must be greater than 0.
 #' @param page_view Logical; open the sheet in Excel's page-layout view rather
@@ -254,10 +321,17 @@ xl_page_setup <- function(orientation = NA, paper = NA, margins = NULL,
                           center_horizontally = NA, center_vertically = NA,
                           header = NA, footer = NA,
                           header_margin = NA, footer_margin = NA,
+                          header_image = NULL, footer_image = NULL,
                           page_view = NA, first_page = NA, across = NA,
                           black_and_white = NA, row_col_headers = NA,
                           print_area = NULL, repeat_rows = NA,
                           repeat_cols = NA, h_breaks = NULL, v_breaks = NULL) {
+  hdr_images <- .resolve_hf_images(header_image, "header_image")
+  ftr_images <- .resolve_hf_images(footer_image, "footer_image")
+  .check_hf_images(.check_header_footer(header, "header"), hdr_images,
+                   "header", "header_image")
+  .check_hf_images(.check_header_footer(footer, "footer"), ftr_images,
+                   "footer", "footer_image")
   if (!is.null(h_breaks) || !is.null(v_breaks)) {
     fit <- .resolve_fit_to(fit_to)
     if (!is.null(fit))
@@ -277,6 +351,8 @@ xl_page_setup <- function(orientation = NA, paper = NA, margins = NULL,
     footer              = .check_header_footer(footer, "footer"),
     header_margin       = .check_hf_margin(header_margin, "header_margin"),
     footer_margin       = .check_hf_margin(footer_margin, "footer_margin"),
+    header_image        = hdr_images,
+    footer_image        = ftr_images,
     page_view           = .val_flag(page_view, "page_view"),
     first_page          = .val_int(first_page, "first_page", min = 0),
     across              = .val_flag(across, "across"),
@@ -337,5 +413,11 @@ print.xl_page_setup <- function(x, ...) {
   if (!is.null(p$footer)) out$footer <- p$footer
   if (!is.null(p$header_margin)) out$header_margin <- as.numeric(p$header_margin)
   if (!is.null(p$footer_margin)) out$footer_margin <- as.numeric(p$footer_margin)
+  for (side in c("header", "footer"))
+    for (pos in .HF_POSITIONS) {
+      f <- p[[paste0(side, "_image")]][[pos]]
+      if (!is.null(f))
+        out[[sprintf("%s_image_%s", side, pos)]] <- f
+    }
   if (length(out)) out else NULL
 }
