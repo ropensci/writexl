@@ -589,6 +589,21 @@ not the *text* `"20"` in row 2. A value list works the other way: because it
 matches displayed text, `xl_filter("v", list = "20")` keeps both row 2 and
 row 5.
 
+### Asking without writing
+
+The matching rule is available on its own, so you can see which rows a filter
+would leave visible without writing a file:
+
+```{r}
+sales <- data.frame(fruit = c("apple", "banana", "cherry"),
+                    qty = c(5, 150, 300))
+xl_filter_keep(sales, xl_filter("qty", ">", 100))
+sales[xl_filter_keep(sales, xl_filter("fruit", "==", "*a*")), ]
+```
+
+`xl_sheet(filter =)` uses this same function to decide what to hide, so the two
+cannot disagree.
+
 Two things are refused rather than guessed at. A column of **formulas** cannot
 be filtered, because writexl does not know what Excel would compute. And a
 **date** column cannot be filtered by `"=="` or `list`: those match displayed

@@ -269,7 +269,7 @@
 #'   character vector.  Matched case-insensitively, as Excel does.
 #' @return An `xl_filter` object.
 #' @family writexl
-#' @seealso [xl_sheet]
+#' @seealso [xl_sheet], [xl_filter_keep]
 #' @export
 #' @examples
 #' xl_filter("qty", ">", 100)
@@ -316,6 +316,70 @@ print.xl_filter <- function(x, ...) {
   invisible(x)
 }
 
+# Normalise one filter or a list of them to a checked list.
+.filter_list <- function(filter, arg = "filter") {
+  if (is.null(filter)) return(list())
+  fs <- if (inherits(filter, "xl_filter")) list(filter) else filter
+  if (!is.list(fs))
+    stop(sprintf("`%s` must be an xl_filter object or a list of them", arg),
+         call. = FALSE)
+  for (i in seq_along(fs))
+    if (!inherits(fs[[i]], "xl_filter"))
+      stop(sprintf("`%s[[%d]]` must be an xl_filter object", arg, i),
+           call. = FALSE)
+  fs
+}
+
+#' Which rows an Excel autofilter would leave visible
+#'
+#' @description
+#' `xl_filter_keep()` answers, for a data frame and a set of [xl_filter()]
+#' rules, the question `xl_sheet(filter =)` has to answer internally: which
+#' rows does Excel leave visible?  It writes nothing --- it is the matching
+#' rule on its own, exported because reproducing Excel's filter semantics is
+#' hard to get right and useful outside writing a file.
+#'
+#' The rules are described in detail under [xl_filter()], and were established
+#' by measurement rather than from documentation: a workbook was written with
+#' criteria set and no rows hidden, opened in Excel, and Data > Reapply pressed
+#' so that Excel computed each match itself.
+#'
+#' @section Accuracy:
+#' This function tracks Excel's *observed* behaviour, so a case found to
+#' disagree with Excel is treated as a bug and fixed, which may change the rows
+#' it returns.  One limitation is known: a filter written as a value list
+#' (`"=="` without a wildcard, or `list`) matches the text a cell **displays**,
+#' which writexl can only predict for the General format.  A numeric column
+#' carrying a custom number format may therefore display differently from what
+#' is compared here --- prefer a comparison such as `">="` on such a column.
+#' Dates are refused outright for the same reason.  See [xl_filter()].
+#'
+#' @param data A data frame whose columns the filters name.
+#' @param filter One [xl_filter()], or a list of them.  Filters on different
+#'   columns combine with AND, as they do in Excel.
+#' @return A logical vector with one element per row of `data`, `TRUE` where
+#'   the row stays visible.
+#' @family writexl
+#' @seealso [xl_filter], [xl_sheet]
+#' @export
+#' @examples
+#' sales <- data.frame(fruit = c("apple", "banana", "cherry"),
+#'                     qty = c(5, 150, 300))
+#' xl_filter_keep(sales, xl_filter("qty", ">", 100))
+#' sales[xl_filter_keep(sales, xl_filter("fruit", "==", "*a*")), ]
+#'
+#' # filters on different columns combine with AND
+#' xl_filter_keep(sales, list(xl_filter("qty", ">", 100),
+#'                            xl_filter("fruit", "==", "b*")))
+xl_filter_keep <- function(data, filter) {
+  if (!is.data.frame(data))
+    stop("`data` must be a data frame", call. = FALSE)
+  fs <- .filter_list(filter)
+  keep <- rep(TRUE, nrow(data))
+  for (f in fs) keep <- keep & .filter_keep(f, data)
+  keep
+}
+
 # Which data rows one filter keeps.
 .filter_keep <- function(f, df) {
   p <- unclass(f)
@@ -335,19 +399,12 @@ print.xl_filter <- function(x, ...) {
 .resolve_filters <- function(el, df, header_offset) {
   if (!inherits(el, "xl_sheet") || is.null(el$filter))
     return(list(payloads = list(), hide = integer(0)))
-  fs <- if (inherits(el$filter, "xl_filter")) list(el$filter) else el$filter
-  if (!is.list(fs))
-    stop("`filter` must be an xl_filter object or a list of them", call. = FALSE)
-
-  keep <- rep(TRUE, nrow(df))
+  fs <- .filter_list(el$filter)
+  # the rows to hide come from the exported predicate, so the file and
+  # xl_filter_keep() can never disagree about what Excel would show
+  keep <- xl_filter_keep(df, fs)
   payloads <- lapply(seq_along(fs), function(i) {
-    f <- fs[[i]]
-    if (!inherits(f, "xl_filter"))
-      stop(sprintf("`filter[[%d]]` must be an xl_filter object", i),
-           call. = FALSE)
-    p <- unclass(f)
-    # filters on different columns combine with AND, as they do in Excel
-    keep <<- keep & .filter_keep(f, df)
+    p <- unclass(fs[[i]])
     out <- list(kind = "filter",
                 col = .resolve_col_index(p$col, names(df), "filter col") - 1L)
     if (!is.null(p$list)) {

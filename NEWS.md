@@ -56,6 +56,11 @@
   empty cell as well as an empty string. Mixed-type columns made with
   `xl_cell_general()` are matched cell by cell.
 
+* `xl_filter_keep()` exposes the matching rule on its own: given a data frame
+  and one or more `xl_filter()`s, it returns which rows Excel would leave
+  visible, without writing anything. `xl_sheet(filter =)` uses it to decide
+  what to hide, so the two cannot disagree.
+
 * Column widths and row heights may be given in **pixels** ---
   `xl_col_spec(width_pixels =)` and `xl_row_spec(height_pixels =)` --- as well
   as in Excel's character units and points.

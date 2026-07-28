@@ -53,6 +53,7 @@ Other writexl:
 \code{\link[=xl_comment]{xl_comment()}},
 \code{\link{xl_conditional}},
 \code{\link[=xl_filter]{xl_filter()}},
+\code{\link[=xl_filter_keep]{xl_filter_keep()}},
 \code{\link{xl_format_groups}},
 \code{\link[=xl_formula]{xl_formula()}},
 \code{\link[=xl_merge]{xl_merge()}},

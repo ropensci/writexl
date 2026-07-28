@@ -268,6 +268,53 @@ test_that("row hiding survives every special column type", {
     xl_rich_string(xl_rich_run("pl"), xl_rich_run("ain"))))), f), 2L)
 })
 
+# ── The exported predicate ────────────────────────────────────────────────────
+
+test_that("xl_filter_keep returns one logical per row", {
+  sales <- data.frame(fruit = c("apple", "banana", "cherry"),
+                      qty = c(5, 150, 300), stringsAsFactors = FALSE)
+  expect_identical(xl_filter_keep(sales, xl_filter("qty", ">", 100)),
+                   c(FALSE, TRUE, TRUE))
+  expect_length(xl_filter_keep(sales, xl_filter("qty", ">", 100)), nrow(sales))
+})
+
+test_that("xl_filter_keep combines a list with AND", {
+  sales <- data.frame(fruit = c("apple", "banana", "cherry"),
+                      qty = c(5, 150, 300), stringsAsFactors = FALSE)
+  expect_identical(
+    xl_filter_keep(sales, list(xl_filter("qty", ">", 100),
+                               xl_filter("fruit", "==", "b*"))),
+    c(FALSE, TRUE, FALSE))
+  # no filters at all keeps everything
+  expect_identical(xl_filter_keep(sales, list()), rep(TRUE, 3))
+  expect_identical(xl_filter_keep(sales, NULL), rep(TRUE, 3))
+})
+
+test_that("xl_filter_keep agrees with the rows the file hides", {
+  # the written file and the exported predicate share one implementation, and
+  # this pins that they cannot drift apart
+  df <- data.frame(q = c(5, 150, 20, 300, 75))
+  f <- xl_filter("q", ">", 100)
+  keep <- xl_filter_keep(df, f)
+  # data row i is sheet row i + 1, since the header takes row 1
+  expect_equal(filter_hidden(df, f), which(!keep) + 1L)
+})
+
+test_that("xl_filter_keep validates its arguments", {
+  df <- data.frame(q = 1:3)
+  expect_error(xl_filter_keep(1:3, xl_filter("q", ">", 1)),
+               "`data` must be a data frame")
+  expect_error(xl_filter_keep(df, "q>1"), "must be an xl_filter object")
+  expect_error(xl_filter_keep(df, list(xl_filter("q", ">", 1), "nope")),
+               "`filter\\[\\[2\\]\\]` must be an xl_filter object")
+  expect_error(xl_filter_keep(df, xl_filter("nope", ">", 1)), "unknown column")
+})
+
+test_that("xl_filter_keep handles a zero-row data frame", {
+  df <- data.frame(q = numeric(0))
+  expect_identical(xl_filter_keep(df, xl_filter("q", ">", 1)), logical(0))
+})
+
 # ── Validation ────────────────────────────────────────────────────────────────
 
 test_that("a filter on a formula column is refused, naming the row", {
