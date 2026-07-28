@@ -352,6 +352,26 @@ print.xl_table <- function(x, ...) {
   out
 }
 
+# The per-column formats a sheet's tables set, indexed by data frame column.
+#
+# These have to reach the sheet's own column plan.  libxlsxwriter applies a
+# table column's `format` only to cells it writes itself -- the total cell in
+# _write_column_function() and a calculated column in _write_column_formula() --
+# and never to data already written by the row loop.  Left to it, setting a
+# format on an ordinary column would do nothing at all, silently.
+.table_column_formats <- function(el, df) {
+  out <- vector("list", length(df))
+  if (!inherits(el, "xl_sheet")) return(out)
+  for (tb in .table_list(el$table))
+    for (cc in unclass(tb)[["columns"]]) {
+      q <- unclass(cc)
+      if (is.null(q[["format"]])) next
+      for (idx in .resolve_col_index(q[["col"]], names(df), "table column"))
+        out[[idx]] <- q[["format"]]
+    }
+  out
+}
+
 # --- Conflicts -----------------------------------------------------------
 #
 # Excel drops or repairs each of these rather than reporting them, and
@@ -534,8 +554,12 @@ print.xl_table <- function(x, ...) {
       ent$format_id <- .register_format(reg,
         merge_xl_format(props$default_format, q[["format"]]))
     if (!is.null(q[["header_format"]]))
+      # cascade over the workbook's header format rather than replacing it, so
+      # an italic header stays bold and centred like every other header
       ent$header_format_id <- .register_format(reg,
-        merge_xl_format(props$default_format, q[["header_format"]]))
+        merge_xl_format(merge_xl_format(props$default_format,
+                                        props$header_format),
+                        q[["header_format"]]))
     ent
   })
 }

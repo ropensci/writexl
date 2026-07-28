@@ -477,6 +477,14 @@ print.xl_sheet <- function(x, ...) {
         row_level  <- c(row_level, if (!is.null(geo$level)) as.integer(geo$level) else NA_integer_)
       }
     }
+    # A table column's format reaches the data cells only through the column
+    # plan; libxlsxwriter never applies it to rows already written.  It merges
+    # over any xl_col_spec() format, being the more specific of the two.
+    tfmt <- .table_column_formats(el, df)
+    for (i in seq_along(tfmt))
+      if (!is.null(tfmt[[i]]))
+        col_fmt[[i]] <- merge_xl_format(col_fmt[[i]], tfmt[[i]])
+
     freeze <- .parse_freeze(el$freeze)
     gridlines <- if (is.na(el$gridlines)) -1L else if (isTRUE(el$gridlines)) 3L else 0L
     tab_color <- if (is.na(el$tab_color)) -1L else xl_color(el$tab_color)

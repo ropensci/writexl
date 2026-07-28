@@ -275,6 +275,44 @@ test_that("a column formula is written as a calculated column", {
   expect_match(x, "Sales[[#This Row],[qty]]*2", fixed = TRUE)
 })
 
+test_that("a column format reaches the data cells", {
+  # libxlsxwriter applies a table column's format only to cells it writes
+  # itself -- the total cell and a calculated column -- never to data already
+  # written, so left to it this argument would silently do nothing
+  p <- write_tmp(list(Sales = xl_sheet(sdf, table = xl_table(
+    columns = xl_table_column("qty", format = xl_num_format("$#,##0.00"))))))
+  s <- xlsx_part(p, "xl/styles.xml", raw = TRUE)
+  w <- xlsx_part(p, "xl/worksheets/sheet1.xml", raw = TRUE)
+  expect_match(s, "$#,##0.00", fixed = TRUE)
+  # the column carries the style, and so does the data cell
+  expect_match(w, '<col min="2" max="2"', fixed = TRUE)
+  expect_match(regmatches(w, regexpr('<row r="2".*?</row>', w)),
+               '<c r="B2" s=', fixed = TRUE)
+})
+
+test_that("a column format merges over an xl_col_spec format", {
+  # the table column is the more specific of the two, so it wins on conflict
+  # while leaving the rest of the column's format in place
+  p <- write_tmp(list(Sales = xl_sheet(sdf,
+    cols = xl_col_spec("qty", format = xl_font(bold = TRUE)),
+    table = xl_table(columns = xl_table_column("qty",
+                                               format = xl_num_format("0.000"))))))
+  s <- xlsx_part(p, "xl/styles.xml", raw = TRUE)
+  expect_match(s, "0.000", fixed = TRUE)
+  expect_match(s, "<b/>", fixed = TRUE)
+})
+
+test_that("a header format cascades over the workbook header format", {
+  # an italic header should stay bold and centred like every other header,
+  # rather than replacing the default outright
+  p <- write_tmp(list(Sales = xl_sheet(sdf, table = xl_table(
+    columns = xl_table_column("qty", header_format = xl_font(italic = TRUE))))))
+  s <- xlsx_part(p, "xl/styles.xml", raw = TRUE)
+  fonts <- regmatches(s, regexpr("<fonts.*?</fonts>", s))
+  # some font carries both, which only happens if the two were merged
+  expect_match(fonts, "<b/><i/>|<i/><b/>")
+})
+
 test_that("a table turns off constant memory", {
   # worksheet_add_table() returns LXW_ERROR_FEATURE_NOT_SUPPORTED in optimize
   # mode, so this is a hard requirement rather than a preference
