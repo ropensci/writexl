@@ -201,6 +201,8 @@ xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
 #'   Excel table --- a named, styled block with banded rows, a filter dropdown
 #'   and an optional total row.  Any table turns off the memory-efficient
 #'   row-streaming mode, which libxlsxwriter refuses to combine with tables.
+#' @param image One [xl_image()], or a list of them, placing images on the
+#'   sheet --- floating over the cells, or inside a cell with `embed = TRUE`.
 #' @param ignore_errors A named list turning off the green error triangle Excel
 #'   shows in cells it believes are wrong.  Each name is an error type and each
 #'   value a range, e.g. `list(number_stored_as_text = "A2:A99")`.  Types:
@@ -228,7 +230,7 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
                      page = NULL, view = NULL, merge = NULL,
                      validation = NULL, conditional = NULL,
                      filter = NULL, outline = NULL, ignore_errors = NULL,
-                     table = NULL) {
+                     table = NULL, image = NULL) {
   if (!is.data.frame(data))
     stop("`data` must be a data frame", call. = FALSE)
   if (!is.logical(auto_colwidth) || length(auto_colwidth) != 1L || is.na(auto_colwidth))
@@ -263,7 +265,8 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
       filter         = filter,
       outline        = outline,
       ignore_errors  = ignore_errors,
-      table          = table
+      table          = table,
+      image          = image
     ),
     class = "xl_sheet"
   )
@@ -565,6 +568,7 @@ print.xl_sheet <- function(x, ...) {
 
   merges <- .resolve_merges(el, df, reg, header_offset, props)
   tables <- .resolve_tables(el, df, reg, header_offset, props, table_names)
+  images <- .resolve_images(el, df, reg, header_offset, props)
   overlay <- c(overlay, .resolve_validations(el, df, header_offset),
               .resolve_conditionals(el, df, reg, header_offset, props),
               .resolve_ignore_errors(el, df, header_offset))
@@ -587,6 +591,7 @@ print.xl_sheet <- function(x, ...) {
     view = if (length(view)) view else NULL,
     merges = if (length(merges)) merges else NULL,
     outline = .resolve_outline(el),
-    tables = if (length(tables)) tables else NULL
+    tables = if (length(tables)) tables else NULL,
+    images = if (length(images)) images else NULL
   )
 }

@@ -471,6 +471,62 @@ static void apply_merges(cell_write_ctx *ctx, SEXP opts){
   }
 }
 
+/*
+ * Place the sheet's images.  Applied after the row loop beside the merges and
+ * tables: an embedded image writes a cell, and a floating one anchors to a row
+ * whose height the row loop may still be setting.
+ *
+ * R sends either `filename` or `buffer`, which picks between the file and the
+ * _buffer variants.  Options are only filled in where R supplied them, so an
+ * unset field keeps libxlsxwriter's own default rather than a zero.
+ */
+static void apply_images(cell_write_ctx *ctx, SEXP opts){
+  SEXP ims = list_get(opts, "images");
+  if(ims == R_NilValue || !Rf_isVectorList(ims)) return;
+  for(R_xlen_t k = 0; k < Rf_length(ims); k++){
+    SEXP im = VECTOR_ELT(ims, k);
+    lxw_row_t row = (lxw_row_t) payload_int(im, "row");
+    lxw_col_t col = (lxw_col_t) payload_int(im, "col");
+    int embed = payload_int(im, "embed");
+
+    lxw_image_options o = {0};
+    if(payload_has(im, "x_scale"))  o.x_scale  = payload_dbl(im, "x_scale");
+    if(payload_has(im, "y_scale"))  o.y_scale  = payload_dbl(im, "y_scale");
+    if(payload_has(im, "x_offset")) o.x_offset = payload_int(im, "x_offset");
+    if(payload_has(im, "y_offset")) o.y_offset = payload_int(im, "y_offset");
+    if(payload_has(im, "object_position"))
+      o.object_position = (uint8_t) payload_int(im, "object_position");
+    o.description = (char *) payload_str(im, "description");
+    o.url         = (char *) payload_str(im, "url");
+    o.tip         = (char *) payload_str(im, "tip");
+    if(payload_has(im, "decorative")) o.decorative = 1;
+    if(payload_has(im, "cell_format_id")){
+      int fid = payload_int(im, "cell_format_id");
+      note_protection(ctx, fid);
+      o.cell_format = ctx_format(ctx, fid);
+    }
+
+    SEXP buf = list_get(im, "buffer");
+    if(buf != R_NilValue && TYPEOF(buf) == RAWSXP){
+      const unsigned char *bytes = (const unsigned char *) RAW(buf);
+      size_t n = (size_t) Rf_xlength(buf);
+      if(embed)
+        assert_lxw(worksheet_embed_image_buffer_opt(ctx->sheet, row, col,
+                                                    bytes, n, &o));
+      else
+        assert_lxw(worksheet_insert_image_buffer_opt(ctx->sheet, row, col,
+                                                     bytes, n, &o));
+    } else {
+      const char *file = payload_str(im, "filename");
+      bail_if(file == NULL, "image payload has neither a filename nor a buffer");
+      if(embed)
+        assert_lxw(worksheet_embed_image_opt(ctx->sheet, row, col, file, &o));
+      else
+        assert_lxw(worksheet_insert_image_opt(ctx->sheet, row, col, file, &o));
+    }
+  }
+}
+
 /* Apply per-sheet scalar options (freeze panes, gridlines, tab color, ...). */
 static void apply_sheet_scalars(cell_write_ctx *ctx, SEXP opts){
   if(opts == R_NilValue) return;
@@ -1411,6 +1467,7 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
        merge turns constant memory off on the R side. */
     apply_merges(&ctx, opts);
     apply_tables(&ctx, opts);
+    apply_images(&ctx, opts);
 
     if(warn_unlocked)
       Rf_warning("Worksheet '%s' uses cell protection formatting (locked = FALSE "
