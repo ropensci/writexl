@@ -11,18 +11,33 @@
 # That makes writexl responsible for reproducing Excel's matching rules
 # exactly.  They were established by writing a workbook with criteria but no
 # hidden rows, opening it in Excel and using Data > Reapply, which makes Excel
-# compute the match itself:
+# compute the match itself.
 #
-#   * text comparison is case-INsensitive         ("Apple" matches "apple")
-#   * "*" and "?" in a text value are wildcards   ("ap*" matches "apricot")
-#   * blank means an empty cell OR an empty string, and non-blank is its exact
-#     complement -- the two partition the column
-#   * there is no type coercion: a numeric criteria matches no text cell
-#   * list membership follows the same case-insensitive rule as equality
+# What the measurements showed is that the rules are not a property of the
+# criteria alone: they are a property of the XML form libxlsxwriter chooses.
+# _set_custom_filter() in worksheet.c picks one of two forms, and Excel matches
+# them by entirely different rules:
 #
-# The one rule inferred rather than observed is the mirror of the fourth: a
-# text criteria is taken to match no numeric cell, by symmetry with the tested
-# direction.
+#   <filters>        "==" and "blanks", unless the value holds a * or ?
+#   <customFilters>  everything else, including "==" with a wildcard
+#
+#   <filters>        matches the cell's DISPLAYED TEXT, case-insensitively.
+#                    The R type of `value` does not enter into it: `== 10`,
+#                    `== "10"` and `list = "10"` all write val="10", and all
+#                    three match the number 10 and the string "10" alike.
+#   <customFilters>  matches by type.  If the written value parses as a number
+#                    the comparison is numeric, and a text cell never satisfies
+#                    it -- except "!=", which a text cell satisfies vacuously.
+#                    Otherwise the comparison is textual, case-insensitive,
+#                    with * and ? as wildcards, and a number cell never
+#                    satisfies it.
+#
+# So `== "10"` keeps the number 10 (it is a value list) while `== "1*"` keeps
+# nothing (it is a custom filter, and no number is text).  Only the string
+# written to val matters, which is why the two disagree.
+#
+# Blank cells satisfy "blanks" and nothing else; "non-blanks" is its exact
+# complement, so the two partition the column.
 # -----------------------------------------------------------------------------
 
 .LXW_FILTER_CRITERIA <- c(
@@ -35,48 +50,166 @@
 # The criteria that compare magnitudes, and so need a numeric column.
 .FILTER_NUMERIC_CRITERIA <- c(">", "<", ">=", "<=")
 
-# Excel treats an absent cell and an empty string alike (verified).
-.filter_is_blank <- function(x) {
-  if (is.character(x)) is.na(x) | !nzchar(x) else is.na(x)
-}
-
 # Excel matches text case-insensitively and honours * and ? as wildcards.
 .filter_text_match <- function(x, value) {
   pat <- utils::glob2rx(as.character(value))
   grepl(pat, as.character(x), ignore.case = TRUE)
 }
 
-# Evaluate one rule against a column, returning TRUE where the row is kept.
-# A blank never matches a comparison in Excel, so NA propagates to FALSE.
-.filter_rule_keep <- function(x, criteria, value) {
-  blank <- .filter_is_blank(x)
-  if (criteria == "blanks")     return(blank)
-  if (criteria == "non-blanks") return(!blank)
+# --- How a column looks to Excel ---------------------------------------------
+# Every column is reduced to three parallel vectors: the numeric value of the
+# cells Excel stores as numbers, the text of the cells it stores as strings,
+# and which cells are blank.  A cell contributes to exactly one of the first
+# two, which is what lets a mixed xl_cell_general column be matched per cell.
+.filter_cells <- function(x, nm) {
+  if (inherits(x, "xl_cell_general")) return(.filter_cells_general(x, nm))
+  n <- length(x)
+  none <- rep(NA_character_, n)
+  if (inherits(x, "Date") || inherits(x, "POSIXct"))
+    return(list(num = as.numeric(x), txt = none, blank = is.na(x),
+                dated = TRUE))
+  if (is.numeric(x))
+    return(list(num = as.numeric(x), txt = none, blank = is.na(x),
+                dated = FALSE))
+  # Excel stores a logical as a boolean, displayed as TRUE/FALSE, and does not
+  # compare it numerically -- so it behaves as text here.
+  if (is.logical(x))
+    return(list(num = rep(NA_real_, n),
+                txt = ifelse(is.na(x), NA_character_, as.character(x)),
+                blank = is.na(x), dated = FALSE))
+  ch <- as.character(x)
+  list(num = rep(NA_real_, n), txt = ch, blank = is.na(ch) | !nzchar(ch),
+       dated = FALSE)
+}
 
-  numeric_col <- is.numeric(x) || inherits(x, "Date") || inherits(x, "POSIXct")
-  numeric_val <- is.numeric(value) || inherits(value, "Date") ||
-                 inherits(value, "POSIXct")
-
-  # no coercion in either direction: a criteria of the wrong kind matches
-  # nothing at all
-  if (criteria %in% .FILTER_NUMERIC_CRITERIA && !numeric_col)
-    return(rep(FALSE, length(x)))
-  if (numeric_val && !numeric_col) return(rep(FALSE, length(x)))
-  if (!numeric_val && numeric_col) return(rep(FALSE, length(x)))
-
-  keep <- if (numeric_col) {
-    v <- as.numeric(value)
-    n <- as.numeric(x)
-    switch(criteria,
-           "==" = n == v, "!=" = n != v, ">" = n > v,
-           "<"  = n <  v, ">=" = n >= v, "<=" = n <= v)
-  } else {
-    m <- .filter_text_match(x, value)
-    switch(criteria, "==" = m, "!=" = !m,
-           stop(sprintf("`criteria = \"%s\"` needs a numeric column", criteria),
-                call. = FALSE))
+.filter_cells_general <- function(x, nm) {
+  recs <- unclass(x)
+  n <- length(recs)
+  num <- rep(NA_real_, n)
+  txt <- rep(NA_character_, n)
+  dated <- FALSE
+  for (i in seq_len(n)) {
+    r <- recs[[i]]
+    if (!is.null(r$formula) && length(r$formula) && !is.na(r$formula))
+      stop(sprintf(paste0("cannot filter column \"%s\": row %d holds a ",
+                          "formula, so writexl cannot know the value Excel ",
+                          "would match. Filter on a plain column instead."),
+                   nm, i), call. = FALSE)
+    v <- r$value
+    if (is_xl_rich_string(v)) {
+      txt[i] <- format(v)
+    } else if (is.null(v) || (length(v) == 1L && !is_xl_rich_string(v) &&
+                              is.na(v))) {
+      # no value: a hyperlink cell displays its URL
+      hl <- r$hyperlink
+      if (is.character(hl) && length(hl) == 1L && !is.na(hl)) txt[i] <- hl
+      else if (is.list(hl) && !is.null(hl$url)) txt[i] <- as.character(hl$url)
+    } else if (inherits(v, "Date") || inherits(v, "POSIXct")) {
+      num[i] <- as.numeric(v)
+      dated <- TRUE
+    } else if (is.numeric(v)) {
+      num[i] <- as.numeric(v)
+    } else {
+      txt[i] <- as.character(v)
+    }
   }
-  keep & !blank
+  list(num = num, txt = txt,
+       blank = is.na(num) & (is.na(txt) | !nzchar(txt)), dated = dated)
+}
+
+# The text Excel shows for a cell, which is what a <filters> list matches.
+.filter_display <- function(cells) {
+  out <- cells$txt
+  ok <- is.na(out) & !is.na(cells$num)
+  # format() per element: a shared format would pad 10 to "10.0" beside 20.5
+  out[ok] <- vapply(cells$num[ok], function(z)
+    format(z, trim = TRUE, scientific = FALSE, digits = 15), character(1))
+  out
+}
+
+# --- Which XML form a rule takes ---------------------------------------------
+# Mirrors _set_custom_filter() in worksheet.c.  It has to be mirrored rather
+# than guessed, because the form decides the matching rules.
+.filter_wildcard <- function(v) is.character(v) && any(grepl("[*?]", v))
+
+.filter_is_custom <- function(p) {
+  custom <- !(identical(p$criteria, "==") || identical(p$criteria, "blanks"))
+  if (!is.null(p$criteria2) && identical(p$and_or, "and")) custom <- TRUE
+  if (.filter_wildcard(p$value) || .filter_wildcard(p$value2)) custom <- TRUE
+  custom
+}
+
+# Does the string libxlsxwriter writes to val parse as a number?  That, not the
+# R type, is what decides whether Excel compares numerically.
+.filter_numeric_value <- function(v) {
+  if (is.null(v)) return(FALSE)
+  if (.filter_wildcard(v)) return(FALSE)
+  if (is.numeric(v) || inherits(v, "Date") || inherits(v, "POSIXct"))
+    return(TRUE)
+  !is.na(suppressWarnings(as.numeric(as.character(v))))
+}
+
+# --- Evaluation ---------------------------------------------------------------
+# A value list: the displayed text, matched case-insensitively.
+.filter_display_match <- function(cells, vals) {
+  d <- tolower(.filter_display(cells))
+  !is.na(d) & d %in% tolower(as.character(vals)) & !cells$blank
+}
+
+# One custom-filter rule.
+.filter_custom_keep <- function(cells, criteria, value) {
+  if (criteria == "blanks")     return(cells$blank)
+  if (criteria == "non-blanks") return(!cells$blank)
+  n <- cells$num
+  if (.filter_numeric_value(value)) {
+    v <- as.numeric(value)
+    keep <- switch(criteria,
+      # a text cell is not a number, so it is never equal to one -- which makes
+      # "!=" true for it, and every other comparison false
+      "==" = !is.na(n) & n == v, "!=" = is.na(n) | n != v,
+      ">"  = !is.na(n) & n >  v, "<"  = !is.na(n) & n <  v,
+      ">=" = !is.na(n) & n >= v, "<=" = !is.na(n) & n <= v)
+  } else {
+    if (criteria %in% .FILTER_NUMERIC_CRITERIA)
+      stop(sprintf(paste0("`criteria = \"%s\"` with the text value \"%s\": ",
+                          "writexl cannot predict how Excel orders text, so it ",
+                          "will not guess which rows to hide. Compare against ",
+                          "a number instead."), criteria, value), call. = FALSE)
+    m <- !is.na(cells$txt) & .filter_text_match(cells$txt, value)
+    keep <- if (criteria == "==") m else !m
+  }
+  keep & !cells$blank
+}
+
+.filter_keep_rules <- function(cells, p) {
+  if (!.filter_is_custom(p)) {
+    # a value list, possibly of two values, plus the blanks flag
+    vals <- c(if (!identical(p$criteria, "blanks")) p$value,
+              if (!is.null(p$criteria2) && !identical(p$criteria2, "blanks"))
+                p$value2)
+    keep <- if (length(vals)) .filter_display_match(cells, vals)
+            else rep(FALSE, length(cells$blank))
+    if (identical(p$criteria, "blanks") || identical(p$criteria2, "blanks"))
+      keep <- keep | cells$blank
+    return(keep)
+  }
+  keep <- .filter_custom_keep(cells, p$criteria, p$value)
+  if (!is.null(p$criteria2)) {
+    k2 <- .filter_custom_keep(cells, p$criteria2, p$value2)
+    keep <- if (identical(p$and_or, "or")) keep | k2 else keep & k2
+  }
+  keep
+}
+
+# A value list matches displayed text, and writexl cannot know how Excel will
+# format a date, so that combination is refused rather than guessed at.
+.filter_check_dated <- function(cells, nm) {
+  if (!cells$dated) return(invisible(NULL))
+  stop(sprintf(paste0("cannot filter column \"%s\" by an exact value or a ",
+                      "`list`: it holds dates, and that form of filter matches ",
+                      "the text Excel displays, which depends on the number ",
+                      "format. Use a comparison such as `\">=\"` instead."),
+               nm), call. = FALSE)
 }
 
 #' Filter an autofilter column, hiding the rows that do not match
@@ -88,16 +221,44 @@
 #' so criteria alone produce a sheet that looks filtered but shows every row.
 #'
 #' Because writexl decides which rows to hide, it reproduces Excel's own
-#' matching rules: text comparison is case-insensitive, `*` and `?` are
-#' wildcards, blank covers both an empty cell and an empty string, and there is
-#' no coercion between text and numbers.
+#' matching rules, which were measured in Excel rather than assumed.  Those
+#' rules depend on which of two forms the filter takes:
+#'
+#' * `"=="` (with no wildcard) and `"blanks"`, and any `list`, are written as a
+#'   **value list**.  Excel matches these against the text a cell *displays*,
+#'   case-insensitively --- so `"=="` with `10`, with `"10"`, or a `list` of
+#'   `"10"` all match both the number `10` and the string `"10"`.
+#' * every other criteria, including `"=="` with a `*` or `?` in it, is written
+#'   as a **typed comparison**.  If the value is a number the comparison is
+#'   numeric and a text cell never satisfies it (except `"!="`, which a text
+#'   cell satisfies because it is not that number).  If the value is text the
+#'   comparison is textual, case-insensitive, with `*` and `?` as wildcards,
+#'   and a number cell never satisfies it.
+#'
+#' The consequence worth knowing is that `"=="` with `"10"` keeps the number
+#' `10`, while `"=="` with `"1*"` keeps nothing on a numeric column: the
+#' wildcard changes the form, and so the rule.
+#'
+#' Blank means an empty cell or an empty string; `"non-blanks"` is its exact
+#' complement.  A mixed-type column built with [xl_cell_general()] is matched
+#' cell by cell, each by its own type.
+#'
+#' @section Limitations:
+#' A value list matches displayed text, which writexl can only predict for the
+#' General format.  Filtering a `Date` or `POSIXct` column by `"=="` or `list`
+#' is therefore refused --- use a comparison such as `">="`.  For the same
+#' reason a numeric column carrying a custom number format (say two decimal
+#' places, or a currency symbol) may display differently from what writexl
+#' compares, so prefer a comparison there too.  Columns whose cells hold
+#' formulas cannot be filtered at all, since writexl does not know what Excel
+#' would compute.
 #'
 #' @param col The column to filter: a name or a 1-based position.
 #' @param criteria One of `"=="`, `"!="`, `">"`, `"<"`, `">="`, `"<="`,
 #'   `"blanks"` or `"non-blanks"`.  The four magnitude comparisons need a
-#'   numeric, `Date` or `POSIXct` column.
-#' @param value The value to compare against.  For text columns `*` matches any
-#'   run of characters and `?` any single one.
+#'   numeric value; writexl will not guess how Excel orders text.
+#' @param value The value to compare against.  In a text comparison `*` matches
+#'   any run of characters and `?` any single one.
 #' @param criteria2,value2 An optional second rule for the same column.
 #' @param and_or How the two rules combine: `"and"` (default) or `"or"`.
 #' @param list Instead of a criteria, keep only rows whose value is in this
@@ -109,8 +270,10 @@
 #' @examples
 #' xl_filter("qty", ">", 100)
 #' xl_filter("qty", ">", 100, "<", 200)          # between, via two rules
-#' xl_filter("fruit", "==", "ap*")               # wildcard
+#' xl_filter("fruit", "==", "ap*")               # wildcard: typed comparison
 #' xl_filter("fruit", list = c("apple", "banana"))
+#' xl_filter("qty", "==", "10")                  # value list: matches the
+#'                                               # number 10 and the text "10"
 xl_filter <- function(col, criteria = NA, value = NULL, criteria2 = NA,
                       value2 = NULL, and_or = "and", list = NULL) {
   if (missing(col) || is.null(col))
@@ -153,21 +316,14 @@ print.xl_filter <- function(x, ...) {
 .filter_keep <- function(f, df) {
   p <- unclass(f)
   idx <- .resolve_col_index(p$col, names(df), "filter col")
-  x <- df[[idx]]
-  if (inherits(x, "xl_cell_general"))
-    stop(sprintf(paste0("cannot filter column \"%s\": its cells carry formulas ",
-                        "or mixed content, so writexl cannot know which rows ",
-                        "Excel would keep. Filter on a plain column instead."),
-                 names(df)[idx]), call. = FALSE)
-  if (!is.null(p$list))
-    return(tolower(as.character(x)) %in% tolower(p$list) &
-             !.filter_is_blank(x))
-  keep <- .filter_rule_keep(x, p$criteria, p$value)
-  if (!is.null(p$criteria2)) {
-    k2 <- .filter_rule_keep(x, p$criteria2, p$value2)
-    keep <- if (identical(p$and_or, "or")) keep | k2 else keep & k2
+  nm <- names(df)[idx]
+  cells <- .filter_cells(df[[idx]], nm)
+  if (!is.null(p$list)) {
+    .filter_check_dated(cells, nm)
+    return(.filter_display_match(cells, p$list))
   }
-  keep
+  if (!.filter_is_custom(p)) .filter_check_dated(cells, nm)
+  .filter_keep_rules(cells, p)
 }
 
 # Resolve a sheet's filters: the C payloads, plus the 0-based sheet rows to

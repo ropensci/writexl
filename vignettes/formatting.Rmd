@@ -474,14 +474,45 @@ and every row still visible — it looks filtered and is not.
 So `xl_filter()` does both: it writes the criteria, and it hides the rows the
 criteria excludes. That means writexl has to reproduce Excel's own matching
 rules, which were established by writing criteria with no hidden rows, opening
-the file and pressing Data → Reapply so that Excel computed the match itself:
+the file and pressing Data → Reapply so that Excel computed the match itself.
 
-* text comparison is **case-insensitive** — `"Apple"` matches `apple`
-* `*` and `?` are **wildcards** — `"ap*"` matches `apricot`
-* **blank** covers an empty cell *and* an empty string, and non-blank is its
-  exact complement
-* there is **no coercion** — a numeric criteria matches no text cell
-* list membership follows the same case-insensitive rule
+### Two kinds of filter
+
+The measurements showed that the rules are not a property of the criteria on
+its own. A filter is written in one of two forms, and Excel matches them
+differently:
+
+| Form | Written for | Excel matches |
+|---|---|---|
+| **value list** | `"=="` without a wildcard, `"blanks"`, any `list` | the text the cell **displays**, case-insensitively |
+| **typed comparison** | everything else, including `"=="` *with* a wildcard | by **type** — numbers to numbers, text to text |
+
+A value list ignores how the value was stored, so all three of these keep the
+number `10` *and* the string `"10"`:
+
+```{r}
+xl_filter("qty", "==", 10)
+xl_filter("qty", "==", "10")
+xl_filter("qty", list = "10")
+```
+
+A typed comparison does not. On a numeric column `"=="` with `"1*"` keeps
+nothing at all, because no number is text — even though `"=="` with `"10"`
+keeps the number 10. The wildcard is the only difference, and it changes the
+form:
+
+```{r}
+xl_filter("qty", "==", "1*")   # typed: matches no number
+xl_filter("qty", "==", "10")   # value list: matches the number 10
+```
+
+Within a typed comparison, a text cell is never equal to a number — which makes
+`"!="` *true* for it. So `xl_filter("fruit", "!=", 10)` keeps every row of a
+text column.
+
+The rest is more predictable: text comparison is case-insensitive, `*` and `?`
+are wildcards, and **blank** covers an empty cell as well as an empty string,
+with `"non-blanks"` its exact complement.
 
 ```{r}
 xl_filter("fruit", "==", "ap*")                  # wildcard, case-insensitive
@@ -492,6 +523,25 @@ xl_filter("fruit", "non-blanks")
 
 Filters on different columns combine with AND, as they do in Excel.
 
-Because writexl must know each value to decide what to hide, a column of
-formulas cannot be filtered — writexl does not know what Excel would compute,
-and says so rather than guessing.
+### Mixed columns, and what cannot be filtered
+
+A column built with `xl_cell_general()` may hold different types in different
+rows, and each cell is matched by its own type:
+
+```{r}
+mixed <- data.frame(row = 1:5)
+mixed$v <- xl_cell_general(value = list(10, "20", "abc", 30, 20))
+```
+
+Here `xl_filter("v", ">", 15)` keeps rows 4 and 5 — the numbers 30 and 20 — but
+not the *text* `"20"` in row 2. A value list works the other way: because it
+matches displayed text, `xl_filter("v", list = "20")` keeps both row 2 and
+row 5.
+
+Two things are refused rather than guessed at. A column of **formulas** cannot
+be filtered, because writexl does not know what Excel would compute. And a
+**date** column cannot be filtered by `"=="` or `list`: those match displayed
+text, which depends on the number format, so use a comparison such as `">="`
+instead. The same caution applies to a numeric column carrying a custom number
+format — writexl compares the General rendering of the number, so a value list
+may not match what Excel shows.

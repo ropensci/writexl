@@ -49,9 +49,12 @@
   not apply a filter when a file is opened, so `xl_filter()` also hides the rows
   the criteria exclude; without that the sheet looks filtered but shows every
   row. writexl reproduces Excel's matching rules, which were measured rather
-  than assumed: text matching is case-insensitive, `*` and `?` are wildcards,
-  blank covers an empty cell and an empty string, and text and numbers are never
-  coerced into each other.
+  than assumed. An exact value or a `list` matches the text a cell *displays*,
+  so it matches the number `10` and the string `"10"` alike; every other
+  criteria compares by type, and a wildcard turns `"=="` into one of those. Text
+  matching is case-insensitive, `*` and `?` are wildcards, and blank covers an
+  empty cell as well as an empty string. Mixed-type columns made with
+  `xl_cell_general()` are matched cell by cell.
 
 * **Merged cells** via `xl_sheet(merge = xl_merge(...))`. A merged range holds
   one value, so `xl_merge()` carries its own text; merging over cells the data

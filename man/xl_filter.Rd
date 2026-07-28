@@ -19,10 +19,10 @@ xl_filter(
 
 \item{criteria}{One of `"=="`, `"!="`, `">"`, `"<"`, `">="`, `"<="`,
 `"blanks"` or `"non-blanks"`.  The four magnitude comparisons need a
-numeric, `Date` or `POSIXct` column.}
+numeric value; writexl will not guess how Excel orders text.}
 
-\item{value}{The value to compare against.  For text columns `*` matches any
-run of characters and `?` any single one.}
+\item{value}{The value to compare against.  In a text comparison `*` matches
+any run of characters and `?` any single one.}
 
 \item{criteria2, value2}{An optional second rule for the same column.}
 
@@ -41,15 +41,47 @@ the hidden rows separately and does not apply a filter when a file is opened,
 so criteria alone produce a sheet that looks filtered but shows every row.
 
 Because writexl decides which rows to hide, it reproduces Excel's own
-matching rules: text comparison is case-insensitive, `*` and `?` are
-wildcards, blank covers both an empty cell and an empty string, and there is
-no coercion between text and numbers.
+matching rules, which were measured in Excel rather than assumed.  Those
+rules depend on which of two forms the filter takes:
+
+* `"=="` (with no wildcard) and `"blanks"`, and any `list`, are written as a
+  **value list**.  Excel matches these against the text a cell *displays*,
+  case-insensitively --- so `"=="` with `10`, with `"10"`, or a `list` of
+  `"10"` all match both the number `10` and the string `"10"`.
+* every other criteria, including `"=="` with a `*` or `?` in it, is written
+  as a **typed comparison**.  If the value is a number the comparison is
+  numeric and a text cell never satisfies it (except `"!="`, which a text
+  cell satisfies because it is not that number).  If the value is text the
+  comparison is textual, case-insensitive, with `*` and `?` as wildcards,
+  and a number cell never satisfies it.
+
+The consequence worth knowing is that `"=="` with `"10"` keeps the number
+`10`, while `"=="` with `"1*"` keeps nothing on a numeric column: the
+wildcard changes the form, and so the rule.
+
+Blank means an empty cell or an empty string; `"non-blanks"` is its exact
+complement.  A mixed-type column built with [xl_cell_general()] is matched
+cell by cell, each by its own type.
 }
+\section{Limitations}{
+
+A value list matches displayed text, which writexl can only predict for the
+General format.  Filtering a `Date` or `POSIXct` column by `"=="` or `list`
+is therefore refused --- use a comparison such as `">="`.  For the same
+reason a numeric column carrying a custom number format (say two decimal
+places, or a currency symbol) may display differently from what writexl
+compares, so prefer a comparison there too.  Columns whose cells hold
+formulas cannot be filtered at all, since writexl does not know what Excel
+would compute.
+}
+
 \examples{
 xl_filter("qty", ">", 100)
 xl_filter("qty", ">", 100, "<", 200)          # between, via two rules
-xl_filter("fruit", "==", "ap*")               # wildcard
+xl_filter("fruit", "==", "ap*")               # wildcard: typed comparison
 xl_filter("fruit", list = c("apple", "banana"))
+xl_filter("qty", "==", "10")                  # value list: matches the
+                                              # number 10 and the text "10"
 }
 \seealso{
 [xl_sheet]
