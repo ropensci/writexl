@@ -303,31 +303,37 @@ static void apply_page_setup(cell_write_ctx *ctx, SEXP opts){
                            (uint16_t) payload_int(p, "fit_width"),
                            (uint16_t) payload_int(p, "fit_height"));
 
-  /* Header and footer.  The _opt form is only needed to carry a margin; the
-     image fields of lxw_header_footer_options are left for a later phase, and
-     R rejects an &G/&[Picture] placeholder so libxlsxwriter's own
-     placeholder/image count check cannot fire. */
+  /* Header and footer.  The _opt form carries the margin and any images; R has
+     already checked that the &G/&[Picture] placeholders and the images agree
+     in number, so libxlsxwriter's own count check is a backstop rather than
+     the first line of defence. */
   const char *hdr = payload_str(p, "header");
   if(hdr){
-    if(payload_has(p, "header_margin")){
-      lxw_header_footer_options o;
-      memset(&o, 0, sizeof(o));
+    lxw_header_footer_options o;
+    memset(&o, 0, sizeof(o));
+    o.image_left   = (char *) payload_str(p, "header_image_left");
+    o.image_center = (char *) payload_str(p, "header_image_center");
+    o.image_right  = (char *) payload_str(p, "header_image_right");
+    if(payload_has(p, "header_margin"))
       o.margin = payload_dbl(p, "header_margin");
+    if(o.margin > 0.0 || o.image_left || o.image_center || o.image_right)
       assert_lxw(worksheet_set_header_opt(sheet, hdr, &o));
-    } else {
+    else
       assert_lxw(worksheet_set_header(sheet, hdr));
-    }
   }
   const char *ftr = payload_str(p, "footer");
   if(ftr){
-    if(payload_has(p, "footer_margin")){
-      lxw_header_footer_options o;
-      memset(&o, 0, sizeof(o));
+    lxw_header_footer_options o;
+    memset(&o, 0, sizeof(o));
+    o.image_left   = (char *) payload_str(p, "footer_image_left");
+    o.image_center = (char *) payload_str(p, "footer_image_center");
+    o.image_right  = (char *) payload_str(p, "footer_image_right");
+    if(payload_has(p, "footer_margin"))
       o.margin = payload_dbl(p, "footer_margin");
+    if(o.margin > 0.0 || o.image_left || o.image_center || o.image_right)
       assert_lxw(worksheet_set_footer_opt(sheet, ftr, &o));
-    } else {
+    else
       assert_lxw(worksheet_set_footer(sheet, ftr));
-    }
   }
 
   if(payload_int(p, "center_horizontally")) worksheet_center_horizontally(sheet);

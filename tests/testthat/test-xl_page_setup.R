@@ -208,14 +208,107 @@ test_that("the length limit counts characters, not bytes", {
   expect_s3_class(xl_page_setup(header = s), "xl_page_setup")
 })
 
-test_that("image placeholders are rejected with a useful message", {
-  # libxlsxwriter would fail this with an opaque parameter-validation error,
-  # because a placeholder needs a matching image writexl cannot supply yet
-  expect_error(xl_page_setup(header = "&L&G"), "image placeholder")
-  expect_error(xl_page_setup(header = "&L&[Picture]"), "image placeholder")
-  expect_error(xl_page_setup(footer = "&C&G"), "image placeholder")
-  expect_error(xl_page_setup(header = "&L&G"), "not supported yet")
-  # a literal ampersand or an unrelated code is fine
+# ── Header and footer images ──────────────────────────────────────────────────
+
+# A minimal valid 1x1 PNG, as in test-xl_image.R.
+HF_PNG <- as.raw(c(
+  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
+  0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+  0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00,
+  0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
+  0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
+  0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82))
+
+hf_logo <- function() {
+  p <- tempfile(fileext = ".png")
+  writeBin(HF_PNG, p)
+  p
+}
+
+# Write a sheet and list every part of the resulting zip.
+hf_parts <- function(page) {
+  p <- write_tmp(list(S = xl_sheet(data.frame(a = 1:3), page = page)))
+  d <- tempfile()
+  dir.create(d)
+  utils::unzip(p, exdir = d)
+  list(files = list.files(d, recursive = TRUE),
+       sheet = xlsx_part(p, "xl/worksheets/sheet1.xml", raw = TRUE))
+}
+
+test_that("both spellings of the image placeholder are counted", {
+  expect_equal(.hf_placeholders("&L&G"), 1L)
+  expect_equal(.hf_placeholders("&G&C&G"), 2L)
+  expect_equal(.hf_placeholders("&L&[Picture]"), 1L)
+  expect_equal(.hf_placeholders("&G&[Picture]"), 2L)
+  expect_equal(.hf_placeholders("plain"), 0L)
+  expect_equal(.hf_placeholders(NULL), 0L)
+})
+
+test_that("a header image reaches the file with everything Excel needs", {
+  # the image alone is not enough: Excel renders a header image through a VML
+  # drawing, and without the legacyDrawingHF reference nothing appears
+  r <- hf_parts(xl_page_setup(header = "&L&G",
+                              header_image = list(left = hf_logo())))
+  expect_true("xl/media/image1.png" %in% r$files)
+  expect_true("xl/drawings/vmlDrawing1.vml" %in% r$files)
+  expect_true("xl/drawings/_rels/vmlDrawing1.vml.rels" %in% r$files)
+  expect_match(r$sheet, "<legacyDrawingHF r:id=", fixed = TRUE)
+})
+
+test_that("a footer image works, and may be given in memory", {
+  r <- hf_parts(xl_page_setup(footer = "&R&G",
+                              footer_image = list(right = HF_PNG)))
+  expect_true("xl/media/image1.png" %in% r$files)
+  expect_match(r$sheet, "<legacyDrawingHF r:id=", fixed = TRUE)
+})
+
+test_that("all three positions can carry an image", {
+  a <- hf_logo()
+  b <- tempfile(fileext = ".png"); writeBin(c(HF_PNG, as.raw(0)), b)
+  cimg <- tempfile(fileext = ".png"); writeBin(c(HF_PNG, as.raw(c(0, 0))), cimg)
+  r <- hf_parts(xl_page_setup(
+    header = "&L&G&C&G&R&G",
+    header_image = list(left = a, center = b, right = cimg)))
+  # three distinct images, so three media files -- identical ones would be
+  # deduplicated by libxlsxwriter and prove nothing
+  expect_true(all(sprintf("xl/media/image%d.png", 1:3) %in% r$files))
+})
+
+test_that("placeholders and images must agree in number", {
+  # libxlsxwriter enforces this too, but its error does not say which side is
+  # short, and that is the only thing the caller needs to know
+  expect_error(xl_page_setup(header = "&LPlain",
+                             header_image = list(left = hf_logo())),
+               "gives 1 image\\(s\\) but `header` has 0 image placeholder")
+  expect_error(xl_page_setup(header = "&L&G"),
+               "has 1 image placeholder.*but `header_image` gives 0")
+  expect_error(xl_page_setup(footer = "&C&G"), "gives 0 image")
+  # the message says how to fix the commoner direction
+  expect_error(xl_page_setup(header = "&LPlain",
+                             header_image = list(left = hf_logo())),
+               "add &G where each image should sit")
+})
+
+test_that("header image positions are validated", {
+  expect_error(xl_page_setup(header = "&L&G",
+                             header_image = list(middle = hf_logo())),
+               "unknown position\\(s\\): middle")
+  expect_error(xl_page_setup(header = "&L&G", header_image = hf_logo()),
+               "must be named by position")
+  expect_error(xl_page_setup(header = "&L&G",
+                             header_image = list(left = "nope.png")),
+               "file does not exist")
+  # the image itself goes through the same checks as xl_image()
+  bad <- tempfile(fileext = ".png"); writeLines("not an image", bad)
+  expect_error(xl_page_setup(header = "&L&G", header_image = list(left = bad)),
+               "is not a PNG, JPEG, GIF or BMP")
+})
+
+test_that("a header without an image is unaffected", {
+  r <- hf_parts(xl_page_setup(header = "&CPlain"))
+  expect_match(r$sheet, "<oddHeader>&amp;CPlain</oddHeader>", fixed = TRUE)
+  expect_false(any(grepl("vmlDrawing", r$files)))
+  # a literal ampersand or an unrelated code is still fine
   expect_s3_class(xl_page_setup(header = "R&&D&Cmid"), "xl_page_setup")
 })
 
