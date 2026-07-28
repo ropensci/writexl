@@ -611,3 +611,72 @@ text, which depends on the number format, so use a comparison such as `">="`
 instead. The same caution applies to a numeric column carrying a custom number
 format — writexl compares the General rendering of the number, so a value list
 may not match what Excel shows.
+
+## Tables
+
+`xl_table()` turns a range into an Excel table: a named, styled block with
+banded rows, a filter dropdown in its header, and structured references in
+formulas.
+
+```{r}
+sales <- data.frame(fruit = c("apple", "banana", "cherry"),
+                    qty   = c(5, 150, 300))
+sheet <- xl_sheet(sales, table = xl_table(style = "medium 9"))
+path <- write_xlsx(list(Sales = sheet), tempfile(fileext = ".xlsx"))
+```
+
+The header captions come from the data frame's column names. That is worth
+knowing rather than taking for granted: Excel stores a table's column names
+separately from the header cells and refuses to open a file where the two
+disagree, so the default is what makes a table safe to add at all. Override one
+with `xl_table_column()` and both sides change together.
+
+Styles are a type and a number — `"light 0"` to `"light 21"`, `"medium 1"` to
+`"medium 28"`, `"dark 1"` to `"dark 11"` — or `"none"` for an unstyled table.
+
+### Totals and formulas
+
+A total row is added below the data, with each column choosing a function or a
+label:
+
+```{r}
+totalled <- xl_sheet(sales, table = xl_table(
+  total_row = TRUE,
+  columns = list(xl_table_column("fruit", total_label = "Total"),
+                 xl_table_column("qty", total = "sum"))
+))
+path <- write_xlsx(list(Sales = totalled), tempfile(fileext = ".xlsx"))
+```
+
+The total row is written by Excel's own machinery and the sheet's row plan does
+not see it: `auto_colwidth` does not measure it, and an `xl_row_spec()` aimed at
+that row will fight it.
+
+A column formula usually uses a structured reference, which names the table —
+so give the table a `name` when you write one:
+
+```{r}
+projected <- sales
+projected$doubled <- NA_real_
+sheet <- xl_sheet(projected, table = xl_table(
+  name = "Sales",
+  columns = xl_table_column("doubled",
+                            formula = "=Sales[[#This Row],[qty]]*2")
+))
+path <- write_xlsx(list(Sales = sheet), tempfile(fileext = ".xlsx"))
+```
+
+Left to itself, `xl_table()` generates a name from the sheet name and writes it
+explicitly, so it cannot shift when a table is added elsewhere. `name = NA`
+leaves the naming to Excel (`Table1`, `Table2`, …), which is fine until a
+formula refers to one — writexl warns if you combine the two.
+
+### What a table will not sit alongside
+
+Excel silently repairs each of these, so writexl refuses them instead: a table
+overlapping `xl_sheet(autofilter =)` (the table brings its own dropdown), an
+`xl_filter()` on a column the table covers, a merged range inside the table, and
+two overlapping tables. Each error quotes the ranges involved.
+
+Any table also turns off the memory-efficient row-streaming mode, which
+libxlsxwriter refuses to combine with tables at all.

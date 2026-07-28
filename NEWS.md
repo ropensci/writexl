@@ -56,6 +56,15 @@
   empty cell as well as an empty string. Mixed-type columns made with
   `xl_cell_general()` are matched cell by cell.
 
+* **Worksheet tables** via `xl_sheet(table = xl_table(...))`: a named, styled
+  range with banded rows, a filter dropdown, an optional total row, and
+  per-column headers, formats and formulas from `xl_table_column()`. Column
+  headers default to the data frame's column names, which is what keeps the
+  table definition and the header cells in agreement — Excel refuses a file
+  where they differ. Table names are made unique across the workbook. Any table
+  turns off the memory-efficient row-streaming mode, which libxlsxwriter does
+  not support alongside tables.
+
 * `xl_filter_keep()` exposes the matching rule on its own: given a data frame
   and one or more `xl_filter()`s, it returns which rows Excel would leave
   visible, without writing anything. `xl_sheet(filter =)` uses it to decide

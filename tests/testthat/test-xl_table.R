@@ -303,6 +303,29 @@ test_that("two tables on one sheet both reach the file", {
                'ref="B1:B4"', fixed = TRUE)
 })
 
+test_that("a range reaching past the data columns is refused", {
+  # there is no header name for the extra column, and "Column 3" is exactly the
+  # generic caption this design exists to make unreachable
+  expect_error(write_tmp(list(D = xl_sheet(sdf, table = xl_table(range = "A1:D4")))),
+               "writexl has no header name for the extra column")
+  # the full width is fine
+  expect_silent(write_tmp(list(D = xl_sheet(sdf, table = xl_table(range = "A1:B4")))))
+})
+
+test_that("a header row that would land on data is refused", {
+  # worksheet_add_table() writes its captions into the range's first row, so a
+  # table starting below row 1 would silently replace values with column names
+  expect_error(write_tmp(list(D = xl_sheet(sdf, table = xl_table(range = "A2:B4")))),
+               "would overwrite data")
+  # ... unless the table has no header row, which is the legitimate way to
+  # cover the data rows only
+  expect_silent(write_tmp(list(D = xl_sheet(sdf, table = xl_table(
+    range = "A2:B4", header_row = FALSE)))))
+  # and with no header written at all, any first row is fine
+  expect_silent(write_tmp(list(D = xl_sheet(sdf, table = xl_table(range = "A2:B4"))),
+                          col_names = FALSE))
+})
+
 test_that("a column outside the table's range is refused", {
   expect_error(write_tmp(list(D = xl_sheet(sdf, table = xl_table(
     range = "A1:A4", columns = xl_table_column("qty"))))),

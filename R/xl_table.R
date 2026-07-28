@@ -464,6 +464,23 @@ print.xl_table <- function(x, ...) {
       stop("a table needs at least one row that is not the header or the ",
            "total row", call. = FALSE)
 
+    # A column past the data has no name to take, and the generic "Column N"
+    # caption is exactly what this design exists to make unreachable.
+    if (rng[4L] > length(df) - 1L)
+      stop(sprintf(paste0("the table at %s reaches column %d, but the data ",
+                          "frame has %d; writexl has no header name for the ",
+                          "extra column(s)"),
+                   .range_a1(rng), rng[4L] + 1L, length(df)), call. = FALSE)
+    # worksheet_add_table() writes its header captions into the range's first
+    # row.  If that is not the sheet's header row it lands on data, silently
+    # replacing values with column names.
+    if (p$header_row && header_offset > 0L && rng[1L] != 0L)
+      stop(sprintf(paste0("the table at %s has a header row, but its first row ",
+                          "is not the sheet's header row; the table's captions ",
+                          "would overwrite data. Start the table at row 1, or ",
+                          "set `header_row = FALSE`."),
+                   .range_a1(rng)), call. = FALSE)
+
     cols <- .table_columns_payload(p, df, rng, reg, props)
     ent <- list(range = as.integer(rng),
                 style_type = p$style_type, style_number = p$style_number,
