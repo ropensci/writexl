@@ -10,7 +10,7 @@ wb_xml <- function(sheets) {
 # ── What reaches the file ─────────────────────────────────────────────────────
 
 test_that("a hidden sheet is marked hidden in workbook.xml", {
-  x <- wb_xml(list(A = xl_sheet(one()), B = xl_sheet(one(), visible = FALSE)))
+  x <- wb_xml(list(A = xl_sheet(one()), B = xl_sheet(one(), view = xl_sheet_view(visible = FALSE))))
   expect_match(x, '<sheet name="B" sheetId="2" state="hidden"', fixed = TRUE)
   # the visible one is untouched
   expect_match(x, '<sheet name="A" sheetId="1" r:id="rId1"/>', fixed = TRUE)
@@ -18,21 +18,21 @@ test_that("a hidden sheet is marked hidden in workbook.xml", {
 
 test_that("active and first_tab reach workbookView", {
   x <- wb_xml(list(A = xl_sheet(one()),
-                   B = xl_sheet(one(), active = TRUE),
-                   C = xl_sheet(one(), first_tab = TRUE)))
+                   B = xl_sheet(one(), view = xl_sheet_view(active = TRUE)),
+                   C = xl_sheet(one(), view = xl_sheet_view(first_tab = TRUE))))
   expect_match(x, 'activeTab="1"', fixed = TRUE)   # 0-based: sheet B
   expect_match(x, 'firstSheet="2"', fixed = TRUE)  # 0-based: sheet C
 })
 
 test_that("selected marks the tab without making it active", {
   x <- xlsx_part(write_tmp(list(A = xl_sheet(one()),
-                                B = xl_sheet(one(), selected = TRUE))),
+                                B = xl_sheet(one(), view = xl_sheet_view(selected = TRUE)))),
                  "xl/worksheets/sheet2.xml", raw = TRUE)
   expect_match(x, 'tabSelected="1"', fixed = TRUE)
 })
 
 test_that("visible = TRUE is not the same as unset, and neither hides", {
-  x <- wb_xml(list(A = xl_sheet(one(), visible = TRUE), B = xl_sheet(one())))
+  x <- wb_xml(list(A = xl_sheet(one(), view = xl_sheet_view(visible = TRUE)), B = xl_sheet(one())))
   expect_false(grepl("state=", x, fixed = TRUE))
 })
 
@@ -40,61 +40,58 @@ test_that("sheet view settings leave the cells alone", {
   skip_if_not_installed("readxl")
   df <- data.frame(a = 1:3, stringsAsFactors = FALSE)
   p <- write_tmp(list(A = xl_sheet(df),
-                      B = xl_sheet(df, active = TRUE, first_tab = TRUE)))
+                      B = xl_sheet(df, view = xl_sheet_view(active = TRUE, first_tab = TRUE))))
   expect_equal(as.data.frame(readxl::read_xlsx(p, sheet = "B")), df)
 })
 
 # ── The cross-sheet rules ─────────────────────────────────────────────────────
 
 test_that("hiding every sheet is refused", {
-  expect_error(write_tmp(list(A = xl_sheet(one(), visible = FALSE),
-                              B = xl_sheet(one(), visible = FALSE))),
+  expect_error(write_tmp(list(A = xl_sheet(one(), view = xl_sheet_view(visible = FALSE)),
+                              B = xl_sheet(one(), view = xl_sheet_view(visible = FALSE)))),
                "at least one visible sheet")
 })
 
 test_that("a hidden sheet cannot also be active or selected", {
   expect_error(write_tmp(list(A = xl_sheet(one()),
-                              B = xl_sheet(one(), visible = FALSE,
-                                           active = TRUE))),
+                              B = xl_sheet(one(), view = xl_sheet_view(visible = FALSE, active = TRUE)))),
                "hidden but also marked active/selected")
   expect_error(write_tmp(list(A = xl_sheet(one()),
-                              B = xl_sheet(one(), visible = FALSE,
-                                           selected = TRUE))),
+                              B = xl_sheet(one(), view = xl_sheet_view(visible = FALSE, selected = TRUE)))),
                "hidden but also marked active/selected")
 })
 
 test_that("only one sheet may be active", {
-  expect_error(write_tmp(list(A = xl_sheet(one(), active = TRUE),
-                              B = xl_sheet(one(), active = TRUE))),
+  expect_error(write_tmp(list(A = xl_sheet(one(), view = xl_sheet_view(active = TRUE)),
+                              B = xl_sheet(one(), view = xl_sheet_view(active = TRUE)))),
                "only one sheet may be active")
 })
 
 test_that("the first sheet cannot be hidden unless another is activated", {
   # Excel opens on the first sheet, so hiding it with nothing else active
   # produces a workbook with no sheet to show
-  expect_error(write_tmp(list(A = xl_sheet(one(), visible = FALSE),
+  expect_error(write_tmp(list(A = xl_sheet(one(), view = xl_sheet_view(visible = FALSE)),
                               B = xl_sheet(one()))),
                "cannot be hidden unless another sheet")
   # ... and it is allowed once another sheet is active
-  x <- wb_xml(list(A = xl_sheet(one(), visible = FALSE),
-                   B = xl_sheet(one(), active = TRUE)))
+  x <- wb_xml(list(A = xl_sheet(one(), view = xl_sheet_view(visible = FALSE)),
+                   B = xl_sheet(one(), view = xl_sheet_view(active = TRUE))))
   expect_match(x, '<sheet name="A" sheetId="1" state="hidden"', fixed = TRUE)
   expect_match(x, 'activeTab="1"', fixed = TRUE)
 })
 
 test_that("error messages name the offending sheet", {
   expect_error(write_tmp(list(Data = xl_sheet(one()),
-                              Notes = xl_sheet(one(), visible = FALSE,
-                                               active = TRUE))),
+                              Notes = xl_sheet(one(), view = xl_sheet_view(visible = FALSE, active = TRUE)))),
                '"Notes"', fixed = TRUE)
-  expect_error(write_tmp(list(First = xl_sheet(one(), active = TRUE),
-                              Second = xl_sheet(one(), active = TRUE))),
+  expect_error(write_tmp(list(First = xl_sheet(one(), view = xl_sheet_view(active = TRUE)),
+                              Second = xl_sheet(one(), view = xl_sheet_view(active = TRUE)))),
                '"First" and "Second"', fixed = TRUE)
 })
 
 test_that("unnamed sheets are identified by position in errors", {
-  expect_error(write_tmp(list(xl_sheet(one(), active = TRUE),
-                              xl_sheet(one(), active = TRUE))),
+  expect_error(write_tmp(list(xl_sheet(one(), view = xl_sheet_view(active = TRUE)),
+                              xl_sheet(one(), view = xl_sheet_view(active = TRUE)))),
                "sheets 1 and 2")
 })
 
@@ -104,21 +101,22 @@ test_that("plain data frames are treated as unset and never trip the rules", {
   # a bare data frame has no tab settings, so it must not be read as hidden
   expect_silent(write_tmp(list(A = one(), B = one())))
   # mixed with an xl_sheet
-  expect_silent(write_tmp(list(A = one(), B = xl_sheet(one(), active = TRUE))))
+  expect_silent(write_tmp(list(A = one(), B = xl_sheet(one(), view = xl_sheet_view(active = TRUE)))))
   # a single plain data frame is not "every sheet hidden"
   expect_silent(write_tmp(one()))
 })
 
 test_that("the flags are validated as logicals", {
-  expect_error(xl_sheet(one(), active = "yes"), "active")
-  expect_error(xl_sheet(one(), visible = 1), "visible")
-  expect_error(xl_sheet(one(), first_tab = c(TRUE, TRUE)), "first_tab")
+  expect_error(xl_sheet(one(), view = xl_sheet_view(active = "yes")), "active")
+  expect_error(xl_sheet(one(), view = xl_sheet_view(visible = 1)), "visible")
+  expect_error(xl_sheet(one(), view = xl_sheet_view(first_tab = c(TRUE, TRUE))), "first_tab")
 })
 
 # ── Zero display, direction, selection and scroll position ───────────────────
 
 view_xml <- function(...) {
-  xlsx_part(write_tmp(list(D = xl_sheet(data.frame(x = 1:5), ...))),
+  xlsx_part(write_tmp(list(D = xl_sheet(data.frame(x = 1:5),
+                                        view = xl_sheet_view(...)))),
             "xl/worksheets/sheet1.xml", raw = TRUE)
 }
 
@@ -139,8 +137,8 @@ test_that("selection accepts a single cell and a range", {
 
 test_that("selection accepts a data-frame-relative spec", {
   df <- data.frame(a = 1:5, b = 1:5)
-  x <- xlsx_part(write_tmp(list(D = xl_sheet(df, selection = list(rows = 1:2,
-                                                                 cols = "a")))),
+  x <- xlsx_part(write_tmp(list(D = xl_sheet(df, view = xl_sheet_view(selection = list(rows = 1:2,
+                                                                 cols = "a"))))),
                  "xl/worksheets/sheet1.xml", raw = TRUE)
   # data rows 1:2 are sheet rows 2:3 once the header is counted
   expect_match(x, 'sqref="A2:A3"', fixed = TRUE)
@@ -150,8 +148,7 @@ test_that("an inverted selection is rejected by the shared range parser", {
   # Excel would read the corner order as naming the active cell; writexl gives
   # that up in exchange for one strict range parser, and says so rather than
   # silently normalising
-  expect_error(write_tmp(list(D = xl_sheet(data.frame(x = 1:5),
-                                           selection = "C4:B2"))),
+  expect_error(write_tmp(list(D = xl_sheet(data.frame(x = 1:5), view = xl_sheet_view(selection = "C4:B2")))),
                "inverted")
 })
 
@@ -167,18 +164,16 @@ test_that("selection and top_left are independent", {
 })
 
 test_that("the view scalars are validated", {
-  expect_error(xl_sheet(data.frame(x = 1), hide_zero = "yes"), "hide_zero")
-  expect_error(xl_sheet(data.frame(x = 1), right_to_left = 1), "right_to_left")
-  expect_error(write_tmp(list(D = xl_sheet(data.frame(x = 1),
-                                           selection = "not a range"))),
+  expect_error(xl_sheet(data.frame(x = 1), view = xl_sheet_view(hide_zero = "yes")), "hide_zero")
+  expect_error(xl_sheet(data.frame(x = 1), view = xl_sheet_view(right_to_left = 1)), "right_to_left")
+  expect_error(write_tmp(list(D = xl_sheet(data.frame(x = 1), view = xl_sheet_view(selection = "not a range")))),
                "selection")
 })
 
 test_that("the view scalars leave the cells alone", {
   skip_if_not_installed("readxl")
   df <- data.frame(a = 1:5, stringsAsFactors = FALSE)
-  p <- write_tmp(list(D = xl_sheet(df, hide_zero = TRUE, right_to_left = TRUE,
-                                   selection = "A2", top_left = "A2")))
+  p <- write_tmp(list(D = xl_sheet(df, view = xl_sheet_view(hide_zero = TRUE, right_to_left = TRUE, selection = "A2", top_left = "A2"))))
   expect_equal(as.data.frame(readxl::read_xlsx(p)), df)
 })
 
@@ -188,9 +183,12 @@ test_that("the view scalars leave the cells alone", {
 # column-width units, not by row and column, so the interesting part is the
 # conversion.
 
-pane <- function(...) {
-  x <- xlsx_part(write_tmp(list(D = xl_sheet(data.frame(a = 1:5, b = 1:5,
-                                                        cc = 1:5), ...))),
+# `split` is a view setting; everything else passed here is a sheet setting
+# (row heights, column widths) that the split conversion has to account for.
+pane <- function(split, ...) {
+  sheet <- xl_sheet(data.frame(a = 1:5, b = 1:5, cc = 1:5),
+                    view = xl_sheet_view(split = split), ...)
+  x <- xlsx_part(write_tmp(list(D = sheet)),
                  "xl/worksheets/sheet1.xml", raw = TRUE)
   m <- regmatches(x, regexpr("<pane[^/]*/>", x))
   if (!length(m)) NA_character_ else m
@@ -243,26 +241,23 @@ test_that("raw units can be given directly", {
 })
 
 test_that("raw split units are validated", {
-  expect_error(write_tmp(list(D = xl_sheet(data.frame(x = 1),
-                                           split = list(vertical = -1)))),
+  expect_error(write_tmp(list(D = xl_sheet(data.frame(x = 1), view = xl_sheet_view(split = list(vertical = -1))))),
                "non-negative")
-  expect_error(write_tmp(list(D = xl_sheet(data.frame(x = 1),
-                                           split = list(sideways = 1)))),
+  expect_error(write_tmp(list(D = xl_sheet(data.frame(x = 1), view = xl_sheet_view(split = list(sideways = 1))))),
                "unknown `split`")
 })
 
 test_that("split and freeze cannot both be set", {
-  expect_error(write_tmp(list(D = xl_sheet(data.frame(x = 1:5),
-                                           split = "B2", freeze = "B2"))),
+  expect_error(write_tmp(list(D = xl_sheet(data.frame(x = 1:5), freeze = "B2", view = xl_sheet_view(split = "B2")))),
                "cannot both be set")
   # either alone is fine
-  expect_silent(write_tmp(list(D = xl_sheet(data.frame(x = 1:5), split = "B2"))))
+  expect_silent(write_tmp(list(D = xl_sheet(data.frame(x = 1:5), view = xl_sheet_view(split = "B2")))))
   expect_silent(write_tmp(list(D = xl_sheet(data.frame(x = 1:5), freeze = "B2"))))
 })
 
 test_that("a split leaves the cells alone", {
   skip_if_not_installed("readxl")
   df <- data.frame(a = 1:5, stringsAsFactors = FALSE)
-  p <- write_tmp(list(D = xl_sheet(df, split = "B3")))
+  p <- write_tmp(list(D = xl_sheet(df, view = xl_sheet_view(split = "B3"))))
   expect_equal(as.data.frame(readxl::read_xlsx(p)), df)
 })

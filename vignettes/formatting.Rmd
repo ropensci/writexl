@@ -286,9 +286,9 @@ opens.
 
 ```{r}
 wb <- list(
-  Summary = xl_sheet(df, active = TRUE, selection = "B2"),
-  Detail  = xl_sheet(df, hide_zero = TRUE),
-  Working = xl_sheet(df, visible = FALSE)     # hidden tab
+  Summary = xl_sheet(df, view = xl_sheet_view(active = TRUE, selection = "B2")),
+  Detail  = xl_sheet(df, view = xl_sheet_view(hide_zero = TRUE)),
+  Working = xl_sheet(df, view = xl_sheet_view(visible = FALSE))     # hidden tab
 )
 path <- write_xlsx(wb, tempfile(fileext = ".xlsx"))
 ```
@@ -316,7 +316,7 @@ does not open.
 the top-left of the window:
 
 ```{r}
-xl_sheet(df, selection = "B2:D10", top_left = "A2")
+xl_sheet(df, view = xl_sheet_view(selection = "B2:D10", top_left = "A2"))
 ```
 
 ### Freezing and splitting
@@ -326,7 +326,7 @@ independent scroll bars instead. They are mutually exclusive.
 
 ```{r}
 xl_sheet(df, freeze = "A2")   # keep the header row visible
-xl_sheet(df, split  = "B3")   # split above row 3 and left of column B
+xl_sheet(df, view = xl_sheet_view(split  = "B3"))   # split above row 3 and left of column B
 ```
 
 Note that libxlsxwriter positions a split by *distance*, in row-height and

@@ -11,11 +11,11 @@
 \title{Cell formatting groups}
 \usage{
 xl_font(
-  name = NA,
-  size = NA,
-  color = NA,
   bold = NA,
   italic = NA,
+  color = NA,
+  size = NA,
+  name = NA,
   underline = NA,
   strikeout = NA,
   script = NA,
@@ -64,14 +64,14 @@ xl_num_format(format = NA, index = NA)
 xl_protection(locked = NA, hidden = NA)
 }
 \arguments{
-\item{name}{Font name, e.g. `"Calibri"`.}
-
-\item{size}{Font size in points (1--409).}
+\item{bold, italic, strikeout, outline, shadow, condense, extend, font_only}{Logical
+font flags.}
 
 \item{color, background, foreground, left_color, right_color, top_color, bottom_color, diagonal_color}{A color: an R color name, a hex string, or an integer (see [xl_color]).}
 
-\item{bold, italic, strikeout, outline, shadow, condense, extend, font_only}{Logical
-font flags.}
+\item{size}{Font size in points (1--409).}
+
+\item{name}{Font name, e.g. `"Calibri"`.}
 
 \item{underline}{One of `"none"`, `"single"`, `"double"`,
 `"single-accounting"`, `"double-accounting"`.}
@@ -165,6 +165,7 @@ Other writexl:
 \code{\link[=xl_rich_run]{xl_rich_run()}},
 \code{\link[=xl_rich_string]{xl_rich_string()}},
 \code{\link[=xl_sheet]{xl_sheet()}},
+\code{\link[=xl_sheet_view]{xl_sheet_view()}},
 \code{\link[=xl_workbook]{xl_workbook()}}
 }
 \concept{writexl}

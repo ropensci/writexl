@@ -369,8 +369,8 @@ test_that("xl_hyperlink() with NA url produces NA formula (blank cell)", {
   expect_true(is.na(x[[2L]][["formula"]]))
 })
 
-test_that("xl_hyperlink() escapes internal double quotes in url and name", {
-  x <- xl_hyperlink('http://example.com/q?a="1"', name = 'Say "hello"')
+test_that("xl_hyperlink() escapes internal double quotes in url and value", {
+  x <- xl_hyperlink('http://example.com/q?a="1"', value = 'Say "hello"')
   expect_equal(x[[1L]][["formula"]],
                '=HYPERLINK("http://example.com/q?a=""1""","Say ""hello""")')
 })
@@ -683,4 +683,37 @@ test_that("array_range accepts a data-frame-relative spec", {
                             array_range = list(list(rows = 1, cols = 4), NA))
   # a single-cell spec resolves to the anchor and needs no memory-mode change
   expect_silent(write_xlsx(wide))
+})
+
+# ── xl_hyperlink(): name deprecated in favour of value ────────────────────────
+
+test_that("xl_hyperlink(value =) is the supported spelling", {
+  x <- xl_hyperlink("https://a.com", value = "Site A")
+  expect_match(x[[1L]][["formula"]], 'HYPERLINK("https://a.com","Site A")',
+               fixed = TRUE)
+})
+
+test_that("xl_hyperlink(name =) still works but warns", {
+  expect_warning(x <- xl_hyperlink("https://a.com", name = "Site A"),
+                 "deprecated")
+  expect_warning(xl_hyperlink("https://a.com", name = "Site A"), "use `value`")
+  # and it produces exactly what value= produces
+  expect_equal(unclass(x),
+               unclass(xl_hyperlink("https://a.com", value = "Site A")))
+})
+
+test_that("giving both value and name is an error", {
+  expect_error(xl_hyperlink("https://a.com", value = "A", name = "B"),
+               "not both")
+})
+
+test_that("positional display text is unaffected by the rename", {
+  # `value` took the position `name` used to occupy, so old positional code
+  # keeps working and must not warn
+  expect_silent(x <- xl_hyperlink("https://a.com", "Site A"))
+  expect_match(x[[1L]][["formula"]], 'HYPERLINK("https://a.com","Site A")',
+               fixed = TRUE)
+  # ... and a positional format argument still lands on format
+  y <- xl_hyperlink("https://a.com", "Site A", xl_font(bold = TRUE))
+  expect_true(is_xl_format(y[[1L]][["format"]]))
 })

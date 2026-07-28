@@ -141,50 +141,17 @@ xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
 #'   per-comment `author` overrides it).
 #' @param show_comments If `TRUE`, all comments on the sheet are initially
 #'   shown (individual comments can still be forced via `xl_comment(visible=)`).
-#' @param active Logical; make this the tab Excel opens on.  At most one sheet
-#'   in a workbook may be active.
-#' @param selected Logical; include this tab in the selected group.  The active
-#'   sheet is always selected.
-#' @param visible Logical; `FALSE` hides the sheet's tab.  A hidden sheet cannot
-#'   be active or selected, the first sheet cannot be hidden unless another is
-#'   made active, and at least one sheet must stay visible or Excel will not
-#'   open the file.
-#' @param first_tab Logical; make this the leftmost visible tab in the tab
-#'   strip.  This is independent of which sheet is active.
-#' @param hide_zero Logical; display zero values as blank cells.
-#' @param right_to_left Logical; order the columns right to left, for a sheet in
-#'   a right-to-left language.
-#' @param selection The cell or range selected when the sheet opens, as an Excel
-#'   reference (`"B2"`, `"B2:D10"`) or a `list(rows = , cols = )` spec.
-#'
-#'   Excel also uses the order of a selection's corners to mark which cell in it
-#'   is active; writexl does not expose that, because ranges are normalised by
-#'   the shared range parser, which rejects an inverted range.
-#' @param top_left The cell scrolled to the top-left of the window when the
-#'   sheet opens, as an Excel reference such as `"A5"`.
+#' @param view An [xl_sheet_view()] describing the sheet's tab state and
+#'   opening view (active/selected/hidden tab, selection, scroll position,
+#'   zero display, direction, split panes).
+#' @param page An [xl_page_setup()] describing how the sheet prints
+#'   (orientation, paper size, margins, scaling, header and footer). Affects
+#'   printing only, never the cell data.
 #' @param merge One [xl_merge()], or a list of them, merging rectangles of cells
 #'   into single cells.  Merges are applied after the sheet's rows are written,
 #'   so a merge over cells the data frame filled keeps only the merged text ---
 #'   as merging in Excel does.  Any merge turns off the memory-efficient
 #'   row-streaming mode, since it writes back over rows already emitted.
-#' @param split Split the sheet into scrollable panes with a visible, movable
-#'   divider, given as the cell reference the split sits above and to the left
-#'   of --- `"B3"` splits above row 3 and left of column B.  Mutually exclusive
-#'   with `freeze`, which does the same thing without the divider.
-#'
-#'   libxlsxwriter positions a split by distance, in row-height and
-#'   column-width units, not by row and column number.  writexl converts the
-#'   cell reference using the sheet's actual row heights and column widths, so
-#'   the split lands where you asked even after resizing.  Pass
-#'   `list(vertical = , horizontal = )` to give those units directly.
-#'
-#'   Note that libxlsxwriter derives the pane's scroll anchor back from that
-#'   distance assuming default row heights, so on a sheet with resized rows or
-#'   columns the divider is placed correctly but the anchor cell may be a row or
-#'   two out.
-#' @param page An [xl_page_setup()] describing how the sheet prints
-#'   (orientation, paper size, margins, scaling, header and footer). Affects
-#'   printing only, never the cell data.
 #' @return An `xl_sheet` object.
 #' @family writexl
 #' @seealso [xl_col_spec], [xl_row_spec], [write_xlsx]
@@ -203,10 +170,7 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
                      default_row_height = NA, auto_colwidth = FALSE,
                      autofilter = FALSE, protect = FALSE,
                      comment_author = NA, show_comments = FALSE,
-                     page = NULL, active = NA, selected = NA, visible = NA,
-                     first_tab = NA, hide_zero = NA, right_to_left = NA,
-                     selection = NULL, top_left = NULL, split = NULL,
-                     merge = NULL) {
+                     page = NULL, view = NULL, merge = NULL) {
   if (!is.data.frame(data))
     stop("`data` must be a data frame", call. = FALSE)
   if (!is.logical(auto_colwidth) || length(auto_colwidth) != 1L || is.na(auto_colwidth))
@@ -234,15 +198,7 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
       comment_author = comment_author,
       show_comments  = show_comments,
       page           = page,
-      active         = .val_flag(active, "active"),
-      selected       = .val_flag(selected, "selected"),
-      visible        = .val_flag(visible, "visible"),
-      first_tab      = .val_flag(first_tab, "first_tab"),
-      hide_zero      = .val_flag(hide_zero, "hide_zero"),
-      right_to_left  = .val_flag(right_to_left, "right_to_left"),
-      selection      = selection,
-      top_left       = top_left,
-      split          = split,
+      view           = view,
       merge          = merge
     ),
     class = "xl_sheet"
@@ -472,15 +428,16 @@ print.xl_sheet <- function(x, ...) {
     overlay <- c(overlay, .as_overlay_list(el$overlay))
     protect <- .resolve_protect(el$protect)
     page_payload <- .page_setup_payload(el$page, df, header_offset)
+    vw <- .sheet_view_of(el)
     for (k in c("active", "selected", "visible", "first_tab", "hide_zero",
                 "right_to_left"))
-      if (!is.null(el[[k]])) view[[k]] <- as.integer(isTRUE(el[[k]]))
-    if (!is.null(el$selection))
-      view$selection <- .xl_resolve_range(el$selection, arg = "selection",
+      if (!is.null(vw[[k]])) view[[k]] <- as.integer(isTRUE(vw[[k]]))
+    if (!is.null(vw$selection))
+      view$selection <- .xl_resolve_range(vw$selection, arg = "selection",
                                           df = df, header_offset = header_offset,
                                           allow_cell = TRUE)
-    if (!is.null(el$top_left))
-      view$top_left <- .xl_resolve_range(el$top_left, arg = "top_left",
+    if (!is.null(vw$top_left))
+      view$top_left <- .xl_resolve_range(vw$top_left, arg = "top_left",
                                          df = df, header_offset = header_offset,
                                          allow_cell = TRUE)[1:2]
     comment_author <- el$comment_author
@@ -498,11 +455,13 @@ print.xl_sheet <- function(x, ...) {
   # The split is resolved last, because converting a cell reference into
   # libxlsxwriter's units needs the sheet's final row heights and column widths
   # (including any set by auto_colwidth just above).
-  if (inherits(el, "xl_sheet") && !is.null(el$split)) {
+  vw_split <- .sheet_view_of(el)$split
+  if (!is.null(vw_split)) {
     if (!is.null(el$freeze) && !(length(el$freeze) == 1L && is.na(el$freeze)))
-      stop("`split` and `freeze` cannot both be set: Excel supports frozen ",
-           "panes or a split, not both", call. = FALSE)
-    view$split <- .resolve_split(el$split, df, header_offset, props,
+      stop("`xl_sheet_view(split =)` and `xl_sheet(freeze =)` cannot both be ",
+           "set: Excel supports frozen panes or a split, not both",
+           call. = FALSE)
+    view$split <- .resolve_split(vw_split, df, header_offset, props,
                                  default_row_height, row_row, row_height,
                                  col_width)
   }

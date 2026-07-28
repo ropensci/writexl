@@ -22,8 +22,10 @@
 #' @param x a data frame, an [xl_sheet], an [xl_workbook], or a (named) list of
 #'   data frames / `xl_sheet`s that become the sheets in the xlsx
 #' @param path a file name to write to
-#' @param col_names write column names at the top of the file?
-#' @param format_headers make the \code{col_names} in the xlsx centered and bold
+#' @param col_names write column names as the header row at the top of the sheet?
+#' @param format_headers apply the workbook's header format to that header row?
+#'   The default header format is bold and centered; change it with
+#'   \code{\link{xl_properties}(header_format = )}.
 #' @param use_zip64 use \href{https://en.wikipedia.org/wiki/Zip_(file_format)#ZIP64}{zip64}
 #' to enable support for 4GB+ xlsx files. Not all platforms can read this.
 #' @examples # Roundtrip example with single excel sheet named 'mysheet'

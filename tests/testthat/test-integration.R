@@ -74,7 +74,7 @@ test_that("comprehensive xlsx output exercises all package functionality", {
   links$named_link <- xl_hyperlink(
     c("https://www.r-project.org", "https://cran.r-project.org", NA,
       "https://www.r-project.org"),
-    name = c("R Project", "CRAN", "none", "R Project")
+    value = c("R Project", "CRAN", "none", "R Project")
   )
   links$cell_link <- xl_hyperlink_cell(
     c(NA, NA, NA, "https://www.r-project.org"),
