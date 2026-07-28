@@ -3,6 +3,9 @@
 \name{xl_conditional}
 \alias{xl_conditional}
 \alias{xl_cond_cell}
+\alias{xl_cond_scale}
+\alias{xl_cond_bar}
+\alias{xl_cond_icons}
 \title{Format cells according to their contents}
 \usage{
 xl_cond_cell(
@@ -13,6 +16,42 @@ xl_cond_cell(
   min = NULL,
   max = NULL,
   format = NULL,
+  stop_if_true = NA,
+  multi_range = NA
+)
+
+xl_cond_scale(
+  range,
+  colors = c("red", "yellow", "green"),
+  values = NULL,
+  rule_types = NULL,
+  stop_if_true = NA,
+  multi_range = NA
+)
+
+xl_cond_bar(
+  range,
+  color = NA,
+  values = NULL,
+  rule_types = NULL,
+  solid = NA,
+  negative_color = NA,
+  border_color = NA,
+  negative_border_color = NA,
+  no_border = NA,
+  direction = NA,
+  axis = NA,
+  axis_color = NA,
+  bar_only = NA,
+  stop_if_true = NA,
+  multi_range = NA
+)
+
+xl_cond_icons(
+  range,
+  style = "3_traffic_lights",
+  reverse = NA,
+  icons_only = NA,
   stop_if_true = NA,
   multi_range = NA
 )
@@ -52,6 +91,46 @@ the same cells.}
 
 \item{multi_range}{A further set of ranges the rule also covers, as an Excel
 multi-range string such as `"B3:K6 B9:K12"`.}
+
+\item{colors}{Two or three colours for the scale, from lowest to highest.
+Two gives a two-colour scale, three a three-colour scale.}
+
+\item{values}{Optional values marking where each colour sits, in the same
+order as `colors`.  Defaults to the range's minimum, midpoint and maximum.}
+
+\item{rule_types}{How each entry of `values` is interpreted: `"minimum"`,
+`"maximum"`, `"number"`, `"percent"`, `"percentile"`, `"formula"`,
+`"auto_min"` or `"auto_max"`.}
+
+\item{color}{The bar's fill colour.}
+
+\item{solid}{Logical; a solid bar rather than Excel's default gradient.}
+
+\item{negative_color, border_color, negative_border_color, axis_color}{Colours
+for the negative portion, the bar border, the negative border, and the
+axis line.}
+
+\item{no_border}{Logical; draw the bar without a border.}
+
+\item{direction}{`"context"` (follow the sheet), `"left to right"` or
+`"right to left"`.}
+
+\item{axis}{Where the zero axis sits: `"automatic"`, `"midpoint"` or
+`"none"`.}
+
+\item{bar_only}{Logical; show the bar without the cell's value.}
+
+\item{style}{Which built-in icon set: one of `"3_arrows"`, `"3_arrows_gray"`,
+`"3_flags"`, `"3_traffic_lights"`, `"3_traffic_lights_rimmed"`,
+`"3_signs"`, `"3_symbols_circled"`, `"3_symbols"`, `"4_arrows"`,
+`"4_arrows_gray"`, `"4_red_to_black"`, `"4_ratings"`,
+`"4_traffic_lights"`, `"5_arrows"`, `"5_arrows_gray"`, `"5_ratings"` or
+`"5_quarters"`.  These are Excel's own icons, not images, so nothing is
+embedded in the file.}
+
+\item{reverse}{Logical; reverse the order the icons are assigned in.}
+
+\item{icons_only}{Logical; show the icon without the cell's value.}
 }
 \value{
 An `xl_conditional` object.
@@ -74,6 +153,12 @@ xl_cond_cell("C2:C100", type = "text", criteria = "contains", value = "urgent",
              format = xl_font(bold = TRUE))
 xl_cond_cell("D2:D100", type = "duplicate",
              format = xl_fill(background = "yellow"))
+xl_cond_scale("C2:C100", colors = c("red", "yellow", "green"))
+xl_cond_scale("C2:C100", colors = c("white", "steelblue"))
+xl_cond_bar("D2:D100", color = "steelblue")
+xl_cond_bar("D2:D100", color = "green", solid = TRUE, bar_only = TRUE)
+xl_cond_icons("E2:E100", style = "3_traffic_lights")
+xl_cond_icons("E2:E100", style = "5_ratings", icons_only = TRUE)
 }
 \seealso{
 [xl_sheet], [xl_format]

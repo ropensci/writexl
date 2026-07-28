@@ -623,6 +623,39 @@ static void apply_conditional(cell_write_ctx *ctx, SEXP p, int *r){
   note_protection(ctx, fid);
   c.format = ctx_format(ctx, fid);
 
+  /* colour scale / data bar points: each end carries a rule type, a value and
+     (for scales) a colour */
+  c.min_rule_type = (uint8_t) payload_int(p, "min_rule_type");
+  c.mid_rule_type = (uint8_t) payload_int(p, "mid_rule_type");
+  c.max_rule_type = (uint8_t) payload_int(p, "max_rule_type");
+  if(payload_has(p, "mid_value")) c.mid_value = payload_dbl(p, "mid_value");
+  c.mid_value_string = payload_str(p, "mid_value_string");
+  if(payload_has(p, "min_color")) c.min_color = (lxw_color_t) payload_int(p, "min_color");
+  if(payload_has(p, "mid_color")) c.mid_color = (lxw_color_t) payload_int(p, "mid_color");
+  if(payload_has(p, "max_color")) c.max_color = (lxw_color_t) payload_int(p, "max_color");
+
+  /* data bars */
+  if(payload_has(p, "bar_color"))
+    c.bar_color = (lxw_color_t) payload_int(p, "bar_color");
+  if(payload_has(p, "bar_negative_color"))
+    c.bar_negative_color = (lxw_color_t) payload_int(p, "bar_negative_color");
+  if(payload_has(p, "bar_border_color"))
+    c.bar_border_color = (lxw_color_t) payload_int(p, "bar_border_color");
+  if(payload_has(p, "bar_negative_border_color"))
+    c.bar_negative_border_color = (lxw_color_t) payload_int(p, "bar_negative_border_color");
+  if(payload_has(p, "bar_axis_color"))
+    c.bar_axis_color = (lxw_color_t) payload_int(p, "bar_axis_color");
+  c.bar_solid         = (uint8_t) payload_int(p, "bar_solid");
+  c.bar_no_border     = (uint8_t) payload_int(p, "bar_no_border");
+  c.bar_only          = (uint8_t) payload_int(p, "bar_only");
+  c.bar_direction     = (uint8_t) payload_int(p, "bar_direction");
+  c.bar_axis_position = (uint8_t) payload_int(p, "bar_axis_position");
+
+  /* icon sets: Excel's own icons, selected by index -- no image is embedded */
+  c.icon_style    = (uint8_t) payload_int(p, "icon_style");
+  c.reverse_icons = (uint8_t) payload_int(p, "reverse_icons");
+  c.icons_only    = (uint8_t) payload_int(p, "icons_only");
+
   if(payload_has(p, "stop_if_true"))
     c.stop_if_true = (uint8_t) payload_int(p, "stop_if_true");
   c.multi_range = payload_str(p, "multi_range");

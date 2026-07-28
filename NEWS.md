@@ -40,6 +40,11 @@
   lists, numeric, date, time and text-length bounds, and custom formulas, with
   the input and error messages Excel shows (#43).
 
+* **Conditional formatting** via `xl_sheet(conditional = ...)`, in four
+  flavours: `xl_cond_cell()` for a rule paired with a format, `xl_cond_scale()`
+  for two- and three-colour scales, `xl_cond_bar()` for data bars and
+  `xl_cond_icons()` for Excel's built-in icon sets.
+
 * **Merged cells** via `xl_sheet(merge = xl_merge(...))`. A merged range holds
   one value, so `xl_merge()` carries its own text; merging over cells the data
   frame filled keeps only the merged text, as it does in Excel.

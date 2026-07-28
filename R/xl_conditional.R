@@ -22,7 +22,11 @@
   none = 0L, cell = 1L, text = 2L, time_period = 3L, average = 4L,
   duplicate = 5L, unique = 6L, top = 7L, bottom = 8L, blanks = 9L,
   no_blanks = 10L, errors = 11L, no_errors = 12L, formula = 13L,
-  icon_sets = 14L
+  # Note these three carry no TYPE_ in their libxlsxwriter names, which makes
+  # them easy to miss when reading the header -- and getting the offset wrong
+  # would silently write the wrong kind of rule.
+  "2_color_scale" = 14L, "3_color_scale" = 15L, data_bar = 16L,
+  icon_sets = 17L
 )
 
 .LXW_COND_CRITERIA <- c(
@@ -276,10 +280,158 @@ print.xl_conditional <- function(x, ...) {
       out$format_id <- .register_format(reg,
                                         merge_xl_format(props$default_format,
                                                         p$format))
+    } else {
+      # scale, bar and icon clusters: the constructor already produced the
+      # flat field names the struct uses, so they pass straight through with
+      # only the type name resolved to its enum value
+      flat <- p[setdiff(names(p), c("cluster", "range", "type",
+                                    "stop_if_true", "multi_range"))]
+      out$type <- unname(.LXW_COND_TYPE[[p$type]])
+      out <- c(out, flat)
     }
     for (k in c("stop_if_true"))
       if (!is.null(p[[k]])) out[[k]] <- as.integer(isTRUE(p[[k]]))
     if (!is.null(p$multi_range)) out$multi_range <- p$multi_range
     out
   })
+}
+
+.LXW_BAR_DIRECTION <- c(context = 0L, "left to right" = 1L, "right to left" = 2L)
+.LXW_BAR_AXIS      <- c(automatic = 0L, midpoint = 1L, none = 2L)
+
+# The min/mid/max triple a colour scale or data bar uses.  Each point carries a
+# rule type ("what kind of number is this"), a value and, for scales, a colour.
+.cond_point <- function(value, rule_type, color, prefix, arg) {
+  out <- list()
+  rt <- .val_enum(rule_type, names(.LXW_COND_RULE_TYPE)[-1L],
+                  paste0(arg, "_rule_type"))
+  if (!is.null(rt)) out[[paste0(prefix, "_rule_type")]] <- unname(.LXW_COND_RULE_TYPE[[rt]])
+  if (!is.null(value)) {
+    if (is.character(value)) out[[paste0(prefix, "_value_string")]] <- value
+    else                     out[[paste0(prefix, "_value")]] <- as.numeric(value)
+  }
+  if (!is.null(color) && !(length(color) == 1L && is.na(color)))
+    out[[paste0(prefix, "_color")]] <- xl_color(color)
+  out
+}
+
+#' @rdname xl_conditional
+#' @param colors Two or three colours for the scale, from lowest to highest.
+#'   Two gives a two-colour scale, three a three-colour scale.
+#' @param values Optional values marking where each colour sits, in the same
+#'   order as `colors`.  Defaults to the range's minimum, midpoint and maximum.
+#' @param rule_types How each entry of `values` is interpreted: `"minimum"`,
+#'   `"maximum"`, `"number"`, `"percent"`, `"percentile"`, `"formula"`,
+#'   `"auto_min"` or `"auto_max"`.
+#' @export
+#' @examples
+#' xl_cond_scale("C2:C100", colors = c("red", "yellow", "green"))
+#' xl_cond_scale("C2:C100", colors = c("white", "steelblue"))
+xl_cond_scale <- function(range, colors = c("red", "yellow", "green"),
+                          values = NULL, rule_types = NULL,
+                          stop_if_true = NA, multi_range = NA) {
+  if (missing(range) || is.null(range))
+    stop("`range` must name the cells to format", call. = FALSE)
+  n <- length(colors)
+  if (!n %in% c(2L, 3L))
+    stop("`colors` must give 2 or 3 colours (Excel has no other colour scale)",
+         call. = FALSE)
+  if (!is.null(values) && length(values) != n)
+    stop(sprintf("`values` must have one entry per colour (%d)", n),
+         call. = FALSE)
+  if (!is.null(rule_types) && length(rule_types) != n)
+    stop(sprintf("`rule_types` must have one entry per colour (%d)", n),
+         call. = FALSE)
+  # a two-colour scale uses min and max; a three-colour one adds mid
+  prefixes <- if (n == 2L) c("min", "max") else c("min", "mid", "max")
+  fields <- list(type = "2_color_scale")
+  if (n == 3L) fields$type <- "3_color_scale"
+  for (i in seq_len(n))
+    fields <- c(fields, .cond_point(values[[i]] %||% NULL,
+                                    rule_types[[i]] %||% NULL,
+                                    colors[[i]], prefixes[i], prefixes[i]))
+  .new_conditional("scale", range, fields, stop_if_true, multi_range)
+}
+
+#' @rdname xl_conditional
+#' @param color The bar's fill colour.
+#' @param solid Logical; a solid bar rather than Excel's default gradient.
+#' @param negative_color,border_color,negative_border_color,axis_color Colours
+#'   for the negative portion, the bar border, the negative border, and the
+#'   axis line.
+#' @param no_border Logical; draw the bar without a border.
+#' @param direction `"context"` (follow the sheet), `"left to right"` or
+#'   `"right to left"`.
+#' @param axis Where the zero axis sits: `"automatic"`, `"midpoint"` or
+#'   `"none"`.
+#' @param bar_only Logical; show the bar without the cell's value.
+#' @export
+#' @examples
+#' xl_cond_bar("D2:D100", color = "steelblue")
+#' xl_cond_bar("D2:D100", color = "green", solid = TRUE, bar_only = TRUE)
+xl_cond_bar <- function(range, color = NA, values = NULL, rule_types = NULL,
+                        solid = NA, negative_color = NA, border_color = NA,
+                        negative_border_color = NA, no_border = NA,
+                        direction = NA, axis = NA, axis_color = NA,
+                        bar_only = NA, stop_if_true = NA, multi_range = NA) {
+  if (missing(range) || is.null(range))
+    stop("`range` must name the cells to format", call. = FALSE)
+  if (!is.null(values) && length(values) != 2L)
+    stop("`values` must give the two ends of the bar", call. = FALSE)
+  if (!is.null(rule_types) && length(rule_types) != 2L)
+    stop("`rule_types` must give the two ends of the bar", call. = FALSE)
+  fields <- list(type = "data_bar")
+  for (i in 1:2) {
+    pre <- c("min", "max")[i]
+    fields <- c(fields, .cond_point(values[[i]] %||% NULL,
+                                    rule_types[[i]] %||% NULL, NA, pre, pre))
+  }
+  cols <- .drop_null(list(
+    bar_color                 = if (!.is_unset(color)) xl_color(color),
+    bar_negative_color        = if (!.is_unset(negative_color)) xl_color(negative_color),
+    bar_border_color          = if (!.is_unset(border_color)) xl_color(border_color),
+    bar_negative_border_color = if (!.is_unset(negative_border_color)) xl_color(negative_border_color),
+    bar_axis_color            = if (!.is_unset(axis_color)) xl_color(axis_color)
+  ))
+  flags <- .drop_null(list(
+    bar_solid     = .val_flag(solid, "solid"),
+    bar_no_border = .val_flag(no_border, "no_border"),
+    bar_only      = .val_flag(bar_only, "bar_only")
+  ))
+  d <- .val_enum(direction, names(.LXW_BAR_DIRECTION), "direction")
+  a <- .val_enum(axis, names(.LXW_BAR_AXIS), "axis")
+  if (!is.null(d)) fields$bar_direction     <- unname(.LXW_BAR_DIRECTION[[d]])
+  if (!is.null(a)) fields$bar_axis_position <- unname(.LXW_BAR_AXIS[[a]])
+  .new_conditional("bar", range, c(fields, cols, flags), stop_if_true,
+                   multi_range)
+}
+
+#' @rdname xl_conditional
+#' @param style Which built-in icon set: one of `"3_arrows"`, `"3_arrows_gray"`,
+#'   `"3_flags"`, `"3_traffic_lights"`, `"3_traffic_lights_rimmed"`,
+#'   `"3_signs"`, `"3_symbols_circled"`, `"3_symbols"`, `"4_arrows"`,
+#'   `"4_arrows_gray"`, `"4_red_to_black"`, `"4_ratings"`,
+#'   `"4_traffic_lights"`, `"5_arrows"`, `"5_arrows_gray"`, `"5_ratings"` or
+#'   `"5_quarters"`.  These are Excel's own icons, not images, so nothing is
+#'   embedded in the file.
+#' @param reverse Logical; reverse the order the icons are assigned in.
+#' @param icons_only Logical; show the icon without the cell's value.
+#' @export
+#' @examples
+#' xl_cond_icons("E2:E100", style = "3_traffic_lights")
+#' xl_cond_icons("E2:E100", style = "5_ratings", icons_only = TRUE)
+xl_cond_icons <- function(range, style = "3_traffic_lights", reverse = NA,
+                          icons_only = NA, stop_if_true = NA,
+                          multi_range = NA) {
+  if (missing(range) || is.null(range))
+    stop("`range` must name the cells to format", call. = FALSE)
+  st <- .val_enum(style, names(.LXW_COND_ICONS), "style")
+  if (is.null(st)) st <- "3_traffic_lights"
+  fields <- .drop_null(list(
+    type          = "icon_sets",
+    icon_style    = unname(.LXW_COND_ICONS[[st]]),
+    reverse_icons = .val_flag(reverse, "reverse"),
+    icons_only    = .val_flag(icons_only, "icons_only")
+  ))
+  .new_conditional("icons", range, fields, stop_if_true, multi_range)
 }
