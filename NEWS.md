@@ -36,6 +36,10 @@
   sheet, no hidden-and-active sheet, at least one visible sheet) are checked
   before writing, naming the sheet at fault.
 
+* **Data validation** via `xl_sheet(validation = xl_validation(...))`: dropdown
+  lists, numeric, date, time and text-length bounds, and custom formulas, with
+  the input and error messages Excel shows (#43).
+
 * **Merged cells** via `xl_sheet(merge = xl_merge(...))`. A merged range holds
   one value, so `xl_merge()` carries its own text; merging over cells the data
   frame filled keeps only the merged text, as it does in Excel.
