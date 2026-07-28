@@ -352,6 +352,87 @@ print.xl_table <- function(x, ...) {
   out
 }
 
+# --- Conflicts -----------------------------------------------------------
+#
+# Excel drops or repairs each of these rather than reporting them, and
+# libxlsxwriter passes them all through, so they are refused here.  Each
+# message names the table's range so the offending pair can be found.
+
+# Do two 0-based c(first_row, first_col, last_row, last_col) quads overlap?
+.ranges_overlap <- function(a, b) {
+  a[1L] <= b[3L] && b[1L] <= a[3L] && a[2L] <= b[4L] && b[2L] <= a[4L]
+}
+
+.range_a1 <- function(r) {
+  cell <- function(row, col) {
+    letters_of <- function(i) {
+      out <- ""
+      repeat {
+        out <- paste0(LETTERS[(i %% 26L) + 1L], out)
+        i <- i %/% 26L - 1L
+        if (i < 0L) break
+      }
+      out
+    }
+    paste0(letters_of(col), row + 1L)
+  }
+  paste0(cell(r[1L], r[2L]), ":", cell(r[3L], r[4L]))
+}
+
+# `tables` is the resolved payload list; the rest come off the sheet element.
+.check_table_conflicts <- function(el, df, header_offset, tables) {
+  if (!length(tables)) return(invisible(NULL))
+  ranges <- lapply(tables, function(t) t$range)
+
+  refuse <- function(rng, what)
+    stop(sprintf("the table at %s %s", .range_a1(rng), what), call. = FALSE)
+
+  for (rng in ranges) {
+    # a table brings its own autofilter; a second one over the same cells is
+    # what Excel repairs the file over
+    af <- el$autofilter
+    if (isTRUE(af) || is.character(af)) {
+      afr <- if (is.character(af))
+        .parse_range(af, "autofilter", df, header_offset)
+      else c(0L, 0L, (nrow(df) - 1L) + header_offset, length(df) - 1L)
+      if (.ranges_overlap(rng, afr))
+        # the remedy is the sheet's autofilter, not the table's: turning the
+        # table's off leaves the sheet-level one over the same cells
+        refuse(rng, paste0("overlaps `xl_sheet(autofilter =)`; a table brings ",
+                           "its own filter dropdown, and Excel allows only one ",
+                           "over a range. Drop the sheet's `autofilter`, or ",
+                           "point it at cells outside the table."))
+    }
+    # libxlsxwriter: "Filter conditions within the table are not supported"
+    for (f in .filter_list(el$filter)) {
+      idx <- .resolve_col_index(unclass(f)$col, names(df), "filter col") - 1L
+      if (idx >= rng[2L] && idx <= rng[4L])
+        refuse(rng, sprintf(paste0("covers column \"%s\", which `filter` also ",
+                                   "filters; filter criteria inside a table ",
+                                   "are not supported"),
+                            names(df)[idx + 1L]))
+    }
+    # Excel forbids merged cells inside a table
+    for (m in .merge_list(el$merge)) {
+      mr <- .xl_resolve_range(unclass(m)$range, arg = "merge range", df = df,
+                              header_offset = header_offset, allow_cell = FALSE)
+      if (.ranges_overlap(rng, mr))
+        refuse(rng, sprintf(paste0("overlaps the merge at %s; Excel does not ",
+                                   "allow merged cells inside a table"),
+                            .range_a1(mr)))
+    }
+  }
+  # two tables may not overlap each other either
+  if (length(ranges) > 1L)
+    for (i in seq_len(length(ranges) - 1L))
+      for (j in seq(i + 1L, length(ranges)))
+        if (.ranges_overlap(ranges[[i]], ranges[[j]]))
+          stop(sprintf("the tables at %s and %s overlap",
+                       .range_a1(ranges[[i]]), .range_a1(ranges[[j]])),
+               call. = FALSE)
+  invisible(NULL)
+}
+
 # --- The C payload -----------------------------------------------------------
 #
 # Every column of the table's range gets an entry, whether or not the caller
@@ -367,7 +448,7 @@ print.xl_table <- function(x, ...) {
   if (nrow(df) < 1L)
     stop("a table needs at least one data row", call. = FALSE)
 
-  lapply(seq_along(ts), function(i) {
+  out <- lapply(seq_along(ts), function(i) {
     p <- unclass(ts[[i]])
     rng <- if (is.null(p$range)) {
       last_row <- (nrow(df) - 1L) + header_offset + as.integer(p$total_row)
@@ -384,7 +465,7 @@ print.xl_table <- function(x, ...) {
            "total row", call. = FALSE)
 
     cols <- .table_columns_payload(p, df, rng, reg, props)
-    out <- list(range = as.integer(rng),
+    ent <- list(range = as.integer(rng),
                 style_type = p$style_type, style_number = p$style_number,
                 header_row = as.integer(p$header_row),
                 autofilter = as.integer(p$autofilter),
@@ -395,9 +476,11 @@ print.xl_table <- function(x, ...) {
                 total_row = as.integer(p$total_row),
                 columns = cols)
     nm <- if (i <= length(table_names)) table_names[[i]] else NA_character_
-    if (!is.na(nm)) out$name <- nm
-    out
+    if (!is.na(nm)) ent$name <- nm
+    ent
   })
+  .check_table_conflicts(el, df, header_offset, out)
+  out
 }
 
 # One entry per column of the range, with the caller's overrides merged over

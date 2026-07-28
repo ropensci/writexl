@@ -69,15 +69,25 @@ print.xl_merge <- function(x, ...) {
 }
 
 # Resolve a sheet's merges to the payloads C applies, registering each format.
-.resolve_merges <- function(el, df, reg, header_offset, props) {
-  if (!inherits(el, "xl_sheet") || is.null(el$merge)) return(list())
-  ms <- if (inherits(el$merge, "xl_merge")) list(el$merge) else el$merge
+# Normalise one merge or a list of them to a checked list.
+.merge_list <- function(merge, arg = "merge") {
+  if (is.null(merge)) return(list())
+  ms <- if (inherits(merge, "xl_merge")) list(merge) else merge
   if (!is.list(ms))
-    stop("`merge` must be an xl_merge object or a list of them", call. = FALSE)
+    stop(sprintf("`%s` must be an xl_merge object or a list of them", arg),
+         call. = FALSE)
+  for (i in seq_along(ms))
+    if (!inherits(ms[[i]], "xl_merge"))
+      stop(sprintf("`%s[[%d]]` must be an xl_merge object", arg, i),
+           call. = FALSE)
+  ms
+}
+
+.resolve_merges <- function(el, df, reg, header_offset, props) {
+  if (!inherits(el, "xl_sheet")) return(list())
+  ms <- .merge_list(el$merge)
   lapply(seq_along(ms), function(i) {
     m <- ms[[i]]
-    if (!inherits(m, "xl_merge"))
-      stop(sprintf("`merge[[%d]]` must be an xl_merge object", i), call. = FALSE)
     arg <- sprintf("merge[[%d]] range", i)
     q <- .xl_resolve_range(m$range, arg = arg, df = df,
                            header_offset = header_offset, allow_cell = FALSE)

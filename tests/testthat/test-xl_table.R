@@ -309,6 +309,64 @@ test_that("a column outside the table's range is refused", {
     'outside the table\'s range')
 })
 
+# ── Conflicts ─────────────────────────────────────────────────────────────────
+
+test_that("a range renders back to A1 notation", {
+  expect_equal(.range_a1(c(0L, 0L, 3L, 1L)), "A1:B4")
+  expect_equal(.range_a1(c(1L, 2L, 5L, 27L)), "C2:AB6")   # past Z
+  expect_equal(.range_a1(c(0L, 0L, 0L, 0L)), "A1:A1")
+})
+
+test_that("range overlap is inclusive on both edges", {
+  expect_true(.ranges_overlap(c(0, 0, 3, 1), c(0, 0, 3, 1)))
+  expect_true(.ranges_overlap(c(0, 0, 3, 1), c(3, 1, 5, 2)))   # touching corner
+  expect_false(.ranges_overlap(c(0, 0, 3, 0), c(0, 1, 3, 1)))  # side by side
+  expect_false(.ranges_overlap(c(0, 0, 1, 1), c(2, 0, 3, 1)))  # stacked
+})
+
+test_that("a table and a sheet autofilter over the same cells is refused", {
+  expect_error(write_tmp(list(D = xl_sheet(sdf, table = xl_table(),
+                                           autofilter = TRUE))),
+               "brings its own filter dropdown")
+  # the message must name the remedy that works: turning the table's own
+  # autofilter off leaves the sheet-level one over the same cells
+  expect_error(write_tmp(list(D = xl_sheet(sdf,
+                                           table = xl_table(autofilter = FALSE),
+                                           autofilter = TRUE))),
+               "Drop the sheet's `autofilter`")
+  # an autofilter outside the table is fine
+  wide <- cbind(sdf, note = c("a", "b", "c"))
+  expect_silent(write_tmp(list(D = xl_sheet(wide,
+                                            table = xl_table(range = "A1:B4"),
+                                            autofilter = "C1:C4"))))
+})
+
+test_that("a filter on a table column is refused", {
+  # libxlsxwriter: "Filter conditions within the table are not supported"
+  expect_error(write_tmp(list(D = xl_sheet(sdf, table = xl_table(),
+                                           filter = xl_filter("qty", ">", 100)))),
+               'covers column "qty", which `filter` also filters')
+})
+
+test_that("a merge inside a table is refused", {
+  expect_error(write_tmp(list(D = xl_sheet(sdf, table = xl_table(),
+                                           merge = xl_merge("A1:B1", "x")))),
+               "does not allow merged cells inside a table")
+  # a merge below the table is fine
+  expect_silent(write_tmp(list(D = xl_sheet(sdf,
+                                            table = xl_table(range = "A1:B4"),
+                                            merge = xl_merge("A6:B6", "Note")))))
+})
+
+test_that("two overlapping tables are refused", {
+  expect_error(write_tmp(list(D = xl_sheet(sdf, table = list(
+    xl_table(range = "A1:B4"), xl_table(range = "B1:B4"))))),
+    "tables at A1:B4 and B1:B4 overlap")
+  # side by side is fine
+  expect_silent(write_tmp(list(D = xl_sheet(sdf, table = list(
+    xl_table(range = "A1:A4"), xl_table(range = "B1:B4"))))))
+})
+
 # ── Name resolution across the workbook ───────────────────────────────────────
 
 tdf <- data.frame(a = 1:2)
