@@ -74,6 +74,9 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
   sheets <- Map(function(el, df, tn)
                   .resolve_sheet_plan(el, df, reg, header_offset, props, tn),
                 elems, dfs, table_names)
+  # Ordering matters to libxlsxwriter's drawing numbering, so this spans the
+  # whole workbook rather than any one sheet
+  .check_drawing_order(sheets, names(dfs))
   cm <- .resolve_constant_memory(dfs, props, sheets)
   ret <- .Call(C_write_data_frame_list, dfs, path, col_names, format_headers,
                use_zip64, reg$table, sheets, header_id,

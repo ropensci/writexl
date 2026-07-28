@@ -320,6 +320,91 @@ print.xl_image <- function(x, ...) {
   })
 }
 
+# Resolve xl_sheet(background =) to the C payload.  A background takes the same
+# shapes as an image but no options: Excel tiles it to fill the sheet, and it
+# is a display-only backdrop that never prints.
+.resolve_background <- function(el, arg = "background") {
+  if (!inherits(el, "xl_sheet") || is.null(el$background)) return(NULL)
+  x <- el$background
+  if (.is_raster_like(x)) x <- .raster_to_png(x, arg)
+  .check_image(x, arg)
+  if (is.raw(x)) list(buffer = x) else list(filename = x)
+}
+
+# --- Guard against libxlsxwriter's drawing-id desync ---------------------------
+#
+# _prepare_drawings() in workbook.c increments drawing_id for any sheet holding
+# images, embedded images, charts, header/footer VML or a background image, and
+# uses it to build the sheet's "../drawings/drawingN.xml" relationship target.
+# The packager numbers the drawing *files* separately, counting only sheets that
+# actually have a drawing (_get_drawing_count() in packager.c).
+#
+# A sheet whose only image is embedded, or lives in a header or footer, is
+# therefore counted without producing a drawing file, and every floating image
+# on a LATER sheet gets a target one too high.  Excel finds the missing part and
+# repairs the file, dropping the image.
+#
+# writexl cannot renumber the relationship without patching vendored code, so
+# the combination is refused.  Ordering the sheets so the floating images come
+# first is a real workaround, which is why the message says so.
+.check_drawing_order <- function(sheets, sheet_names) {
+  has_floating <- function(s)
+    any(vapply(s$images, function(i) !isTRUE(as.logical(i$embed)), logical(1)))
+  has_embedded <- function(s)
+    any(vapply(s$images, function(i) isTRUE(as.logical(i$embed)), logical(1)))
+  has_hf_image <- function(s)
+    any(grepl("_image_(left|center|right)$", names(s$page)))
+  has_background <- function(s) !is.null(s$background)
+
+  # 1. An embedded image alongside any other kind.
+  #
+  # _prepare_drawings() gives an embedded image the shared image_ref_id and
+  # passes it to worksheet_set_error_cell(), which writes it as the cell's `vm`
+  # attribute.  But `vm` indexes the <valueMetadata> blocks, of which there is
+  # one per *embedded* image.  With only embedded images in the workbook the two
+  # counters move together and the file is right; any other image shifts the
+  # ref id and `vm` then points past the end of the metadata, which Excel
+  # repairs away.  The richValueRel target goes to the wrong image for the same
+  # reason.
+  emb <- vapply(sheets, has_embedded, logical(1))
+  other <- vapply(sheets, function(s) has_floating(s) || has_hf_image(s),
+                  logical(1))
+  if (any(emb) && any(other))
+    stop(sprintf(paste0("sheet \"%s\" has an embedded image and sheet \"%s\" ",
+                        "has another image.\n  libxlsxwriter numbers the ",
+                        "embedded image's metadata from a counter shared with ",
+                        "every other image, so mixing them writes a cell ",
+                        "reference that points past the end of the metadata ",
+                        "and Excel repairs the sheet.\n  Use `embed = TRUE` ",
+                        "only in a workbook whose images are all embedded, or ",
+                        "make this one a floating image."),
+                 sheet_names[which(emb)[1L]], sheet_names[which(other)[1L]]),
+         call. = FALSE)
+
+  # 2. A sheet counted for a drawing id that produces no drawing file, before a
+  # sheet with a floating image.
+  offender <- NULL
+  for (i in seq_along(sheets)) {
+    s <- sheets[[i]]
+    if (!is.null(offender) && has_floating(s))
+      stop(sprintf(paste0("sheet \"%s\" has a floating image, but sheet \"%s\" ",
+                          "earlier in the workbook has %s.\n  libxlsxwriter ",
+                          "numbers the drawing relationship wrongly in that ",
+                          "order, and Excel repairs the file and drops the ",
+                          "image.\n  Put the sheet(s) with floating images ",
+                          "before \"%s\"."),
+                   sheet_names[i], offender$name, offender$what,
+                   offender$name), call. = FALSE)
+    if (is.null(offender) && !has_floating(s)) {
+      what <- if (has_hf_image(s)) "a header or footer image"
+              else if (has_background(s)) "a background image"
+              else NULL
+      if (!is.null(what)) offender <- list(name = sheet_names[i], what = what)
+    }
+  }
+  invisible(NULL)
+}
+
 # Normalise one image or a list of them to a checked list.
 .image_list <- function(image, arg = "image") {
   if (is.null(image)) return(list())

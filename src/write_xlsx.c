@@ -486,6 +486,22 @@ static void apply_merges(cell_write_ctx *ctx, SEXP opts){
  * _buffer variants.  Options are only filled in where R supplied them, so an
  * unset field keeps libxlsxwriter's own default rather than a zero.
  */
+/* The sheet's background image: a tiled screen backdrop, never printed. */
+static void apply_background(cell_write_ctx *ctx, SEXP opts){
+  SEXP bg = list_get(opts, "background");
+  if(bg == R_NilValue || !Rf_isVectorList(bg)) return;
+  SEXP buf = list_get(bg, "buffer");
+  if(buf != R_NilValue && TYPEOF(buf) == RAWSXP){
+    assert_lxw(worksheet_set_background_buffer(ctx->sheet,
+                                               (const unsigned char *) RAW(buf),
+                                               (size_t) Rf_xlength(buf)));
+  } else {
+    const char *file = payload_str(bg, "filename");
+    bail_if(file == NULL, "background has neither a filename nor a buffer");
+    assert_lxw(worksheet_set_background(ctx->sheet, file));
+  }
+}
+
 static void apply_images(cell_write_ctx *ctx, SEXP opts){
   SEXP ims = list_get(opts, "images");
   if(ims == R_NilValue || !Rf_isVectorList(ims)) return;
@@ -1474,6 +1490,7 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
     apply_merges(&ctx, opts);
     apply_tables(&ctx, opts);
     apply_images(&ctx, opts);
+    apply_background(&ctx, opts);
 
     if(warn_unlocked)
       Rf_warning("Worksheet '%s' uses cell protection formatting (locked = FALSE "

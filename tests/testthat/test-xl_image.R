@@ -212,3 +212,172 @@ test_that("encoding a raster leaves no device open", {
   xl_image(as.raster(matrix("red", 2, 2)))
   expect_equal(grDevices::dev.cur(), before)
 })
+
+# ── What reaches the file ─────────────────────────────────────────────────────
+
+img_parts <- function(..., df = data.frame(a = 1:4)) {
+  p <- write_tmp(list(S = xl_sheet(df, ...)))
+  d <- tempfile(); dir.create(d); utils::unzip(p, exdir = d)
+  part <- function(f) {
+    q <- file.path(d, f)
+    if (file.exists(q)) paste(readLines(q, warn = FALSE), collapse = "") else ""
+  }
+  list(files = list.files(d, recursive = TRUE),
+       drawing = part("xl/drawings/drawing1.xml"),
+       sheet = part("xl/worksheets/sheet1.xml"),
+       rels = part("xl/drawings/_rels/drawing1.xml.rels"))
+}
+
+test_that("a floating image reaches the drawing and the media", {
+  r <- img_parts(image = xl_image(png_file(), at = "C2"))
+  expect_true("xl/media/image1.png" %in% r$files)
+  expect_true("xl/drawings/drawing1.xml" %in% r$files)
+  expect_match(r$sheet, "<drawing r:id=", fixed = TRUE)
+  # anchored to C2, which is 0-based col 2, row 1
+  expect_match(r$drawing, "<xdr:col>2</xdr:col>", fixed = TRUE)
+  expect_match(r$drawing, "<xdr:row>1</xdr:row>", fixed = TRUE)
+})
+
+test_that("a path and a raw vector differ only in the default alt text", {
+  a <- img_parts(image = xl_image(png_file(), at = "A1"))
+  b <- img_parts(image = xl_image(PNG_1x1, at = "A1"))
+  expect_equal(a$files, b$files)
+  # Excel defaults an image's alt text to its file name, so the path form
+  # carries a descr the raw form cannot have -- the rest must be identical
+  expect_match(a$drawing, "descr=", fixed = TRUE)
+  expect_no_match(b$drawing, "descr=", fixed = TRUE)
+  strip <- function(x) sub(' descr="[^"]*"', "", x)
+  expect_equal(strip(a$drawing), strip(b$drawing))
+})
+
+test_that("offsets and the object position are written", {
+  r <- img_parts(image = xl_image(png_file(), at = "A1", offset = c(40, 20)))
+  # Pixels become EMU at 9525 each.  The absolute offset is the stable thing to
+  # assert: an offset larger than the row's height is normalised into the next
+  # row, so a 20px y-offset on a 20px row comes out as row 1 with rowOff 0 --
+  # the position is right, the spelling is not what a naive test expects.
+  expect_match(r$drawing, sprintf('<a:off x="%d" y="%d"/>', 40 * 9525,
+                                  20 * 9525), fixed = TRUE)
+  expect_match(r$drawing, sprintf("<xdr:colOff>%d</xdr:colOff>", 40 * 9525),
+               fixed = TRUE)
+  # the position controls the anchor kind
+  expect_match(img_parts(image = xl_image(png_file(), at = "A1",
+                                          position = "dont_move_dont_size"))$drawing,
+               "absoluteAnchor|editAs=\"absolute\"")
+  expect_match(img_parts(image = xl_image(png_file(), at = "A1",
+                                          position = "move_dont_size"))$drawing,
+               "oneCellAnchor|editAs=\"oneCell\"")
+})
+
+test_that("a description is written, and decorative replaces it", {
+  expect_match(img_parts(image = xl_image(png_file(), at = "A1",
+                                          description = "A logo"))$drawing,
+               "A logo", fixed = TRUE)
+  # Excel does not write a description for a decorative image
+  d <- img_parts(image = xl_image(png_file(), at = "A1",
+                                  description = "A logo",
+                                  decorative = TRUE))$drawing
+  expect_no_match(d, "descr=\"A logo\"", fixed = TRUE)
+})
+
+test_that("a url becomes an external relationship", {
+  r <- img_parts(image = xl_image(png_file(), at = "A1",
+                                  url = "https://example.com", tip = "Home"))
+  expect_match(r$rels, "https://example.com", fixed = TRUE)
+  expect_match(r$rels, "TargetMode=\"External\"", fixed = TRUE)
+})
+
+test_that("several images share one drawing", {
+  r <- img_parts(image = list(xl_image(png_file(), at = "A1"),
+                              xl_image(png_file(), at = "A5"),
+                              xl_image(PNG_1x1, at = "A9")))
+  # the same picture three times is deduplicated to one media file
+  expect_equal(sum(grepl("^xl/media/", r$files)), 1L)
+  expect_equal(sum(grepl("^xl/drawings/drawing", r$files)), 1L)
+  expect_equal(length(gregexpr("<xdr:pic>", r$drawing)[[1L]]), 3L)
+})
+
+test_that("an anchor must name a single cell", {
+  expect_error(write_tmp(list(S = xl_sheet(data.frame(a = 1:4),
+                                           image = xl_image(PNG_1x1, at = "A1:B2")))),
+               "must name a single cell")
+})
+
+test_that("an embedded image writes a cell, not a drawing", {
+  r <- img_parts(image = xl_image(PNG_1x1, at = "C2", embed = TRUE))
+  expect_true("xl/media/image1.png" %in% r$files)
+  expect_false("xl/drawings/drawing1.xml" %in% r$files)
+  expect_true("xl/richData/richValueRel.xml" %in% r$files)
+  # the cell carries the value-metadata index, and it must be in range
+  expect_match(r$sheet, "vm=\"1\"", fixed = TRUE)
+})
+
+# ── Background ────────────────────────────────────────────────────────────────
+
+test_that("a background image is stored and referenced", {
+  r <- img_parts(background = png_file())
+  expect_true("xl/media/image1.png" %in% r$files)
+  expect_match(r$sheet, "<picture r:id=", fixed = TRUE)
+  # a background is a backdrop, not a drawing
+  expect_false("xl/drawings/drawing1.xml" %in% r$files)
+})
+
+test_that("a background may be a raw vector or an in-memory image", {
+  expect_true("xl/media/image1.png" %in% img_parts(background = PNG_1x1)$files)
+  skip_if_not(isTRUE(capabilities("png")))
+  expect_true("xl/media/image1.png" %in%
+                img_parts(background = as.raster(matrix("red", 2, 2)))$files)
+})
+
+test_that("a bad background is refused like any other image", {
+  bad <- tempfile(fileext = ".png")
+  writeLines("not an image", bad)
+  expect_error(write_tmp(list(S = xl_sheet(data.frame(a = 1), background = bad))),
+               "is not a PNG, JPEG, GIF or BMP")
+})
+
+# ── Guards against libxlsxwriter's counter bugs ───────────────────────────────
+
+test_that("an embedded image may not share a workbook with any other image", {
+  # _prepare_drawings() gives the embedded image the shared image ref id and
+  # writes it as the cell's vm, which indexes the valueMetadata blocks instead
+  df <- data.frame(a = 1:4)
+  expect_error(write_tmp(list(
+    A = xl_sheet(df, image = xl_image(PNG_1x1, at = "C2")),
+    B = xl_sheet(df, image = xl_image(PNG_1x1, at = "C2", embed = TRUE)))),
+    "points past the end of the metadata")
+  # embedded images on their own are fine, in any number
+  expect_silent(write_tmp(list(
+    A = xl_sheet(df, image = xl_image(PNG_1x1, at = "C2", embed = TRUE)),
+    B = xl_sheet(df, image = xl_image(PNG_1x1, at = "C4", embed = TRUE)))))
+})
+
+test_that("a drawing-less image sheet may not precede a floating image", {
+  # header/footer and background images each consume a drawing id without
+  # writing a drawing part, so a later floating image points at a missing file
+  df <- data.frame(a = 1:4)
+  logo <- png_file()
+  hdr <- xl_sheet(df, page = xl_page_setup(header = "&L&G",
+                                           header_image = list(left = logo)))
+  expect_error(write_tmp(list(A = hdr,
+                              B = xl_sheet(df, image = xl_image(logo, "C2")))),
+               "earlier in the workbook has a header or footer image")
+  expect_error(write_tmp(list(A = xl_sheet(df, background = logo),
+                              B = xl_sheet(df, image = xl_image(logo, "C2")))),
+               "earlier in the workbook has a background image")
+  # the other order is fine, and is what the message recommends
+  expect_silent(write_tmp(list(A = xl_sheet(df, image = xl_image(logo, "C2")),
+                               B = hdr)))
+  expect_silent(write_tmp(list(A = xl_sheet(df, image = xl_image(logo, "C2")),
+                               B = xl_sheet(df, background = logo))))
+})
+
+test_that("only an embedded image costs row streaming", {
+  df <- data.frame(a = 1:4)
+  plan_float <- list(list(images = list(list(embed = 0L))))
+  plan_embed <- list(list(images = list(list(embed = 1L))))
+  expect_equal(.resolve_constant_memory(list(D = df), list(), plan_float)$on, 1L)
+  cm <- .resolve_constant_memory(list(D = df), list(), plan_embed)
+  expect_equal(cm$on, 0L)
+  expect_match(cm$reasons, "embedded image")
+})

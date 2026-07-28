@@ -27,7 +27,8 @@ xl_sheet(
   outline = NULL,
   ignore_errors = NULL,
   table = NULL,
-  image = NULL
+  image = NULL,
+  background = NULL
 )
 }
 \arguments{
@@ -121,6 +122,10 @@ row-streaming mode, which libxlsxwriter refuses to combine with tables.}
 
 \item{image}{One [xl_image()], or a list of them, placing images on the
 sheet --- floating over the cells, or inside a cell with `embed = TRUE`.}
+
+\item{background}{An image tiled behind the sheet's cells, in any shape
+[xl_image()] accepts.  It is a screen backdrop only --- Excel never prints
+it.}
 }
 \value{
 An `xl_sheet` object.
