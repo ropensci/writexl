@@ -71,14 +71,16 @@ test_that("an image may be a path or a raw vector", {
   expect_s3_class(xl_image(png_file()), "xl_image")
   expect_s3_class(xl_image(PNG_1x1), "xl_image")
   expect_equal(unclass(xl_image(PNG_1x1))$image_format, "png")
+  # the argument is `image`, not `file`: it takes more than a filename
+  expect_equal(names(formals(xl_image))[1L], "image")
 })
 
 test_that("a missing or unreadable source is refused", {
-  expect_error(xl_image(), "must be an image path or a raw vector")
+  expect_error(xl_image(), "must be a file path, a raw vector")
   expect_error(xl_image("no_such_file.png"), "file does not exist")
   expect_error(xl_image(tempdir()), "is a directory, not an image")
   expect_error(xl_image(raw(0)), "empty raw vector")
-  expect_error(xl_image(42), "single file path or a raw vector")
+  expect_error(xl_image(42), "must be a file path, a raw vector")
 })
 
 # ── Options ───────────────────────────────────────────────────────────────────
@@ -145,4 +147,68 @@ test_that("the print method runs", {
   expect_output(print(xl_image(png_file())), "xl_image")
   expect_output(print(xl_image(PNG_1x1)), "67 bytes")
   expect_output(print(xl_image(png_file(), embed = TRUE)), "embedded")
+})
+
+# ── In-memory pictures ────────────────────────────────────────────────────────
+
+# A PNG's real pixel size, read from its IHDR chunk -- no decoder needed.
+png_dims <- function(bytes) {
+  be <- function(i) sum(as.integer(bytes[i]) * c(256^3, 256^2, 256, 1))
+  c(width = be(17:20), height = be(21:24))
+}
+
+test_that("a raster is encoded at its own pixel size", {
+  skip_if_not(isTRUE(capabilities("png")))
+  # dim(raster) is rows x cols, and a PNG is width x height -- so a 2x3 raster
+  # must come out 3 wide and 2 tall, not the other way round
+  r <- as.raster(matrix(c("red", "green", "blue", "black", "white", "grey"),
+                        nrow = 2, byrow = TRUE))
+  expect_equal(dim(r), c(2L, 3L))
+  b <- unclass(xl_image(r))$image
+  expect_true(is.raw(b))
+  expect_equal(.image_format(b), "png")
+  expect_equal(unname(png_dims(b)), c(3, 2))
+})
+
+test_that("everything as.raster() accepts is encoded", {
+  skip_if_not(isTRUE(capabilities("png")))
+  # colour matrix
+  m <- matrix(c("#FF0000", "#00FF00", "#0000FF", "#FFFFFF"), nrow = 2)
+  expect_equal(unname(png_dims(unclass(xl_image(m))$image)), c(2, 2))
+  # numeric matrix (greyscale)
+  g <- matrix(c(0, 0.5, 1, 0.25, 0.75, 0.1), nrow = 2)
+  expect_equal(unname(png_dims(unclass(xl_image(g))$image)), c(3, 2))
+  # RGB array
+  a <- array(0.5, dim = c(4, 5, 3))
+  expect_equal(unname(png_dims(unclass(xl_image(a))$image)), c(5, 4))
+})
+
+test_that("a nativeRaster is encoded", {
+  skip_if_not(isTRUE(capabilities("png")))
+  nr <- structure(as.integer(c(-1, -16777216, -65536, -16711936)),
+                  dim = c(2L, 2L), class = "nativeRaster")
+  expect_equal(unname(png_dims(unclass(xl_image(nr))$image)), c(2, 2))
+})
+
+test_that("an in-memory image is encoded once, at construction", {
+  skip_if_not(isTRUE(capabilities("png")))
+  # the object carries bytes, not the raster, so a later change to the raster
+  # cannot alter what gets written
+  r <- as.raster(matrix("red", 1, 1))
+  im <- xl_image(r)
+  expect_true(is.raw(unclass(im)$image))
+  expect_equal(unclass(im)$image_format, "png")
+})
+
+test_that("a degenerate raster is refused", {
+  skip_if_not(isTRUE(capabilities("png")))
+  expect_error(xl_image(matrix(character(0), nrow = 0, ncol = 0)),
+               "no pixels to write")
+})
+
+test_that("encoding a raster leaves no device open", {
+  skip_if_not(isTRUE(capabilities("png")))
+  before <- grDevices::dev.cur()
+  xl_image(as.raster(matrix("red", 2, 2)))
+  expect_equal(grDevices::dev.cur(), before)
 })

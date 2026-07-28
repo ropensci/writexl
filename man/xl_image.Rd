@@ -5,7 +5,7 @@
 \title{Insert an image into a worksheet}
 \usage{
 xl_image(
-  file,
+  image,
   at = "A1",
   scale = 1,
   offset = NULL,
@@ -19,8 +19,11 @@ xl_image(
 )
 }
 \arguments{
-\item{file}{The image: a path to a PNG, JPEG, GIF or BMP, or a raw vector
-holding one.}
+\item{image}{The image, in any of four shapes: a path to a PNG, JPEG, GIF or
+BMP; a raw vector holding one of those encoded; a `raster` (or anything
+[grDevices::as.raster()] accepts, such as a colour matrix or an RGB/RGBA
+array); or a `nativeRaster`.  The last two are what
+[graphics::rasterImage()] draws, so anything you can plot can be written.}
 
 \item{at}{The cell the image is anchored to, such as `"B2"`, or a
 `list(rows = , cols = )` spec selecting a single cell.}

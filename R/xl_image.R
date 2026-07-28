@@ -8,9 +8,21 @@
 # embedded image sits, so the two are not interchangeable and `embed` is an
 # explicit choice rather than a default.
 #
-# The image itself may be a path or a raw vector.  A raw vector is the common
-# case in R, where a plot has just been written by a graphics device, and it
-# maps to libxlsxwriter's _buffer variants.
+# An image may arrive in four shapes: a file path, a raw vector of encoded
+# bytes, or an in-memory picture as either a `raster` (or anything as.raster()
+# accepts -- a colour matrix, a numeric matrix, an RGB/RGBA array) or a
+# `nativeRaster`.  The last two are what rasterImage() draws, so anything that
+# can be plotted can be written.
+#
+# xlsx stores encoded images, so an in-memory picture has to become PNG bytes
+# first.  Base R has no PNG encoder outside its graphics devices, so the
+# conversion renders the raster through grDevices::png() at exactly its own
+# pixel dimensions.  That needs capabilities("png"), which is not guaranteed on
+# a headless build -- when it is missing the error says how to do the
+# conversion by hand rather than failing obscurely.
+#
+# Paths and raw vectors map to libxlsxwriter's file and _buffer variants
+# respectively; a converted raster becomes a raw vector.
 #
 # Format is detected from the leading bytes rather than the file extension: a
 # ".png" that is really a JPEG would otherwise reach libxlsxwriter and be
@@ -50,14 +62,76 @@
   readBin(con, "raw", n)
 }
 
+# Is this an in-memory picture rather than a path or encoded bytes?
+.is_raster_like <- function(x) {
+  inherits(x, "nativeRaster") || inherits(x, "raster") ||
+    is.matrix(x) || (is.array(x) && length(dim(x)) == 3L)
+}
+
+# Render an in-memory picture to PNG bytes, at exactly its own pixel size.
+#
+# grDevices and graphics are Suggests rather than Imports: writexl needs them
+# only to encode an in-memory image, and only this one path uses them, so the
+# package keeps its zero-dependency footing and the requirement is checked
+# where it arises.
+.raster_to_png <- function(x, arg) {
+  missing_ns <- !vapply(c("grDevices", "graphics"), requireNamespace,
+                        logical(1), quietly = TRUE)
+  if (any(missing_ns) || !isTRUE(capabilities("png")))
+    stop(sprintf(paste0("`%s` is an in-memory image, which writexl encodes ",
+                        "with R's PNG device -- unavailable here (%s).\n",
+                        "  Encode it yourself and pass the result instead:\n",
+                        "    xl_image(png::writePNG(img))            # raw ",
+                        "vector\n",
+                        "    png::writePNG(img, \"plot.png\")           # or a ",
+                        "file\n",
+                        "    xl_image(\"plot.png\")"),
+                 arg,
+                 if (any(missing_ns))
+                   paste("missing package(s):",
+                         paste(names(missing_ns)[missing_ns], collapse = ", "))
+                 else "capabilities(\"png\") is FALSE"),
+         call. = FALSE)
+  d <- dim(x)
+  if (length(d) < 2L || anyNA(d[1:2]) || any(d[1:2] < 1L))
+    stop(sprintf("`%s` has no pixels to write", arg), call. = FALSE)
+  height <- d[1L]
+  width  <- d[2L]
+
+  path <- tempfile(fileext = ".png")
+  # png() warns that a small pixel size is "unlikely", meaning it suspects the
+  # caller wanted inches.  Here the size is the image's own, so the warning is
+  # noise -- muted by message, not blanket-suppressed, so anything else the
+  # device has to say still comes through.
+  withCallingHandlers(
+    grDevices::png(path, width = width, height = height, units = "px",
+                   bg = "transparent"),
+    warning = function(w) {
+      if (grepl("unlikely values in pixels", conditionMessage(w), fixed = TRUE))
+        invokeRestart("muffleWarning")
+    })
+  # dev.off() must run even if drawing fails, or the device is left open
+  on.exit({
+    if (grDevices::dev.cur() > 1L) grDevices::dev.off()
+    unlink(path)
+  }, add = TRUE)
+  graphics::par(mar = c(0, 0, 0, 0), xaxs = "i", yaxs = "i")
+  graphics::plot.new()
+  graphics::plot.window(c(0, 1), c(0, 1))
+  graphics::rasterImage(x, 0, 0, 1, 1, interpolate = FALSE)
+  grDevices::dev.off()
+  readBin(path, "raw", file.size(path))
+}
+
 # Check that an image is one Excel can read, and say what it is otherwise.
-.check_image <- function(x, arg = "file") {
+.check_image <- function(x, arg = "image") {
   if (is.raw(x)) {
     if (!length(x))
       stop(sprintf("`%s` is an empty raw vector", arg), call. = FALSE)
   } else {
     if (!is.character(x) || length(x) != 1L || is.na(x) || !nzchar(x))
-      stop(sprintf("`%s` must be a single file path or a raw vector", arg),
+      stop(sprintf(paste0("`%s` must be a file path, a raw vector of encoded ",
+                          "bytes, or an image rasterImage() can draw"), arg),
            call. = FALSE)
     if (!file.exists(x))
       stop(sprintf("`%s`: file does not exist: %s", arg, x), call. = FALSE)
@@ -106,8 +180,11 @@
 #' compatibility and must be 24-bit true colour; prefer PNG.  SVG is refused,
 #' because Excel stores it converted to PNG anyway.
 #'
-#' @param file The image: a path to a PNG, JPEG, GIF or BMP, or a raw vector
-#'   holding one.
+#' @param image The image, in any of four shapes: a path to a PNG, JPEG, GIF or
+#'   BMP; a raw vector holding one of those encoded; a `raster` (or anything
+#'   [grDevices::as.raster()] accepts, such as a colour matrix or an RGB/RGBA
+#'   array); or a `nativeRaster`.  The last two are what
+#'   [graphics::rasterImage()] draws, so anything you can plot can be written.
 #' @param at The cell the image is anchored to, such as `"B2"`, or a
 #'   `list(rows = , cols = )` spec selecting a single cell.
 #' @param scale Scale factor: one number for both axes, or `c(x, y)`.
@@ -137,13 +214,17 @@
 #'   xl_image(logo, at = "C2", scale = 0.5)
 #'   xl_image(logo, at = "C2", url = "https://example.com", tip = "Home")
 #' }
-xl_image <- function(file, at = "A1", scale = 1, offset = NULL,
+xl_image <- function(image, at = "A1", scale = 1, offset = NULL,
                      position = "move_and_size", description = NULL,
                      decorative = FALSE, url = NULL, tip = NULL,
                      embed = FALSE, format = NULL) {
-  if (missing(file) || is.null(file))
-    stop("`file` must be an image path or a raw vector", call. = FALSE)
-  fmt <- .check_image(file, "file")
+  if (missing(image) || is.null(image))
+    stop("`image` must be a file path, a raw vector, or an image ",
+         "rasterImage() can draw", call. = FALSE)
+  # an in-memory picture is encoded now, so a later failure cannot be blamed on
+  # a file that was fine when it was named
+  if (.is_raster_like(image)) image <- .raster_to_png(image, "image")
+  fmt <- .check_image(image, "image")
 
   str1 <- function(x, arg) {
     if (is.null(x)) return(NULL)
@@ -180,7 +261,7 @@ xl_image <- function(file, at = "A1", scale = 1, offset = NULL,
          "in the cell, leaving nowhere for the link", call. = FALSE)
 
   structure(.drop_null(list(
-    file = file, image_format = fmt, at = at, scale = sc, offset = off,
+    image = image, image_format = fmt, at = at, scale = sc, offset = off,
     position = pos, description = str1(description, "description"),
     decorative = dec, url = str1(url, "url"), tip = str1(tip, "tip"),
     embed = emb, format = format
@@ -190,13 +271,53 @@ xl_image <- function(file, at = "A1", scale = 1, offset = NULL,
 #' @export
 print.xl_image <- function(x, ...) {
   p <- unclass(x)
-  src <- if (is.raw(p[["file"]]))
-    sprintf("<%s, %d bytes>", p[["image_format"]], length(p[["file"]]))
-  else basename(p[["file"]])
+  src <- if (is.raw(p[["image"]]))
+    sprintf("<%s, %d bytes>", p[["image_format"]], length(p[["image"]]))
+  else basename(p[["image"]])
   cat(sprintf("<xl_image: %s at %s%s>\n", src,
               if (is.character(p[["at"]])) p[["at"]] else "a cell",
               if (isTRUE(p[["embed"]])) ", embedded" else ""))
   invisible(x)
+}
+
+# Resolve a sheet's images to the C payloads.  Applied after the row loop
+# beside the merges and tables: an embedded image writes a cell, and a floating
+# one anchors to a row whose height the row loop may still be setting.
+.resolve_images <- function(el, df, reg, header_offset, props) {
+  if (!inherits(el, "xl_sheet")) return(list())
+  ims <- .image_list(el$image)
+  lapply(seq_along(ims), function(i) {
+    p <- unclass(ims[[i]])
+    at <- .xl_resolve_range(p[["at"]], arg = sprintf("image[[%d]] at", i),
+                            df = df, header_offset = header_offset,
+                            allow_cell = TRUE)
+    if (at[1L] != at[3L] || at[2L] != at[4L])
+      stop(sprintf(paste0("`image[[%d]] at` must name a single cell, not a ",
+                          "range: an image is anchored to one cell"), i),
+           call. = FALSE)
+    ent <- list(row = at[1L], col = at[2L],
+                embed = as.integer(isTRUE(p[["embed"]])))
+    if (is.raw(p[["image"]])) ent$buffer <- p[["image"]]
+    else                      ent$filename <- p[["image"]]
+    if (!is.null(p[["scale"]])) {
+      ent$x_scale <- p[["scale"]][1L]
+      ent$y_scale <- p[["scale"]][2L]
+    }
+    if (!is.null(p[["offset"]])) {
+      ent$x_offset <- as.integer(p[["offset"]][1L])
+      ent$y_offset <- as.integer(p[["offset"]][2L])
+    }
+    if (!is.null(p[["position"]]))
+      ent$object_position <- unname(.LXW_OBJECT_POSITION[[p[["position"]]]])
+    if (!is.null(p[["description"]])) ent$description <- p[["description"]]
+    if (isTRUE(p[["decorative"]]))    ent$decorative <- 1L
+    if (!is.null(p[["url"]]))         ent$url <- p[["url"]]
+    if (!is.null(p[["tip"]]))         ent$tip <- p[["tip"]]
+    if (!is.null(p[["format"]]))
+      ent$cell_format_id <- .register_format(reg,
+        merge_xl_format(props$default_format, p[["format"]]))
+    ent
+  })
 }
 
 # Normalise one image or a list of them to a checked list.
