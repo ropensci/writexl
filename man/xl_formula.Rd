@@ -90,6 +90,7 @@ Other writexl:
 \code{\link[=xl_filter_keep]{xl_filter_keep()}},
 \code{\link[=xl_format]{xl_format()}},
 \code{\link{xl_format_groups}},
+\code{\link[=xl_image]{xl_image()}},
 \code{\link[=xl_merge]{xl_merge()}},
 \code{\link[=xl_outline]{xl_outline()}},
 \code{\link[=xl_page_setup]{xl_page_setup()}},
