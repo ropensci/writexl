@@ -22,7 +22,8 @@ xl_sheet(
   view = NULL,
   merge = NULL,
   validation = NULL,
-  conditional = NULL
+  conditional = NULL,
+  filter = NULL
 )
 }
 \arguments{
@@ -91,6 +92,12 @@ length limit or a custom formula.}
 \item{conditional}{One conditional format ([xl_cond_cell()],
 [xl_cond_scale()], [xl_cond_bar()], [xl_cond_icons()]), or a list of them,
 formatting cells according to their contents.}
+
+\item{filter}{One [xl_filter()], or a list of them, setting autofilter
+criteria.  Each also hides the rows it excludes, because Excel does not
+apply a filter when a file is opened --- criteria on their own produce a
+sheet that looks filtered but shows every row.  Implies `autofilter = TRUE`
+over the used range when `autofilter` is not set separately.}
 }
 \value{
 An `xl_sheet` object.
@@ -122,6 +129,7 @@ Other writexl:
 \code{\link{xl_colrow_spec}},
 \code{\link[=xl_comment]{xl_comment()}},
 \code{\link{xl_conditional}},
+\code{\link[=xl_filter]{xl_filter()}},
 \code{\link[=xl_format]{xl_format()}},
 \code{\link{xl_format_groups}},
 \code{\link[=xl_formula]{xl_formula()}},

@@ -45,6 +45,14 @@
   for two- and three-colour scales, `xl_cond_bar()` for data bars and
   `xl_cond_icons()` for Excel's built-in icon sets.
 
+* **Autofilter criteria** via `xl_sheet(filter = xl_filter(...))`. Excel does
+  not apply a filter when a file is opened, so `xl_filter()` also hides the rows
+  the criteria exclude; without that the sheet looks filtered but shows every
+  row. writexl reproduces Excel's matching rules, which were measured rather
+  than assumed: text matching is case-insensitive, `*` and `?` are wildcards,
+  blank covers an empty cell and an empty string, and text and numbers are never
+  coerced into each other.
+
 * **Merged cells** via `xl_sheet(merge = xl_merge(...))`. A merged range holds
   one value, so `xl_merge()` carries its own text; merging over cells the data
   frame filled keeps only the merged text, as it does in Excel.

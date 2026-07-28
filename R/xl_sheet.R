@@ -158,6 +158,11 @@ xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
 #' @param conditional One conditional format ([xl_cond_cell()],
 #'   [xl_cond_scale()], [xl_cond_bar()], [xl_cond_icons()]), or a list of them,
 #'   formatting cells according to their contents.
+#' @param filter One [xl_filter()], or a list of them, setting autofilter
+#'   criteria.  Each also hides the rows it excludes, because Excel does not
+#'   apply a filter when a file is opened --- criteria on their own produce a
+#'   sheet that looks filtered but shows every row.  Implies `autofilter = TRUE`
+#'   over the used range when `autofilter` is not set separately.
 #' @return An `xl_sheet` object.
 #' @family writexl
 #' @seealso [xl_col_spec], [xl_row_spec], [write_xlsx]
@@ -177,7 +182,8 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
                      autofilter = FALSE, protect = FALSE,
                      comment_author = NA, show_comments = FALSE,
                      page = NULL, view = NULL, merge = NULL,
-                     validation = NULL, conditional = NULL) {
+                     validation = NULL, conditional = NULL,
+                     filter = NULL) {
   if (!is.data.frame(data))
     stop("`data` must be a data frame", call. = FALSE)
   if (!is.logical(auto_colwidth) || length(auto_colwidth) != 1L || is.na(auto_colwidth))
@@ -208,7 +214,8 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
       view           = view,
       merge          = merge,
       validation     = validation,
-      conditional    = conditional
+      conditional    = conditional,
+      filter         = filter
     ),
     class = "xl_sheet"
   )
@@ -424,7 +431,12 @@ print.xl_sheet <- function(x, ...) {
     tab_color <- if (is.na(el$tab_color)) -1L else xl_color(el$tab_color)
     zoom <- if (is.na(el$zoom)) 0L else as.integer(el$zoom)
     default_row_height <- if (is.na(el$default_row_height)) NA_real_ else as.numeric(el$default_row_height)
+    # libxlsxwriter requires the autofilter range before any column criteria,
+    # so the filter payloads are appended after the autofilter one below
+    fr <- .resolve_filters(el, df, header_offset)
     af <- el$autofilter
+    # a filter is meaningless without the autofilter it belongs to
+    if (length(fr$payloads) && !is.character(af) && !isTRUE(af)) af <- TRUE
     if (is.character(af)) {
       overlay <- c(overlay, list(.overlay_autofilter(
         .parse_range(af, "autofilter", df, header_offset))))
@@ -434,6 +446,7 @@ print.xl_sheet <- function(x, ...) {
         overlay <- c(overlay, list(.overlay_autofilter(
           c(0L, 0L, as.integer(last_row), ncols - 1L))))
     }
+    overlay <- c(overlay, fr$payloads)
     overlay <- c(overlay, .as_overlay_list(el$overlay))
     protect <- .resolve_protect(el$protect)
     page_payload <- .page_setup_payload(el$page, df, header_offset)
@@ -473,6 +486,22 @@ print.xl_sheet <- function(x, ...) {
     view$split <- .resolve_split(vw_split, df, header_offset, props,
                                  default_row_height, row_row, row_height,
                                  col_width)
+  }
+
+  # rows excluded by a filter are hidden alongside any set by an xl_row_spec()
+  if (exists("fr", inherits = FALSE) && length(fr$hide)) {
+    for (rr in fr$hide) {
+      k <- which(row_row == rr)
+      if (length(k)) {
+        row_hidden[k[1L]] <- 1L
+      } else {
+        row_row    <- c(row_row, rr)
+        row_height <- c(row_height, NA_real_)
+        row_fmt_id <- c(row_fmt_id, 0L)
+        row_hidden <- c(row_hidden, 1L)
+        row_level  <- c(row_level, NA_integer_)
+      }
+    }
   }
 
   merges <- .resolve_merges(el, df, reg, header_offset, props)

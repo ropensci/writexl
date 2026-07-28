@@ -7,11 +7,11 @@
 xl_validation(
   range,
   type = "any",
-  list = NULL,
   criteria = NA,
   value = NULL,
   min = NULL,
   max = NULL,
+  list = NULL,
   input_title = NA,
   input_message = NA,
   error_title = NA,
@@ -32,11 +32,6 @@ xl_validation(
 must evaluate `TRUE`), or `"any"` (no restriction, useful when you only
 want the input message).  Ignored when `list` is given.}
 
-\item{list}{A dropdown of allowed values: a character vector of choices, or a
-single `"=..."` formula naming a range that holds them.  The choices are
-stored joined by commas, and Excel limits that joined string to 255
-characters.}
-
 \item{criteria}{How `value` (or `min`/`max`) limits the entry: `"between"`,
 `"not between"`, `"=="`, `"!="`, `">"`, `"<"`, `">="` or `"<="`.  Required
 for the numeric, date, time and length kinds; must not be given for
@@ -48,6 +43,11 @@ and `max` implies `"between"`.}
 
 \item{min, max}{The two limits for `"between"` / `"not between"`.  Supplying
 both and omitting `criteria` implies `"between"`.}
+
+\item{list}{A dropdown of allowed values: a character vector of choices, or a
+single `"=..."` formula naming a range that holds them.  The choices are
+stored joined by commas, and Excel limits that joined string to 255
+characters.}
 
 \item{input_title, input_message}{Text shown in a tooltip when the cell is
 selected.  Titles are limited to 32 characters and messages to 255.}
@@ -107,6 +107,7 @@ Other writexl:
 \code{\link{xl_colrow_spec}},
 \code{\link[=xl_comment]{xl_comment()}},
 \code{\link{xl_conditional}},
+\code{\link[=xl_filter]{xl_filter()}},
 \code{\link[=xl_format]{xl_format()}},
 \code{\link{xl_format_groups}},
 \code{\link[=xl_formula]{xl_formula()}},

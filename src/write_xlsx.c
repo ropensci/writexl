@@ -665,6 +665,46 @@ static void apply_conditional(cell_write_ctx *ctx, SEXP p, int *r){
                                                 (lxw_col_t) r[3], &c));
 }
 
+/* Fill one lxw_filter_rule from a payload, using the given key suffix. */
+static void filter_rule(SEXP p, const char *crit_key, const char *num_key,
+                        const char *str_key, lxw_filter_rule *r){
+  memset(r, 0, sizeof(*r));
+  r->criteria = (uint8_t) payload_int(p, crit_key);
+  if(payload_has(p, num_key)) r->value = payload_dbl(p, num_key);
+  r->value_string = payload_str(p, str_key);
+}
+
+/*
+ * Apply one column's autofilter criteria.  The rows this excludes are hidden
+ * on the R side, because Excel stores the criteria and the hidden rows
+ * independently and applies neither when the file is opened.
+ */
+static void apply_filter(cell_write_ctx *ctx, SEXP p){
+  lxw_col_t col = (lxw_col_t) payload_int(p, "col");
+
+  SEXP lst = list_get(p, "value_list");
+  if(lst != R_NilValue && TYPEOF(lst) == STRSXP && Rf_length(lst) > 0){
+    R_xlen_t n = Rf_length(lst);
+    const char **items = (const char **) R_alloc((size_t) n + 1, sizeof(char *));
+    for(R_xlen_t k = 0; k < n; k++)
+      items[k] = Rf_translateCharUTF8(STRING_ELT(lst, k));
+    items[n] = NULL;
+    assert_lxw(worksheet_filter_list(ctx->sheet, col, items));
+    return;
+  }
+
+  lxw_filter_rule r1;
+  filter_rule(p, "criteria", "value", "value_string", &r1);
+  if(payload_has(p, "criteria2")){
+    lxw_filter_rule r2;
+    filter_rule(p, "criteria2", "value2", "value_string2", &r2);
+    assert_lxw(worksheet_filter_column2(ctx->sheet, col, &r1, &r2,
+                                        (uint8_t) payload_int(p, "and_or")));
+  } else {
+    assert_lxw(worksheet_filter_column(ctx->sheet, col, &r1));
+  }
+}
+
 static void apply_overlay(cell_write_ctx *ctx, SEXP p){
   const char *kind = payload_str(p, "kind");
   bail_if(kind == NULL, "sheet overlay payload is missing a 'kind'");
@@ -685,6 +725,8 @@ static void apply_overlay(cell_write_ctx *ctx, SEXP p){
     bail_if(!overlay_range(p, "range", r),
             "conditional overlay needs a length-4 range");
     apply_conditional(ctx, p, r);
+  } else if(strcmp(kind, "filter") == 0){
+    apply_filter(ctx, p);
   } else {
     Rf_errorcall(R_NilValue,
                  "Error in writexl: unknown sheet overlay kind '%s'", kind);

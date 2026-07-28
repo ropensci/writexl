@@ -446,3 +446,52 @@ values and rule types marking where each sits. `xl_cond_bar()` draws in-cell
 data bars, with control over the negative and border colours, the axis and the
 direction. `xl_cond_icons()` selects one of Excel's seventeen built-in icon
 sets — these are drawn by Excel itself, so nothing is embedded in the file.
+
+## Filtering
+
+`xl_sheet(autofilter = TRUE)` adds the filter dropdowns. `xl_filter()` goes
+further and sets the criteria on a column:
+
+```{r}
+fruit <- data.frame(
+  fruit = c("apple", "banana", "cherry", "damson", "elderberry"),
+  qty   = c(5, 150, 20, 300, 75),
+  stringsAsFactors = FALSE
+)
+sheet <- xl_sheet(fruit, filter = xl_filter("qty", ">", 100))
+path <- write_xlsx(list(Data = sheet), tempfile(fileext = ".xlsx"))
+```
+
+That file opens showing only banana and damson.
+
+### Why writexl hides the rows
+
+Excel stores a filter's *criteria* and its *hidden rows* as two independent
+things, and it does not apply a filter when a file is opened. A file carrying
+criteria alone therefore opens with the funnel icon showing "greater than 100"
+and every row still visible — it looks filtered and is not.
+
+So `xl_filter()` does both: it writes the criteria, and it hides the rows the
+criteria excludes. That means writexl has to reproduce Excel's own matching
+rules, which were established by writing criteria with no hidden rows, opening
+the file and pressing Data → Reapply so that Excel computed the match itself:
+
+* text comparison is **case-insensitive** — `"Apple"` matches `apple`
+* `*` and `?` are **wildcards** — `"ap*"` matches `apricot`
+* **blank** covers an empty cell *and* an empty string, and non-blank is its
+  exact complement
+* there is **no coercion** — a numeric criteria matches no text cell
+* list membership follows the same case-insensitive rule
+
+```{r}
+xl_filter("fruit", "==", "ap*")                  # wildcard, case-insensitive
+xl_filter("fruit", list = c("apple", "cherry"))  # keep only these
+xl_filter("qty", ">", 100, "<", 200)             # two rules, combined with and
+xl_filter("fruit", "non-blanks")
+```
+
+Filters on different columns combine with AND, as they do in Excel.
+
+Because writexl must know each value to decide what to hide, a column of
+formulas cannot be filtered — writexl does not know what Excel would compute,
+and says so rather than guessing.
