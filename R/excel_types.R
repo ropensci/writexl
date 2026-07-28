@@ -70,16 +70,24 @@ xl_formula <- function(x, format = NULL){
 #' @rdname xl_formula
 #' @export
 #' @param url character vector of URLs.  Use `NA` to produce a blank cell.
-#' @param name character vector of friendly display names shown in the cell
-#'   instead of the URL.  This is the same idea as `value` in
-#'   [xl_hyperlink_cell()] and in [xl_cell_general()]; the names differ only
-#'   because `xl_hyperlink()` mirrors Excel's own `HYPERLINK()` argument
-#'   instead of the raw URL.  When `NULL`, the URL is shown.  Ignored for
-#'   `NA` URLs.
-xl_hyperlink <- function(url, name = NULL, format = NULL){
+#' @param name **Deprecated.** The former spelling of `value`, kept for
+#'   backward compatibility.  Supplying it warns and points at `value`;
+#'   supplying both is an error, since they mean the same thing.  `value` has
+#'   taken the argument position `name` used to occupy, so code that passed the
+#'   display text positionally keeps working unchanged.
+xl_hyperlink <- function(url, value = NULL, format = NULL, name = NULL){
+  if(!is.null(name)){
+    if(!is.null(value))
+      stop("Give either `value` or the deprecated `name`, not both: they mean ",
+           "the same thing", call. = FALSE)
+    warning("The `name` argument of xl_hyperlink() is deprecated; use `value` ",
+            "instead, which is what xl_hyperlink_cell() and xl_cell_general() ",
+            "already call it.", call. = FALSE)
+    value <- name
+  }
   url <- .as_character_arg(url, "url")
-  fmlas <- if(!is.null(name)){
-    paste0("=HYPERLINK(", dubquote(url), ",", dubquote(name), ")")
+  fmlas <- if(!is.null(value)){
+    paste0("=HYPERLINK(", dubquote(url), ",", dubquote(value), ")")
   } else {
     paste0("=HYPERLINK(", dubquote(url), ")")
   }
@@ -89,11 +97,11 @@ xl_hyperlink <- function(url, name = NULL, format = NULL){
 
 #' @rdname xl_formula
 #' @export
-#' @param value character vector (or `NULL`) of display text shown in the
-#'   cell instead of the URL --- the same idea as `name` in [xl_hyperlink()]
-#'   cell.  For `xl_hyperlink_cell()`, when `NULL` the raw URL is shown.
-#'   Recycled to the length of `url`.  Automatically set to `NA` for cells
-#'   whose URL is `NA`.
+#' @param value character vector (or `NULL`) of display text shown in the cell
+#'   instead of the URL.  When `NULL` the URL itself is shown.  Recycled to the
+#'   length of `url`, and automatically `NA` for cells whose URL is `NA`.  The
+#'   same argument name is used by [xl_hyperlink_cell()] and
+#'   [xl_cell_general()].
 xl_hyperlink_cell <- function(url, value = NULL, format = NULL){
   url <- .as_character_arg(url, "url")
   if(is.null(value)){

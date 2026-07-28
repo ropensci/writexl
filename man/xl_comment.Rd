@@ -6,8 +6,8 @@
 \usage{
 xl_comment(
   text,
-  author = NA,
   format = NULL,
+  author = NA,
   visible = NA,
   width = NA,
   height = NA,
@@ -22,13 +22,13 @@ xl_comment(
 \arguments{
 \item{text}{A single string: the comment text.}
 
-\item{author}{Comment author (shown in Excel's status bar).  Defaults to the
-sheet/workbook `comment_author` when unset (see [xl_sheet()],
-[xl_properties()]).}
-
 \item{format}{An optional [xl_format]; only its fill background color and
 font name/size/family are used (see [xl_fill()], [xl_font()]).  Other
 properties are unsupported and warned about.}
+
+\item{author}{Comment author (shown in Excel's status bar).  Defaults to the
+sheet/workbook `comment_author` when unset (see [xl_sheet()],
+[xl_properties()]).}
 
 \item{visible}{Initial visibility: `NA` follows the sheet default (comments
 are hidden unless `show_comments` is set), `TRUE` shows this comment,
