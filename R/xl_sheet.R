@@ -36,6 +36,10 @@
 #'   (row 1 is the first data row, ignoring the header).
 #' @param width Column width (in Excel character units).
 #' @param height Row height (in points).
+#' @param width_pixels,height_pixels The same geometry given in pixels instead.
+#'   Give one or the other, not both.  Excel stores character units and points,
+#'   so the pixel value is converted on the way in --- read back, a width set
+#'   as 100 pixels is 13.57 character units.
 #' @param hidden Logical; hide the column/row.
 #' @param level Integer outline (grouping) level, 0--7.
 #' @param format An optional [xl_format] applied to the column/row as its
@@ -47,21 +51,47 @@
 #' @examples
 #' xl_col_spec("revenue", width = 14, format = xl_num_format("#,##0.00"))
 #' xl_col_spec(c(1, 2), width = 10) + xl_font(bold = TRUE)
+#' xl_col_spec("logo", width_pixels = 100)
 #' xl_row_spec(1, height = 24, format = xl_font(bold = TRUE))
+#' xl_row_spec(1, height_pixels = 40)
 #' @name xl_colrow_spec
 NULL
+
+# Pixel geometry, converted exactly as _pixels_to_width() / _pixels_to_height()
+# in libxlsxwriter's worksheet.c do.  Converting here rather than calling
+# worksheet_set_*_pixels() keeps one geometry path through to C, which matters
+# because auto_colwidth and the split-pane resolver both read these widths.
+.pixels_to_width <- function(px) {
+  if (px == 64) return(8.43)          # LXW_DEF_COL_WIDTH_PIXELS -> default
+  if (px <= 12) px / 12 else (px - 5) / 7
+}
+
+.pixels_to_height <- function(px) {
+  if (px == 20) 15 else px * 0.75     # LXW_DEF_ROW_HEIGHT_PIXELS -> default
+}
+
+# Resolve a units pair to the single value the geometry carries.
+.one_of_units <- function(value, pixels, arg, px_arg, convert) {
+  v  <- .val_num(value, arg, min = 0)
+  pv <- .val_num(pixels, px_arg, min = 0)
+  if (!is.null(v) && !is.null(pv))
+    stop(sprintf("give either `%s` or `%s`, not both", arg, px_arg),
+         call. = FALSE)
+  if (!is.null(pv)) convert(pv) else v
+}
 
 #' @rdname xl_colrow_spec
 #' @export
 xl_col_spec <- function(cols, width = NA, hidden = NA, level = NA,
-                        format = NULL) {
+                        format = NULL, width_pixels = NA) {
   if (missing(cols) || length(cols) < 1L)
     stop("`cols` must name or index at least one column", call. = FALSE)
   if (!is.character(cols) && !is.numeric(cols))
     stop("`cols` must be a character (names) or numeric (positions) vector",
          call. = FALSE)
   geometry <- .drop_null(list(
-    width  = .val_num(width, "width", min = 0),
+    width  = .one_of_units(width, width_pixels, "width", "width_pixels",
+                           .pixels_to_width),
     hidden = .val_flag(hidden, "hidden"),
     level  = .val_int(level, "level", min = 0, max = 7)
   ))
@@ -71,7 +101,7 @@ xl_col_spec <- function(cols, width = NA, hidden = NA, level = NA,
 #' @rdname xl_colrow_spec
 #' @export
 xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
-                        format = NULL) {
+                        format = NULL, height_pixels = NA) {
   if (missing(rows) || length(rows) < 1L)
     stop("`rows` must index at least one row", call. = FALSE)
   if (!is.numeric(rows))
@@ -80,7 +110,8 @@ xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
   if (any(rows < 1))
     stop("`rows` must be positive (1-based data-row indices)", call. = FALSE)
   geometry <- .drop_null(list(
-    height = .val_num(height, "height", min = 0),
+    height = .one_of_units(height, height_pixels, "height", "height_pixels",
+                           .pixels_to_height),
     hidden = .val_flag(hidden, "hidden"),
     level  = .val_int(level, "level", min = 0, max = 7)
   ))
@@ -158,6 +189,20 @@ xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
 #' @param conditional One conditional format ([xl_cond_cell()],
 #'   [xl_cond_scale()], [xl_cond_bar()], [xl_cond_icons()]), or a list of them,
 #'   formatting cells according to their contents.
+#' @param filter One [xl_filter()], or a list of them, setting autofilter
+#'   criteria.  Each also hides the rows it excludes, because Excel does not
+#'   apply a filter when a file is opened --- criteria on their own produce a
+#'   sheet that looks filtered but shows every row.  Implies `autofilter = TRUE`
+#'   over the used range when `autofilter` is not set separately.
+#' @param outline An [xl_outline()] controlling how the grouping symbols
+#'   created by `level` in [xl_col_spec()] / [xl_row_spec()] are drawn.  It
+#'   changes their display only, never which rows are grouped.
+#' @param ignore_errors A named list turning off the green error triangle Excel
+#'   shows in cells it believes are wrong.  Each name is an error type and each
+#'   value a range, e.g. `list(number_stored_as_text = "A2:A99")`.  Types:
+#'   `number_stored_as_text`, `eval_error`, `formula_differs`, `formula_range`,
+#'   `formula_unlocked`, `empty_cell_reference`, `list_data_validation`,
+#'   `calculated_column`, `two_digit_text_year`.
 #' @return An `xl_sheet` object.
 #' @family writexl
 #' @seealso [xl_col_spec], [xl_row_spec], [write_xlsx]
@@ -177,7 +222,8 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
                      autofilter = FALSE, protect = FALSE,
                      comment_author = NA, show_comments = FALSE,
                      page = NULL, view = NULL, merge = NULL,
-                     validation = NULL, conditional = NULL) {
+                     validation = NULL, conditional = NULL,
+                     filter = NULL, outline = NULL, ignore_errors = NULL) {
   if (!is.data.frame(data))
     stop("`data` must be a data frame", call. = FALSE)
   if (!is.logical(auto_colwidth) || length(auto_colwidth) != 1L || is.na(auto_colwidth))
@@ -208,7 +254,10 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
       view           = view,
       merge          = merge,
       validation     = validation,
-      conditional    = conditional
+      conditional    = conditional,
+      filter         = filter,
+      outline        = outline,
+      ignore_errors  = ignore_errors
     ),
     class = "xl_sheet"
   )
@@ -424,7 +473,12 @@ print.xl_sheet <- function(x, ...) {
     tab_color <- if (is.na(el$tab_color)) -1L else xl_color(el$tab_color)
     zoom <- if (is.na(el$zoom)) 0L else as.integer(el$zoom)
     default_row_height <- if (is.na(el$default_row_height)) NA_real_ else as.numeric(el$default_row_height)
+    # libxlsxwriter requires the autofilter range before any column criteria,
+    # so the filter payloads are appended after the autofilter one below
+    fr <- .resolve_filters(el, df, header_offset)
     af <- el$autofilter
+    # a filter is meaningless without the autofilter it belongs to
+    if (length(fr$payloads) && !is.character(af) && !isTRUE(af)) af <- TRUE
     if (is.character(af)) {
       overlay <- c(overlay, list(.overlay_autofilter(
         .parse_range(af, "autofilter", df, header_offset))))
@@ -434,6 +488,7 @@ print.xl_sheet <- function(x, ...) {
         overlay <- c(overlay, list(.overlay_autofilter(
           c(0L, 0L, as.integer(last_row), ncols - 1L))))
     }
+    overlay <- c(overlay, fr$payloads)
     overlay <- c(overlay, .as_overlay_list(el$overlay))
     protect <- .resolve_protect(el$protect)
     page_payload <- .page_setup_payload(el$page, df, header_offset)
@@ -475,9 +530,26 @@ print.xl_sheet <- function(x, ...) {
                                  col_width)
   }
 
+  # rows excluded by a filter are hidden alongside any set by an xl_row_spec()
+  if (exists("fr", inherits = FALSE) && length(fr$hide)) {
+    for (rr in fr$hide) {
+      k <- which(row_row == rr)
+      if (length(k)) {
+        row_hidden[k[1L]] <- 1L
+      } else {
+        row_row    <- c(row_row, rr)
+        row_height <- c(row_height, NA_real_)
+        row_fmt_id <- c(row_fmt_id, 0L)
+        row_hidden <- c(row_hidden, 1L)
+        row_level  <- c(row_level, NA_integer_)
+      }
+    }
+  }
+
   merges <- .resolve_merges(el, df, reg, header_offset, props)
   overlay <- c(overlay, .resolve_validations(el, df, header_offset),
-              .resolve_conditionals(el, df, reg, header_offset, props))
+              .resolve_conditionals(el, df, reg, header_offset, props),
+              .resolve_ignore_errors(el, df, header_offset))
 
   col_format_id <- vapply(col_fmt, function(f) .register_format(reg, f), integer(1))
 
@@ -495,6 +567,7 @@ print.xl_sheet <- function(x, ...) {
     show_comments = as.integer(show_comments),
     page = page_payload,
     view = if (length(view)) view else NULL,
-    merges = if (length(merges)) merges else NULL
+    merges = if (length(merges)) merges else NULL,
+    outline = .resolve_outline(el)
   )
 }

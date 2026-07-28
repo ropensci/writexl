@@ -45,6 +45,34 @@
   for two- and three-colour scales, `xl_cond_bar()` for data bars and
   `xl_cond_icons()` for Excel's built-in icon sets.
 
+* **Autofilter criteria** via `xl_sheet(filter = xl_filter(...))`. Excel does
+  not apply a filter when a file is opened, so `xl_filter()` also hides the rows
+  the criteria exclude; without that the sheet looks filtered but shows every
+  row. writexl reproduces Excel's matching rules, which were measured rather
+  than assumed. An exact value or a `list` matches the text a cell *displays*,
+  so it matches the number `10` and the string `"10"` alike; every other
+  criteria compares by type, and a wildcard turns `"=="` into one of those. Text
+  matching is case-insensitive, `*` and `?` are wildcards, and blank covers an
+  empty cell as well as an empty string. Mixed-type columns made with
+  `xl_cell_general()` are matched cell by cell.
+
+* `xl_filter_keep()` exposes the matching rule on its own: given a data frame
+  and one or more `xl_filter()`s, it returns which rows Excel would leave
+  visible, without writing anything. `xl_sheet(filter =)` uses it to decide
+  what to hide, so the two cannot disagree.
+
+* Column widths and row heights may be given in **pixels** ---
+  `xl_col_spec(width_pixels =)` and `xl_row_spec(height_pixels =)` --- as well
+  as in Excel's character units and points.
+
+* **Outline display** via `xl_sheet(outline = xl_outline(...))`: whether the
+  grouping symbols are shown, and which side of the detail rows and columns
+  the summary sits on. Grouping itself still comes from `level`.
+
+* **Error indicators** can be turned off with `xl_sheet(ignore_errors =)`, for
+  example `list(number_stored_as_text = "A2:A99")` to stop Excel flagging
+  numbers deliberately stored as text.
+
 * **Merged cells** via `xl_sheet(merge = xl_merge(...))`. A merged range holds
   one value, so `xl_merge()` carries its own text; merging over cells the data
   frame filled keeps only the merged text, as it does in Excel.

@@ -125,6 +125,55 @@ Set `auto_colwidth = TRUE` to size every column to its contents (a
 character-count estimate, since the xlsx format has no true "AutoFit");
 columns given an explicit width via `xl_col_spec()` are left as-is.
 
+Geometry can be given in **pixels** instead of Excel's character units and
+points, which is easier to reason about when sizing a column around an image
+or a fixed layout. Give one unit or the other, not both:
+
+```{r}
+xl_col_spec("thumbnail", width_pixels = 100)
+xl_row_spec(1, height_pixels = 40)
+```
+
+Excel stores character units and points, so the value is converted on the way
+in — a column set to 100 pixels reads back as 13.57 character units, and
+renders at 100 pixels again.
+
+### Grouping and outlines
+
+`level` in `xl_col_spec()` / `xl_row_spec()` puts columns or rows into an
+outline group, which Excel draws with the +/- controls that collapse it.
+`xl_outline()` changes how those controls are *drawn* — never which rows are
+grouped — and its defaults already match Excel's, so it is rarely needed:
+
+```{r}
+grouped <- xl_sheet(
+  data.frame(q1 = 1:2, q2 = 3:4, total = 4:5),
+  cols    = list(xl_col_spec(c("q1", "q2"), level = 1)),
+  outline = xl_outline(symbols_right = FALSE)   # summary column on the left
+)
+path <- write_xlsx(list(Grouped = grouped), tempfile(fileext = ".xlsx"))
+```
+
+### Silencing Excel's error indicators
+
+Excel puts a green triangle in cells it thinks are wrong — most often a number
+deliberately stored as text. `ignore_errors` turns that off for a range, one
+entry per error type:
+
+```{r}
+codes <- xl_sheet(
+  data.frame(zip = c("01234", "02138")),
+  ignore_errors = list(number_stored_as_text = "A2:A3")
+)
+path <- write_xlsx(list(Codes = codes), tempfile(fileext = ".xlsx"))
+```
+
+The range takes any spelling the other range arguments accept, so
+`list(cols = "zip")` would cover the whole column. The available types are
+`number_stored_as_text`, `eval_error`, `formula_differs`, `formula_range`,
+`formula_unlocked`, `empty_cell_reference`, `list_data_validation`,
+`calculated_column` and `two_digit_text_year`.
+
 Columns can be targeted by name or position. A plain data frame passed
 alongside an `xl_sheet` behaves exactly as before:
 
@@ -446,3 +495,119 @@ values and rule types marking where each sits. `xl_cond_bar()` draws in-cell
 data bars, with control over the negative and border colours, the axis and the
 direction. `xl_cond_icons()` selects one of Excel's seventeen built-in icon
 sets — these are drawn by Excel itself, so nothing is embedded in the file.
+
+## Filtering
+
+`xl_sheet(autofilter = TRUE)` adds the filter dropdowns. `xl_filter()` goes
+further and sets the criteria on a column:
+
+```{r}
+fruit <- data.frame(
+  fruit = c("apple", "banana", "cherry", "damson", "elderberry"),
+  qty   = c(5, 150, 20, 300, 75),
+  stringsAsFactors = FALSE
+)
+sheet <- xl_sheet(fruit, filter = xl_filter("qty", ">", 100))
+path <- write_xlsx(list(Data = sheet), tempfile(fileext = ".xlsx"))
+```
+
+That file opens showing only banana and damson.
+
+### Why writexl hides the rows
+
+Excel stores a filter's *criteria* and its *hidden rows* as two independent
+things, and it does not apply a filter when a file is opened. A file carrying
+criteria alone therefore opens with the funnel icon showing "greater than 100"
+and every row still visible — it looks filtered and is not.
+
+So `xl_filter()` does both: it writes the criteria, and it hides the rows the
+criteria excludes. That means writexl has to reproduce Excel's own matching
+rules, which were established by writing criteria with no hidden rows, opening
+the file and pressing Data → Reapply so that Excel computed the match itself.
+
+### Two kinds of filter
+
+The measurements showed that the rules are not a property of the criteria on
+its own. A filter is written in one of two forms, and Excel matches them
+differently:
+
+| Form | Written for | Excel matches |
+|---|---|---|
+| **value list** | `"=="` without a wildcard, `"blanks"`, any `list` | the text the cell **displays**, case-insensitively |
+| **typed comparison** | everything else, including `"=="` *with* a wildcard | by **type** — numbers to numbers, text to text |
+
+A value list ignores how the value was stored, so all three of these keep the
+number `10` *and* the string `"10"`:
+
+```{r}
+xl_filter("qty", "==", 10)
+xl_filter("qty", "==", "10")
+xl_filter("qty", list = "10")
+```
+
+A typed comparison does not. On a numeric column `"=="` with `"1*"` keeps
+nothing at all, because no number is text — even though `"=="` with `"10"`
+keeps the number 10. The wildcard is the only difference, and it changes the
+form:
+
+```{r}
+xl_filter("qty", "==", "1*")   # typed: matches no number
+xl_filter("qty", "==", "10")   # value list: matches the number 10
+```
+
+Within a typed comparison, a text cell is never equal to a number — which makes
+`"!="` *true* for it. So `xl_filter("fruit", "!=", 10)` keeps every row of a
+text column.
+
+The rest is more predictable: text comparison is case-insensitive, `*` and `?`
+are wildcards, and **blank** covers an empty cell as well as an empty string,
+with `"non-blanks"` its exact complement. Blanks are dropped by every
+comparison save one — `"!="` keeps them, since a blank is not equal to
+anything.
+
+```{r}
+xl_filter("fruit", "==", "ap*")                  # wildcard, case-insensitive
+xl_filter("fruit", list = c("apple", "cherry"))  # keep only these
+xl_filter("qty", ">", 100, "<", 200)             # two rules, combined with and
+xl_filter("fruit", "non-blanks")
+```
+
+Filters on different columns combine with AND, as they do in Excel.
+
+### Mixed columns, and what cannot be filtered
+
+A column built with `xl_cell_general()` may hold different types in different
+rows, and each cell is matched by its own type:
+
+```{r}
+mixed <- data.frame(row = 1:5)
+mixed$v <- xl_cell_general(value = list(10, "20", "abc", 30, 20))
+```
+
+Here `xl_filter("v", ">", 15)` keeps rows 4 and 5 — the numbers 30 and 20 — but
+not the *text* `"20"` in row 2. A value list works the other way: because it
+matches displayed text, `xl_filter("v", list = "20")` keeps both row 2 and
+row 5.
+
+### Asking without writing
+
+The matching rule is available on its own, so you can see which rows a filter
+would leave visible without writing a file:
+
+```{r}
+sales <- data.frame(fruit = c("apple", "banana", "cherry"),
+                    qty = c(5, 150, 300))
+xl_filter_keep(sales, xl_filter("qty", ">", 100))
+sales[xl_filter_keep(sales, xl_filter("fruit", "==", "*a*")), ]
+```
+
+`xl_sheet(filter =)` uses this same function to decide what to hide, so the two
+cannot disagree.
+
+Two things are refused rather than guessed at. A column of **formulas** cannot
+be filtered, because writexl does not know what Excel would compute. And a
+**date** column cannot be filtered by `"=="` or `list`: those match displayed
+text, which depends on the number format, so use a comparison such as `">="`
+instead. The same caution applies to a numeric column carrying a custom number
+format — writexl compares the General rendering of the number, so a value list
+may not match what Excel shows.

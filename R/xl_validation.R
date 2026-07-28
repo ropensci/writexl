@@ -155,8 +155,8 @@
 #' df <- data.frame(qty = 1:3)
 #' tmp <- write_xlsx(list(Data = xl_sheet(df,
 #'   validation = xl_validation("A2:A4", type = "integer", min = 0, max = 99))))
-xl_validation <- function(range, type = "any", list = NULL, criteria = NA,
-                          value = NULL, min = NULL, max = NULL,
+xl_validation <- function(range, type = "any", criteria = NA, value = NULL,
+                          min = NULL, max = NULL, list = NULL,
                           input_title = NA, input_message = NA,
                           error_title = NA, error_message = NA,
                           error_type = NA, ignore_blank = NA,

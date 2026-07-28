@@ -6,9 +6,23 @@
 \alias{xl_row_spec}
 \title{Column and row specifications for a worksheet}
 \usage{
-xl_col_spec(cols, width = NA, hidden = NA, level = NA, format = NULL)
+xl_col_spec(
+  cols,
+  width = NA,
+  hidden = NA,
+  level = NA,
+  format = NULL,
+  width_pixels = NA
+)
 
-xl_row_spec(rows, height = NA, hidden = NA, level = NA, format = NULL)
+xl_row_spec(
+  rows,
+  height = NA,
+  hidden = NA,
+  level = NA,
+  format = NULL,
+  height_pixels = NA
+)
 }
 \arguments{
 \item{cols}{Columns to target: a character vector of column names or a
@@ -23,6 +37,11 @@ numeric vector of 1-based positions.}
 \item{format}{An optional [xl_format] applied to the column/row as its
 default cell format.  Combine groups with `+` (e.g.
 `xl_font(bold = TRUE) + xl_fill(background = "yellow")`).}
+
+\item{width_pixels, height_pixels}{The same geometry given in pixels instead.
+Give one or the other, not both.  Excel stores character units and points,
+so the pixel value is converted on the way in --- read back, a width set
+as 100 pixels is 13.57 character units.}
 
 \item{rows}{Rows to target: a numeric vector of 1-based data-row indices
 (row 1 is the first data row, ignoring the header).}
@@ -42,7 +61,9 @@ columns/rows) and geometry (width/height, hidden, outline level).
 \examples{
 xl_col_spec("revenue", width = 14, format = xl_num_format("#,##0.00"))
 xl_col_spec(c(1, 2), width = 10) + xl_font(bold = TRUE)
+xl_col_spec("logo", width_pixels = 100)
 xl_row_spec(1, height = 24, format = xl_font(bold = TRUE))
+xl_row_spec(1, height_pixels = 40)
 }
 \seealso{
 [xl_sheet], [xl_format]
@@ -54,10 +75,13 @@ Other writexl:
 \code{\link[=xl_color]{xl_color()}},
 \code{\link[=xl_comment]{xl_comment()}},
 \code{\link{xl_conditional}},
+\code{\link[=xl_filter]{xl_filter()}},
+\code{\link[=xl_filter_keep]{xl_filter_keep()}},
 \code{\link[=xl_format]{xl_format()}},
 \code{\link{xl_format_groups}},
 \code{\link[=xl_formula]{xl_formula()}},
 \code{\link[=xl_merge]{xl_merge()}},
+\code{\link[=xl_outline]{xl_outline()}},
 \code{\link[=xl_page_setup]{xl_page_setup()}},
 \code{\link[=xl_properties]{xl_properties()}},
 \code{\link[=xl_rich_run]{xl_rich_run()}},
