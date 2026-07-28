@@ -23,7 +23,9 @@ xl_sheet(
   merge = NULL,
   validation = NULL,
   conditional = NULL,
-  filter = NULL
+  filter = NULL,
+  outline = NULL,
+  ignore_errors = NULL
 )
 }
 \arguments{
@@ -98,6 +100,17 @@ criteria.  Each also hides the rows it excludes, because Excel does not
 apply a filter when a file is opened --- criteria on their own produce a
 sheet that looks filtered but shows every row.  Implies `autofilter = TRUE`
 over the used range when `autofilter` is not set separately.}
+
+\item{outline}{An [xl_outline()] controlling how the grouping symbols
+created by `level` in [xl_col_spec()] / [xl_row_spec()] are drawn.  It
+changes their display only, never which rows are grouped.}
+
+\item{ignore_errors}{A named list turning off the green error triangle Excel
+shows in cells it believes are wrong.  Each name is an error type and each
+value a range, e.g. `list(number_stored_as_text = "A2:A99")`.  Types:
+`number_stored_as_text`, `eval_error`, `formula_differs`, `formula_range`,
+`formula_unlocked`, `empty_cell_reference`, `list_data_validation`,
+`calculated_column`, `two_digit_text_year`.}
 }
 \value{
 An `xl_sheet` object.
@@ -134,6 +147,7 @@ Other writexl:
 \code{\link{xl_format_groups}},
 \code{\link[=xl_formula]{xl_formula()}},
 \code{\link[=xl_merge]{xl_merge()}},
+\code{\link[=xl_outline]{xl_outline()}},
 \code{\link[=xl_page_setup]{xl_page_setup()}},
 \code{\link[=xl_properties]{xl_properties()}},
 \code{\link[=xl_rich_run]{xl_rich_run()}},

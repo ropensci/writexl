@@ -125,6 +125,55 @@ Set `auto_colwidth = TRUE` to size every column to its contents (a
 character-count estimate, since the xlsx format has no true "AutoFit");
 columns given an explicit width via `xl_col_spec()` are left as-is.
 
+Geometry can be given in **pixels** instead of Excel's character units and
+points, which is easier to reason about when sizing a column around an image
+or a fixed layout. Give one unit or the other, not both:
+
+```{r}
+xl_col_spec("thumbnail", width_pixels = 100)
+xl_row_spec(1, height_pixels = 40)
+```
+
+Excel stores character units and points, so the value is converted on the way
+in — a column set to 100 pixels reads back as 13.57 character units, and
+renders at 100 pixels again.
+
+### Grouping and outlines
+
+`level` in `xl_col_spec()` / `xl_row_spec()` puts columns or rows into an
+outline group, which Excel draws with the +/- controls that collapse it.
+`xl_outline()` changes how those controls are *drawn* — never which rows are
+grouped — and its defaults already match Excel's, so it is rarely needed:
+
+```{r}
+grouped <- xl_sheet(
+  data.frame(q1 = 1:2, q2 = 3:4, total = 4:5),
+  cols    = list(xl_col_spec(c("q1", "q2"), level = 1)),
+  outline = xl_outline(symbols_right = FALSE)   # summary column on the left
+)
+path <- write_xlsx(list(Grouped = grouped), tempfile(fileext = ".xlsx"))
+```
+
+### Silencing Excel's error indicators
+
+Excel puts a green triangle in cells it thinks are wrong — most often a number
+deliberately stored as text. `ignore_errors` turns that off for a range, one
+entry per error type:
+
+```{r}
+codes <- xl_sheet(
+  data.frame(zip = c("01234", "02138")),
+  ignore_errors = list(number_stored_as_text = "A2:A3")
+)
+path <- write_xlsx(list(Codes = codes), tempfile(fileext = ".xlsx"))
+```
+
+The range takes any spelling the other range arguments accept, so
+`list(cols = "zip")` would cover the whole column. The available types are
+`number_stored_as_text`, `eval_error`, `formula_differs`, `formula_range`,
+`formula_unlocked`, `empty_cell_reference`, `list_data_validation`,
+`calculated_column` and `two_digit_text_year`.
+
 Columns can be targeted by name or position. A plain data frame passed
 alongside an `xl_sheet` behaves exactly as before:
 

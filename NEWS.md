@@ -56,6 +56,18 @@
   empty cell as well as an empty string. Mixed-type columns made with
   `xl_cell_general()` are matched cell by cell.
 
+* Column widths and row heights may be given in **pixels** ---
+  `xl_col_spec(width_pixels =)` and `xl_row_spec(height_pixels =)` --- as well
+  as in Excel's character units and points.
+
+* **Outline display** via `xl_sheet(outline = xl_outline(...))`: whether the
+  grouping symbols are shown, and which side of the detail rows and columns
+  the summary sits on. Grouping itself still comes from `level`.
+
+* **Error indicators** can be turned off with `xl_sheet(ignore_errors =)`, for
+  example `list(number_stored_as_text = "A2:A99")` to stop Excel flagging
+  numbers deliberately stored as text.
+
 * **Merged cells** via `xl_sheet(merge = xl_merge(...))`. A merged range holds
   one value, so `xl_merge()` carries its own text; merging over cells the data
   frame filled keeps only the merged text, as it does in Excel.

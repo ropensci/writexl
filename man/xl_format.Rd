@@ -56,6 +56,7 @@ Other writexl:
 \code{\link{xl_format_groups}},
 \code{\link[=xl_formula]{xl_formula()}},
 \code{\link[=xl_merge]{xl_merge()}},
+\code{\link[=xl_outline]{xl_outline()}},
 \code{\link[=xl_page_setup]{xl_page_setup()}},
 \code{\link[=xl_properties]{xl_properties()}},
 \code{\link[=xl_rich_run]{xl_rich_run()}},

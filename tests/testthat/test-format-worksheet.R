@@ -118,6 +118,36 @@ test_that("hidden columns and outline levels are written", {
   expect_match(w, 'outlineLevel="1"')
 })
 
+test_that("geometry can be given in pixels instead", {
+  # converted with libxlsxwriter's own formulas, so the width Excel stores
+  # round-trips back to the pixel count asked for: 100 px -> 13.571 chars,
+  # stored as 13.571 + 5/7 = 14.2857, which renders at 100 px again
+  expect_equal(.pixels_to_width(100), (100 - 5) / 7)
+  expect_equal(.pixels_to_height(40), 30)
+  # the two documented special cases: the pixel defaults map to the unit
+  # defaults exactly, rather than through the general formula
+  expect_equal(.pixels_to_width(64), 8.43)
+  expect_equal(.pixels_to_height(20), 15)
+  expect_equal(.pixels_to_width(12), 1)      # the <= 12 branch
+
+  s <- xl_sheet(data.frame(a = 1:2, b = 3:4),
+                cols = xl_col_spec("a", width_pixels = 100),
+                rows = xl_row_spec(1, height_pixels = 40))
+  w <- sheet_xml(list(D = s))
+  expect_match(w, 'width="14.28515625"', fixed = TRUE)
+  expect_match(w, 'ht="30"', fixed = TRUE)
+})
+
+test_that("a geometry may not be given in both units", {
+  expect_error(xl_col_spec("a", width = 10, width_pixels = 100),
+               "either `width` or `width_pixels`, not both")
+  expect_error(xl_row_spec(1, height = 10, height_pixels = 40),
+               "either `height` or `height_pixels`, not both")
+  # each on its own is fine
+  expect_s3_class(xl_col_spec("a", width_pixels = 100), "xl_col_spec")
+  expect_s3_class(xl_row_spec(1, height_pixels = 40), "xl_row_spec")
+})
+
 test_that("plain data frames still work and Date columns stay formatted", {
   # regression: date formatting moved from C to the R sheet plan
   df <- data.frame(d = as.Date("2020-01-01") + 0:2, x = 1:3)

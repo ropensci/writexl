@@ -394,6 +394,18 @@ static void apply_page_setup(cell_write_ctx *ctx, SEXP opts){
  * libxlsxwriter enforces none of them, so by the time we get here the
  * combination is known to be sane.
  */
+/* How the outline (grouping) controls are drawn.  Grouping itself comes from
+   the per-column/row `level`; this only changes the symbols. */
+static void apply_outline(cell_write_ctx *ctx, SEXP opts){
+  SEXP o = list_get(opts, "outline");
+  if(o == R_NilValue || !Rf_isVectorList(o)) return;
+  worksheet_outline_settings(ctx->sheet,
+                             (uint8_t) payload_int(o, "visible"),
+                             (uint8_t) payload_int(o, "symbols_below"),
+                             (uint8_t) payload_int(o, "symbols_right"),
+                             (uint8_t) payload_int(o, "auto_style"));
+}
+
 static void apply_sheet_view(cell_write_ctx *ctx, SEXP opts){
   SEXP v = list_get(opts, "view");
   if(v == R_NilValue || !Rf_isVectorList(v)) return;
@@ -727,6 +739,18 @@ static void apply_overlay(cell_write_ctx *ctx, SEXP p){
     apply_conditional(ctx, p, r);
   } else if(strcmp(kind, "filter") == 0){
     apply_filter(ctx, p);
+  } else if(strcmp(kind, "ignore_errors") == 0){
+    /* libxlsxwriter takes the range as an A1 string, so build it back from the
+       0-based quad the shared range resolver produced on the R side. */
+    int r[4];
+    char range[LXW_MAX_CELL_RANGE_LENGTH];
+    bail_if(!overlay_range(p, "range", r),
+            "ignore_errors overlay needs a length-4 range");
+    lxw_rowcol_to_range(range, (lxw_row_t) r[0], (lxw_col_t) r[1],
+                        (lxw_row_t) r[2], (lxw_col_t) r[3]);
+    assert_lxw(worksheet_ignore_errors(ctx->sheet,
+                                       (uint8_t) payload_int(p, "type"),
+                                       range));
   } else {
     Rf_errorcall(R_NilValue,
                  "Error in writexl: unknown sheet overlay kind '%s'", kind);
@@ -1295,6 +1319,7 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
     apply_sheet_scalars(&ctx, opts);
     apply_page_setup(&ctx, opts);
     apply_sheet_view(&ctx, opts);
+    apply_outline(&ctx, opts);
     apply_sheet_overlays(&ctx, opts);
 
     // Need to iterate by row first for performance
