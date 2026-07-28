@@ -398,3 +398,51 @@ whether Excel refuses the entry (`"stop"`, the default) or merely warns. Excel
 limits titles to 32 characters and messages to 255, and a dropdown's choices to
 255 characters once joined by commas --- put longer lists in a range and pass a
 `"=..."` formula instead.
+
+## Conditional formatting
+
+Four constructors cover Excel's conditional formatting, and all of them go into
+`xl_sheet(conditional = )`:
+
+```{r}
+sheet <- xl_sheet(df, conditional = list(
+  xl_cond_cell("A2:A4", criteria = ">", value = 2,
+               format = xl_fill(background = "#FFC7CE")),
+  xl_cond_scale("B2:B4", colors = c("red", "yellow", "green"))
+))
+path <- write_xlsx(list(Data = sheet), tempfile(fileext = ".xlsx"))
+```
+
+`xl_cond_cell()` pairs a condition with a format. The condition can be a
+comparison, a text match, a time period, above/below average, top/bottom N,
+duplicates, uniques, blanks, errors, or an arbitrary formula:
+
+```{r}
+xl_cond_cell("A2:A100", criteria = "contains", value = "urgent")
+xl_cond_cell("A2:A100", type = "duplicate", format = xl_font(bold = TRUE))
+xl_cond_cell("A2:A100", type = "formula", value = "=$B2>$C2")
+```
+
+Each rule type accepts its own set of criteria — text criteria only make sense
+for a text rule, time-period criteria only for a time rule. Pairing them wrongly
+is an error, because Excel would accept the file and then silently ignore the
+rule. Where the two are redundant the type is inferred, so
+`criteria = "contains"` alone is enough.
+
+A rule's format is an ordinary `xl_format`, but Excel stores it as a
+*differential* format rather than a cell style, so only the properties that make
+sense as an override are used.
+
+### Scales, bars and icons
+
+```{r}
+xl_cond_scale("B2:B100", colors = c("white", "steelblue"))  # two-colour
+xl_cond_bar("C2:C100", color = "steelblue", solid = TRUE)
+xl_cond_icons("D2:D100", style = "3_traffic_lights")
+```
+
+`xl_cond_scale()` takes two or three colours, low to high, optionally with the
+values and rule types marking where each sits. `xl_cond_bar()` draws in-cell
+data bars, with control over the negative and border colours, the axis and the
+direction. `xl_cond_icons()` selects one of Excel's seventeen built-in icon
+sets — these are drawn by Excel itself, so nothing is embedded in the file.

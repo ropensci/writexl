@@ -21,7 +21,8 @@ xl_sheet(
   page = NULL,
   view = NULL,
   merge = NULL,
-  validation = NULL
+  validation = NULL,
+  conditional = NULL
 )
 }
 \arguments{
@@ -86,6 +87,10 @@ row-streaming mode, since it writes back over rows already emitted.}
 \item{validation}{One [xl_validation()], or a list of them, restricting what
 may be typed into a range --- a dropdown, a numeric or date bound, a text
 length limit or a custom formula.}
+
+\item{conditional}{One conditional format ([xl_cond_cell()],
+[xl_cond_scale()], [xl_cond_bar()], [xl_cond_icons()]), or a list of them,
+formatting cells according to their contents.}
 }
 \value{
 An `xl_sheet` object.
@@ -116,6 +121,7 @@ Other writexl:
 \code{\link[=xl_color]{xl_color()}},
 \code{\link{xl_colrow_spec}},
 \code{\link[=xl_comment]{xl_comment()}},
+\code{\link{xl_conditional}},
 \code{\link[=xl_format]{xl_format()}},
 \code{\link{xl_format_groups}},
 \code{\link[=xl_formula]{xl_formula()}},
