@@ -197,6 +197,10 @@ xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
 #' @param outline An [xl_outline()] controlling how the grouping symbols
 #'   created by `level` in [xl_col_spec()] / [xl_row_spec()] are drawn.  It
 #'   changes their display only, never which rows are grouped.
+#' @param table One [xl_table()], or a list of them, turning a range into an
+#'   Excel table --- a named, styled block with banded rows, a filter dropdown
+#'   and an optional total row.  Any table turns off the memory-efficient
+#'   row-streaming mode, which libxlsxwriter refuses to combine with tables.
 #' @param ignore_errors A named list turning off the green error triangle Excel
 #'   shows in cells it believes are wrong.  Each name is an error type and each
 #'   value a range, e.g. `list(number_stored_as_text = "A2:A99")`.  Types:
@@ -223,7 +227,8 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
                      comment_author = NA, show_comments = FALSE,
                      page = NULL, view = NULL, merge = NULL,
                      validation = NULL, conditional = NULL,
-                     filter = NULL, outline = NULL, ignore_errors = NULL) {
+                     filter = NULL, outline = NULL, ignore_errors = NULL,
+                     table = NULL) {
   if (!is.data.frame(data))
     stop("`data` must be a data frame", call. = FALSE)
   if (!is.logical(auto_colwidth) || length(auto_colwidth) != 1L || is.na(auto_colwidth))
@@ -257,7 +262,8 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
       conditional    = conditional,
       filter         = filter,
       outline        = outline,
-      ignore_errors  = ignore_errors
+      ignore_errors  = ignore_errors,
+      table          = table
     ),
     class = "xl_sheet"
   )
@@ -408,7 +414,10 @@ print.xl_sheet <- function(x, ...) {
 }
 
 # Build the per-sheet plan (column/row/scalar options) that C applies.
-.resolve_sheet_plan <- function(el, df, reg, header_offset, props) {
+# `table_names` carries this sheet's tables' workbook-resolved names, since
+# uniqueness is settled across sheets rather than within one.
+.resolve_sheet_plan <- function(el, df, reg, header_offset, props,
+                                table_names = character(0)) {
   ncols  <- length(df)
   cnames <- names(df)
 
@@ -468,6 +477,14 @@ print.xl_sheet <- function(x, ...) {
         row_level  <- c(row_level, if (!is.null(geo$level)) as.integer(geo$level) else NA_integer_)
       }
     }
+    # A table column's format reaches the data cells only through the column
+    # plan; libxlsxwriter never applies it to rows already written.  It merges
+    # over any xl_col_spec() format, being the more specific of the two.
+    tfmt <- .table_column_formats(el, df)
+    for (i in seq_along(tfmt))
+      if (!is.null(tfmt[[i]]))
+        col_fmt[[i]] <- merge_xl_format(col_fmt[[i]], tfmt[[i]])
+
     freeze <- .parse_freeze(el$freeze)
     gridlines <- if (is.na(el$gridlines)) -1L else if (isTRUE(el$gridlines)) 3L else 0L
     tab_color <- if (is.na(el$tab_color)) -1L else xl_color(el$tab_color)
@@ -547,6 +564,7 @@ print.xl_sheet <- function(x, ...) {
   }
 
   merges <- .resolve_merges(el, df, reg, header_offset, props)
+  tables <- .resolve_tables(el, df, reg, header_offset, props, table_names)
   overlay <- c(overlay, .resolve_validations(el, df, header_offset),
               .resolve_conditionals(el, df, reg, header_offset, props),
               .resolve_ignore_errors(el, df, header_offset))
@@ -568,6 +586,7 @@ print.xl_sheet <- function(x, ...) {
     page = page_payload,
     view = if (length(view)) view else NULL,
     merges = if (length(merges)) merges else NULL,
-    outline = .resolve_outline(el)
+    outline = .resolve_outline(el),
+    tables = if (length(tables)) tables else NULL
   )
 }
