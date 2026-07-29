@@ -355,6 +355,14 @@ print.xl_image <- function(x, ...) {
   has_hf_image <- function(s)
     any(grepl("_image_(left|center|right)$", names(s$page)))
   has_background <- function(s) !is.null(s$background)
+  # A chart produces a drawing of its own, so it never *causes* the desync --
+  # but it is subject to it exactly as a floating image is, since its
+  # relationship target is numbered from the same counter.  Established with a
+  # pure-C reprex against libxlsxwriter 1.2.4 before charts existed here: a
+  # header-image sheet followed by a chart sheet points at a missing drawing
+  # part, while the reverse order is fine.  No test could have caught this
+  # omission, because nothing else notices a chart is a victim.
+  has_drawing <- function(s) has_floating(s) || length(s$charts) > 0L
 
   # 1. An embedded image alongside any other kind.
   #
@@ -382,20 +390,21 @@ print.xl_image <- function(x, ...) {
          call. = FALSE)
 
   # 2. A sheet counted for a drawing id that produces no drawing file, before a
-  # sheet with a floating image.
+  # sheet that does produce one -- a floating image or a chart.
   offender <- NULL
   for (i in seq_along(sheets)) {
     s <- sheets[[i]]
-    if (!is.null(offender) && has_floating(s))
-      stop(sprintf(paste0("sheet \"%s\" has a floating image, but sheet \"%s\" ",
-                          "earlier in the workbook has %s.\n  libxlsxwriter ",
-                          "numbers the drawing relationship wrongly in that ",
-                          "order, and Excel repairs the file and drops the ",
-                          "image.\n  Put the sheet(s) with floating images ",
-                          "before \"%s\"."),
-                   sheet_names[i], offender$name, offender$what,
+    if (!is.null(offender) && has_drawing(s))
+      stop(sprintf(paste0("sheet \"%s\" has %s, but sheet \"%s\" earlier in ",
+                          "the workbook has %s.\n  libxlsxwriter numbers the ",
+                          "drawing relationship wrongly in that order, and ",
+                          "Excel repairs the file and drops it.\n  Put the ",
+                          "sheet(s) with images or charts before \"%s\"."),
+                   sheet_names[i],
+                   if (has_floating(s)) "a floating image" else "a chart",
+                   offender$name, offender$what,
                    offender$name), call. = FALSE)
-    if (is.null(offender) && !has_floating(s)) {
+    if (is.null(offender) && !has_drawing(s)) {
       what <- if (has_hf_image(s)) "a header or footer image"
               else if (has_background(s)) "a background image"
               else NULL

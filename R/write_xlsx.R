@@ -89,9 +89,14 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
   # Table names are unique across the workbook, not the sheet, so they are
   # resolved here alongside the sheet names rather than inside xl_table().
   table_names <- .resolve_table_names(elems, names(dfs))
-  sheets <- Map(function(el, df, tn)
-                  .resolve_sheet_plan(el, df, reg, header_offset, props, tn),
-                elems, dfs, table_names)
+  # Charts resolve after the sheets are known: a series may plot data from any
+  # sheet, so its range cannot be resolved against one sheet in isolation.
+  chart_plans <- Map(function(el, nm)
+    .resolve_charts(el, dfs[[nm]], reg, header_offset, props, dfs, nm),
+    elems, names(dfs))
+  sheets <- Map(function(el, df, tn, ch)
+                  .resolve_sheet_plan(el, df, reg, header_offset, props, tn, ch),
+                elems, dfs, table_names, chart_plans)
   # Ordering matters to libxlsxwriter's drawing numbering, so this spans the
   # whole workbook rather than any one sheet
   .check_drawing_order(sheets, names(dfs))

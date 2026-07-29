@@ -203,6 +203,9 @@ xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
 #'   row-streaming mode, which libxlsxwriter refuses to combine with tables.
 #' @param image One [xl_image()], or a list of them, placing images on the
 #'   sheet --- floating over the cells, or inside a cell with `embed = TRUE`.
+#' @param chart One [xl_chart()], or a list of them, placed on the sheet and
+#'   anchored to a cell.  A chart's series may plot data from any sheet in the
+#'   workbook, not only this one.
 #' @param background An image tiled behind the sheet's cells, in any shape
 #'   [xl_image()] accepts.  It is a screen backdrop only --- Excel never prints
 #'   it.
@@ -233,7 +236,8 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
                      page = NULL, view = NULL, merge = NULL,
                      validation = NULL, conditional = NULL,
                      filter = NULL, outline = NULL, ignore_errors = NULL,
-                     table = NULL, image = NULL, background = NULL) {
+                     table = NULL, image = NULL, background = NULL,
+                     chart = NULL) {
   if (!is.data.frame(data))
     stop("`data` must be a data frame", call. = FALSE)
   if (!is.logical(auto_colwidth) || length(auto_colwidth) != 1L || is.na(auto_colwidth))
@@ -270,7 +274,8 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
       ignore_errors  = ignore_errors,
       table          = table,
       image          = image,
-      background     = background
+      background     = background,
+      chart          = chart
     ),
     class = "xl_sheet"
   )
@@ -424,7 +429,8 @@ print.xl_sheet <- function(x, ...) {
 # `table_names` carries this sheet's tables' workbook-resolved names, since
 # uniqueness is settled across sheets rather than within one.
 .resolve_sheet_plan <- function(el, df, reg, header_offset, props,
-                                table_names = character(0)) {
+                                table_names = character(0),
+                                charts = list()) {
   ncols  <- length(df)
   cnames <- names(df)
 
@@ -598,6 +604,7 @@ print.xl_sheet <- function(x, ...) {
     outline = .resolve_outline(el),
     tables = if (length(tables)) tables else NULL,
     images = if (length(images)) images else NULL,
-    background = background
+    background = background,
+    charts = if (length(charts)) charts else NULL
   )
 }

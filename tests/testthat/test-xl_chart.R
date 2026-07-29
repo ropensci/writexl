@@ -199,3 +199,107 @@ test_that("the print methods run", {
                                title = "T")), "\"T\"")
   expect_output(print(xl_chart_series(values = "A1", name = "S")), "S")
 })
+
+# ── Range resolution across the workbook ──────────────────────────────────────
+
+crange_sales <- data.frame(fruit = c("a", "b", "c"), qty = c(5, 150, 300),
+                           stringsAsFactors = FALSE)
+crange_other <- data.frame(x = 1:4, y = c(2, 4, 6, 8))
+
+# Resolve a workbook's charts the way write_xlsx() does.
+chart_plan <- function(wb, sheet = "Data") {
+  dfs <- lapply(wb, function(e) if (inherits(e, "xl_sheet")) e$data else e)
+  dfs <- lapply(dfs, writexl:::normalize_df)
+  .resolve_charts(wb[[sheet]], dfs[[sheet]], .new_format_registry(), 1L,
+                  xl_properties(), dfs, sheet)
+}
+
+test_that("a series resolves against the chart's own sheet by default", {
+  p <- chart_plan(list(Data = xl_sheet(crange_sales, chart = xl_chart("column",
+    xl_chart_series(values = list(cols = "qty"),
+                    categories = list(cols = "fruit"))))))
+  s <- p[[1L]]$series[[1L]]
+  expect_equal(s$values_sheet, "Data")
+  # column qty is 0-based col 1, data rows 1..3 are sheet rows 1..3
+  expect_equal(s$values_range, c(1L, 1L, 3L, 1L))
+  expect_equal(s$categories_range, c(1L, 0L, 3L, 0L))
+})
+
+test_that("a series may plot another sheet, in either spelling", {
+  wb <- function(v) list(Data = xl_sheet(crange_sales,
+                                         chart = xl_chart("line",
+                                           xl_chart_series(values = v))),
+                         Other = crange_other)
+  a <- chart_plan(wb("Other!B2:B5"))[[1L]]$series[[1L]]
+  b <- chart_plan(wb(list(sheet = "Other", cols = "y")))[[1L]]$series[[1L]]
+  expect_equal(a$values_sheet, "Other")
+  expect_equal(b$values_sheet, "Other")
+  # the two spellings must resolve to the same block
+  expect_equal(a$values_range, b$values_range)
+})
+
+test_that("an unknown sheet is refused, listing the real ones", {
+  expect_error(chart_plan(list(Data = xl_sheet(crange_sales,
+    chart = xl_chart("column",
+      xl_chart_series(values = list(sheet = "Nope", cols = "qty")))))),
+    'names sheet "Nope", which is not in the workbook')
+  expect_error(chart_plan(list(Data = xl_sheet(crange_sales,
+    chart = xl_chart("column",
+      xl_chart_series(values = list(sheet = "Nope", cols = "qty")))))),
+    '"Data"')
+})
+
+test_that("a range holding no data is refused, not plotted empty", {
+  # Excel shows an empty chart with no complaint, so the emptiness has to be
+  # caught here or it is delivered as a silently blank chart
+  expect_error(chart_plan(list(Data = xl_sheet(crange_sales,
+    chart = xl_chart("column", xl_chart_series(values = "A99:A200"))))),
+    "selects no data")
+  expect_error(chart_plan(list(Data = xl_sheet(crange_sales[0, ],
+    chart = xl_chart("column", xl_chart_series(values = "A2:A3"))))),
+    "selects no data")
+})
+
+test_that("a title or series name may come from a cell", {
+  p <- chart_plan(list(Data = xl_sheet(crange_sales, chart = xl_chart("pie",
+    xl_chart_series(values = list(cols = "qty"),
+                    name = list(rows = 1, cols = "fruit")),
+    title = list(rows = 1, cols = "fruit")))))
+  expect_equal(p[[1L]]$title_range, c(1L, 0L, 1L, 0L))
+  expect_equal(p[[1L]]$series[[1L]]$name_range, c(1L, 0L, 1L, 0L))
+  # a string title stays a string
+  q <- chart_plan(list(Data = xl_sheet(crange_sales, chart = xl_chart("pie",
+    xl_chart_series(values = list(cols = "qty")), title = "Share"))))
+  expect_equal(q[[1L]]$title, "Share")
+  expect_null(q[[1L]]$title_range)
+})
+
+test_that("a chart is anchored to one cell", {
+  expect_error(chart_plan(list(Data = xl_sheet(crange_sales,
+    chart = xl_chart("column", xl_chart_series(values = list(cols = "qty")),
+                     at = "A1:B2")))),
+    "must name a single cell")
+})
+
+test_that("a chart is a victim of the drawing-id desync, like an image", {
+  # charts produce a drawing so they never cause the desync, but they are
+  # numbered from the same counter and so are subject to it.  Established with
+  # a pure-C reprex before charts existed here; nothing else would notice.
+  logo <- tempfile(fileext = ".png")
+  writeBin(as.raw(c(
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
+    0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+    0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00,
+    0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
+    0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
+    0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82)), logo)
+  hdr <- xl_sheet(crange_sales,
+                  page = xl_page_setup(header = "&L&G",
+                                       header_image = list(left = logo)))
+  charted <- xl_sheet(crange_sales, chart = xl_chart("column",
+    xl_chart_series(values = list(cols = "qty"))))
+  expect_error(write_tmp(list(H = hdr, C = charted)),
+               'sheet "C" has a chart')
+  # the other order is fine, and is what the message recommends
+  expect_silent(write_tmp(list(C = charted, H = hdr)))
+})

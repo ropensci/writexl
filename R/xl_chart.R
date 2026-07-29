@@ -275,6 +275,119 @@ print.xl_chart <- function(x, ...) {
   invisible(x)
 }
 
+# --- Resolving a series range against the workbook ---------------------------
+#
+# A series may plot data from a sheet other than the one the chart sits on, so
+# a range cannot be resolved until every sheet is known.  `sheets` maps sheet
+# name to the resolved data frame; `own` is the chart's own sheet, used when the
+# range names none.
+.resolve_chart_range <- function(rng, arg, sheets, own, header_offset) {
+  if (is.null(rng)) return(NULL)
+  spec <- rng[["spec"]]
+  sheet <- rng[["sheet"]]
+  # a string may carry its own qualifier -- "Data!B2:B10" -- which the shared
+  # resolver parses; the list form carries it as an element
+  if (is.character(spec) && is.null(sheet)) {
+    sp <- .split_sheet_ref(spec)
+    sheet <- sp$sheet
+    spec <- sp$rest
+  }
+  target <- if (is.null(sheet)) own else sheet
+  if (!target %in% names(sheets))
+    stop(sprintf(paste0("`%s` names sheet \"%s\", which is not in the ",
+                        "workbook.\n  Sheets are: %s."),
+                 arg, target, paste(sprintf("\"%s\"", names(sheets)),
+                                    collapse = ", ")), call. = FALSE)
+  df <- sheets[[target]]
+  q <- .xl_resolve_range(spec, arg = arg, df = df,
+                         header_offset = header_offset, allow_cell = TRUE)
+  # A range outside the data plots nothing, and Excel shows an empty chart with
+  # no complaint -- so the emptiness is caught here rather than delivered.
+  last_row <- (nrow(df) - 1L) + header_offset
+  if (q[1L] > last_row || q[2L] > length(df) - 1L)
+    stop(sprintf(paste0("`%s` selects no data: sheet \"%s\" has %d row(s) and ",
+                        "%d column(s), and the range starts outside them."),
+                 arg, target, nrow(df), length(df)), call. = FALSE)
+  if (nrow(df) < 1L)
+    stop(sprintf("`%s` names sheet \"%s\", which has no data rows", arg,
+                 target), call. = FALSE)
+  list(sheet = target, range = as.integer(q))
+}
+
+# Resolve a sheet's charts to the C payloads.  Called once the whole workbook is
+# known, since a series may point at another sheet.
+.resolve_charts <- function(el, df, reg, header_offset, props, sheets, own) {
+  if (!inherits(el, "xl_sheet")) return(list())
+  cs <- .chart_list(el$chart)
+  lapply(seq_along(cs), function(i) {
+    p <- unclass(cs[[i]])
+    at <- .xl_resolve_range(p[["at"]], arg = sprintf("chart[[%d]] at", i),
+                            df = df, header_offset = header_offset,
+                            allow_cell = TRUE)
+    if (at[1L] != at[3L] || at[2L] != at[4L])
+      stop(sprintf(paste0("`chart[[%d]] at` must name a single cell: a chart ",
+                          "is anchored to one cell"), i), call. = FALSE)
+    ent <- list(type = unname(.LXW_CHART_TYPE[[p[["type"]]]]),
+                row = at[1L], col = at[2L])
+    if (!is.null(p[["scale"]])) {
+      ent$x_scale <- p[["scale"]][1L]
+      ent$y_scale <- p[["scale"]][2L]
+    }
+    if (!is.null(p[["offset"]])) {
+      ent$x_offset <- as.integer(p[["offset"]][1L])
+      ent$y_offset <- as.integer(p[["offset"]][2L])
+    }
+    if (!is.null(p[["position"]]))
+      ent$object_position <- unname(.LXW_OBJECT_POSITION[[p[["position"]]]])
+    if (!is.null(p[["description"]])) ent$description <- p[["description"]]
+    if (isTRUE(p[["decorative"]]))    ent$decorative <- 1L
+    if (!is.null(p[["style"]]))       ent$style <- as.integer(p[["style"]])
+
+    ttl <- p[["title"]]
+    if (!is.null(ttl)) {
+      if (isTRUE(ttl[["off"]]))        ent$title_off <- 1L
+      else if (!is.null(ttl[["text"]])) ent$title <- ttl[["text"]]
+      else {
+        r <- .resolve_chart_range(ttl, sprintf("chart[[%d]] title", i),
+                                  sheets, own, header_offset)
+        ent$title_sheet <- r$sheet
+        ent$title_range <- r$range
+      }
+    }
+
+    ent$series <- lapply(seq_along(p[["series"]]), function(k) {
+      q <- unclass(p[["series"]][[k]])
+      where <- function(what) sprintf("chart[[%d]] series[[%d]] %s", i, k, what)
+      v <- .resolve_chart_range(q[["values"]], where("values"), sheets, own,
+                                header_offset)
+      se <- list(values_sheet = v$sheet, values_range = v$range)
+      cat_ <- .resolve_chart_range(q[["categories"]], where("categories"),
+                                   sheets, own, header_offset)
+      if (!is.null(cat_)) {
+        se$categories_sheet <- cat_$sheet
+        se$categories_range <- cat_$range
+      }
+      nm <- q[["name"]]
+      if (!is.null(nm)) {
+        if (!is.null(nm[["text"]])) se$name <- nm[["text"]]
+        else {
+          r <- .resolve_chart_range(nm, where("name"), sheets, own,
+                                    header_offset)
+          se$name_sheet <- r$sheet
+          se$name_range <- r$range
+        }
+      }
+      if (isTRUE(q[["smooth"]]))             se$smooth <- 1L
+      if (isTRUE(q[["invert_if_negative"]])) se$invert_if_negative <- 1L
+      if (!is.null(q[["format"]]))
+        se$format_id <- .register_format(reg,
+          merge_xl_format(props$default_format, q[["format"]]))
+      se
+    })
+    ent
+  })
+}
+
 # Normalise one series or a list of them.
 .chart_series_list <- function(series, arg = "series") {
   if (is.null(series)) return(list())

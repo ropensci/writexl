@@ -28,7 +28,8 @@ xl_sheet(
   ignore_errors = NULL,
   table = NULL,
   image = NULL,
-  background = NULL
+  background = NULL,
+  chart = NULL
 )
 }
 \arguments{
@@ -126,6 +127,10 @@ sheet --- floating over the cells, or inside a cell with `embed = TRUE`.}
 \item{background}{An image tiled behind the sheet's cells, in any shape
 [xl_image()] accepts.  It is a screen backdrop only --- Excel never prints
 it.}
+
+\item{chart}{One [xl_chart()], or a list of them, placed on the sheet and
+anchored to a cell.  A chart's series may plot data from any sheet in the
+workbook, not only this one.}
 }
 \value{
 An `xl_sheet` object.
