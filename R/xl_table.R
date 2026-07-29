@@ -359,6 +359,17 @@ print.xl_table <- function(x, ...) {
 # _write_column_function() and a calculated column in _write_column_formula() --
 # and never to data already written by the row loop.  Left to it, setting a
 # format on an ordinary column would do nothing at all, silently.
+#
+# This is by design, not a bug: the other ports take the table's data as a
+# parameter, so the library writes the cells and can format them, while
+# libxlsxwriter's caller writes them first (jmcnamara/libxlsxwriter#520).  The
+# recommended fix is exactly this -- put the format on the column.
+#
+# BOTH paths are needed and neither is redundant.  The column plan formats the
+# data cells; the format_id passed through .table_columns_payload() becomes the
+# table part's dataDxfId, which upstream says is required "for strict
+# correctness with Excel".  A test asserts both survive, because after the
+# column plan lands the dataDxfId looks like the removable one.
 .table_column_formats <- function(el, df) {
   out <- vector("list", length(df))
   if (!inherits(el, "xl_sheet")) return(out)

@@ -192,8 +192,12 @@ test_that("conditional formatting leaves the cells alone and keeps streaming", {
     conditional = xl_cond_cell("A2:A4", criteria = ">", value = 100,
                                format = xl_fill(background = "red")))))
   expect_equal(as.data.frame(readxl::read_xlsx(p)), df)
-  # written at packaging time, so row streaming stays on
-  expect_true(is.null(xlsx_part(p, "xl/sharedStrings.xml")))
+  # written at packaging time, so row streaming stays on when asked for
+  expect_true(is.null(xlsx_part(
+    write_tmp(list(D = xl_sheet(df, conditional = xl_cond_cell(
+      "A2:A4", criteria = ">", value = 100,
+      format = xl_fill(background = "red")))), constant_memory = TRUE),
+    "xl/sharedStrings.xml")))
 })
 
 test_that("the print method runs", {

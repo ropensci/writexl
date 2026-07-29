@@ -128,6 +128,7 @@ test_that("a merge turns row streaming off, and says why", {
   p <- write_tmp(sheets)
   expect_false(is.null(xlsx_part(p, "xl/sharedStrings.xml")))
   # ... and a sheet with no merge keeps streaming on
-  expect_true(is.null(xlsx_part(write_tmp(list(D = xl_sheet(df))),
+  expect_true(is.null(xlsx_part(write_tmp(list(D = xl_sheet(df)),
+                                          constant_memory = TRUE),
                                 "xl/sharedStrings.xml")))
 })
