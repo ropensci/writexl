@@ -195,7 +195,8 @@ print.xl_chart_series <- function(x, ...) {
 #' @param type The chart type: `"column"`, `"bar"`, `"line"`, `"pie"`,
 #'   `"doughnut"`, `"area"`, `"scatter"`, `"radar"`, and the stacked,
 #'   percent-stacked, smoothed and marker variants.
-#' @param series One [xl_chart_series()], or a list of them.
+#' @param series One [xl_chart_series()], or a list of them.  Every series of a
+#'   scatter chart must have `categories`, which are its x axis.
 #' @param title The chart title: a string, or a range holding one.  `FALSE`
 #'   removes the title Excel would otherwise generate.
 #' @param at The cell the chart's top-left corner is anchored to.
@@ -230,6 +231,16 @@ xl_chart <- function(type, series, title = NULL, at = "A1", scale = 1,
     p <- unclass(ss[[i]])
     if (isTRUE(p[["smooth"]]))
       .check_chart_feature(ty, "smooth", sprintf("series[[%d]]$smooth", i))
+    # A scatter chart plots x against y, so a series with no categories has no
+    # x values.  It is also a hard requirement of libxlsxwriter: for a scatter
+    # series _chart_write_cat() reads series->categories->has_string_cache
+    # before its own NULL guard on ->formula, so omitting them segfaults rather
+    # than producing a poor chart.  Reduced from a crash to this check.
+    if (identical(.CHART_FAMILY(ty), "scatter") && is.null(p[["categories"]]))
+      stop(sprintf(paste0("`series[[%d]]` has no `categories`, which a \"%s\" ",
+                          "chart needs: a scatter plots values against ",
+                          "categories, so the categories are its x axis."),
+                   i, ty), call. = FALSE)
   }
 
   pair <- function(x, arg, what) {
@@ -379,9 +390,10 @@ print.xl_chart <- function(x, ...) {
       }
       if (isTRUE(q[["smooth"]]))             se$smooth <- 1L
       if (isTRUE(q[["invert_if_negative"]])) se$invert_if_negative <- 1L
+      # a series is styled by its line and fill, translated from the ordinary
+      # xl_format the caller gave -- see .chart_format_payload()
       if (!is.null(q[["format"]]))
-        se$format_id <- .register_format(reg,
-          merge_xl_format(props$default_format, q[["format"]]))
+        se$format <- .chart_format_payload(q[["format"]], where("format"))
       se
     })
     ent

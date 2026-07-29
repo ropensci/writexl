@@ -8,8 +8,13 @@ test_that("every chart type libxlsxwriter offers is reachable", {
   # a count mismatch rather than being quietly unreachable
   expect_equal(length(.LXW_CHART_TYPE), 22L)
   expect_equal(sort(unname(.LXW_CHART_TYPE)), 1:22)
-  for (ty in names(.LXW_CHART_TYPE))
-    expect_s3_class(xl_chart(ty, xl_chart_series(values = "A1:A5")), "xl_chart")
+  for (ty in names(.LXW_CHART_TYPE)) {
+    # scatter needs categories; see the crash test below
+    se <- if (identical(.CHART_FAMILY(ty), "scatter"))
+      xl_chart_series(values = "B1:B5", categories = "A1:A5")
+    else xl_chart_series(values = "A1:A5")
+    expect_true(inherits(xl_chart(ty, se), "xl_chart"), info = ty)
+  }
 })
 
 test_that("an unknown chart type is refused, listing the real ones", {
@@ -80,7 +85,8 @@ test_that("an unsupported feature is refused, naming the types that work", {
   expect_s3_class(xl_chart("line", xl_chart_series(values = "A1", smooth = TRUE)),
                   "xl_chart")
   expect_s3_class(xl_chart("scatter_smooth",
-                           xl_chart_series(values = "A1", smooth = TRUE)),
+                           xl_chart_series(values = "B1:B5", smooth = TRUE,
+                                           categories = "A1:A5")),
                   "xl_chart")
 })
 
@@ -302,4 +308,156 @@ test_that("a chart is a victim of the drawing-id desync, like an image", {
                'sheet "C" has a chart')
   # the other order is fine, and is what the message recommends
   expect_silent(write_tmp(list(C = charted, H = hdr)))
+})
+
+# ── What reaches the file ─────────────────────────────────────────────────────
+
+cfile <- function(..., df = crange_sales) {
+  p <- write_tmp(list(Data = xl_sheet(df, ...)))
+  d <- tempfile(); dir.create(d); utils::unzip(p, exdir = d)
+  ch <- list.files(file.path(d, "xl/charts"), pattern = "^chart",
+                   full.names = TRUE)
+  list(files = list.files(d, recursive = TRUE),
+       chart = if (length(ch)) paste(readLines(ch[1L], warn = FALSE),
+                                     collapse = "") else "",
+       sheet = xlsx_part(p, "xl/worksheets/sheet1.xml", raw = TRUE))
+}
+
+test_that("a chart reaches the file with its drawing and reference", {
+  r <- cfile(chart = xl_chart("column",
+    xl_chart_series(values = list(cols = "qty"),
+                    categories = list(cols = "fruit"), name = "Qty"),
+    title = "Fruit", at = "D2"))
+  expect_true(any(grepl("^xl/charts/chart", r$files)))
+  expect_true(any(grepl("^xl/drawings/drawing", r$files)))
+  expect_match(r$sheet, "<drawing r:id=", fixed = TRUE)
+  expect_match(r$chart, "<c:barChart>", fixed = TRUE)
+  # the series points at the resolved range, absolute and sheet-qualified
+  expect_match(r$chart, "<c:f>Data!$B$2:$B$4</c:f>", fixed = TRUE)
+  expect_match(r$chart, "<c:f>Data!$A$2:$A$4</c:f>", fixed = TRUE)
+  expect_match(r$chart, "Fruit", fixed = TRUE)
+  expect_match(r$chart, "Qty", fixed = TRUE)
+})
+
+test_that("each chart type writes its own plot element", {
+  kinds <- c(column = "barChart", bar = "barChart", line = "lineChart",
+             pie = "pieChart", doughnut = "doughnutChart", area = "areaChart",
+             scatter = "scatterChart", radar = "radarChart")
+  for (ty in names(kinds)) {
+    se <- if (identical(.CHART_FAMILY(ty), "scatter"))
+      xl_chart_series(values = list(cols = "qty"),
+                      categories = list(cols = "fruit"))
+    else xl_chart_series(values = list(cols = "qty"))
+    expect_match(cfile(chart = xl_chart(ty, se))$chart,
+                 sprintf("<c:%s>", kinds[[ty]]), fixed = TRUE, label = ty)
+  }
+})
+
+test_that("a series format reaches the chart's shape properties", {
+  r <- cfile(chart = xl_chart("line", xl_chart_series(
+    values = list(cols = "qty"),
+    format = xl_border(all = "dashed", color = "red") +
+             xl_fill(background = "yellow", transparency = 30))))
+  # charts use 6-digit RGB, not the 8-digit ARGB of cell styles
+  expect_match(r$chart, "<a:srgbClr val=\"FF0000\"/>", fixed = TRUE)
+  expect_match(r$chart, "<a:srgbClr val=\"FFFF00\">", fixed = TRUE)
+  expect_match(r$chart, "<a:prstDash val=\"dash\"/>", fixed = TRUE)
+  # transparency 30 becomes 70% opacity
+  expect_match(r$chart, "<a:alpha val=\"70000\"/>", fixed = TRUE)
+})
+
+test_that("a cross-sheet series names the other sheet", {
+  p <- write_tmp(list(
+    Chart = xl_sheet(data.frame(z = 1), chart = xl_chart("pie",
+      xl_chart_series(values = list(sheet = "Data", cols = "qty")))),
+    Data = crange_sales))
+  d <- tempfile(); dir.create(d); utils::unzip(p, exdir = d)
+  x <- paste(readLines(list.files(file.path(d, "xl/charts"), pattern = "^chart",
+                                  full.names = TRUE)[1L], warn = FALSE),
+             collapse = "")
+  expect_match(x, "Data!", fixed = TRUE)
+})
+
+test_that("several charts on one sheet share its drawing", {
+  r <- cfile(chart = list(
+    xl_chart("column", xl_chart_series(values = list(cols = "qty")), at = "D2"),
+    xl_chart("pie", xl_chart_series(values = list(cols = "qty")), at = "D20")))
+  expect_equal(sum(grepl("^xl/charts/chart", r$files)), 2L)
+  # one drawing per sheet, two charts anchored in it
+  expect_equal(sum(grepl("^xl/drawings/drawing", r$files)), 1L)
+})
+
+test_that("placement and style options are written", {
+  r <- cfile(chart = xl_chart("column",
+    xl_chart_series(values = list(cols = "qty")),
+    at = "A1", offset = c(20, 10), style = 12))
+  expect_match(r$chart, "<c:style val=\"12\"/>", fixed = TRUE)
+  d <- tempfile(); dir.create(d)
+  p <- write_tmp(list(Data = xl_sheet(crange_sales, chart = xl_chart("column",
+    xl_chart_series(values = list(cols = "qty")), at = "A1",
+    offset = c(20, 10)))))
+  utils::unzip(p, exdir = d)
+  dr <- paste(readLines(file.path(d, "xl/drawings/drawing1.xml"), warn = FALSE),
+              collapse = "")
+  expect_match(dr, sprintf("<xdr:colOff>%d</xdr:colOff>", 20 * 9525),
+               fixed = TRUE)
+})
+
+test_that("title = FALSE writes autoTitleDeleted", {
+  expect_match(cfile(chart = xl_chart("pie",
+    xl_chart_series(values = list(cols = "qty")), title = FALSE))$chart,
+    "<c:autoTitleDeleted val=\"1\"/>", fixed = TRUE)
+})
+
+test_that("every relationship a chart adds resolves", {
+  p <- write_tmp(list(Data = xl_sheet(crange_sales, chart = xl_chart("column",
+    xl_chart_series(values = list(cols = "qty"))))))
+  d <- tempfile(); dir.create(d); utils::unzip(p, exdir = d)
+  bad <- character(0)
+  for (rel in list.files(d, recursive = TRUE, pattern = "_rels/")) {
+    x <- paste(readLines(file.path(d, rel), warn = FALSE), collapse = "")
+    base <- dirname(dirname(rel))
+    for (tg in regmatches(x, gregexpr('Target="[^"]+"[^>]*', x))[[1L]]) {
+      if (grepl('TargetMode="External"', tg)) next
+      target <- sub('Target="([^"]+)".*', "\\1", tg)
+      q <- if (startsWith(target, "/")) sub("^/", "", target)
+           else if (base == ".") target else file.path(base, target)
+      while (grepl("/[^/]+/\\.\\./", q)) q <- sub("/[^/]+/\\.\\./", "/", q)
+      if (!file.exists(file.path(d, q))) bad <- c(bad, target)
+    }
+  }
+  expect_equal(bad, character(0))
+})
+
+test_that("a scatter series must have categories", {
+  # not a style preference: libxlsxwriter's _chart_write_cat() reads
+  # series->categories->has_string_cache before its own NULL guard, so a
+  # scatter series without categories segfaults.  Found by bisecting a crash in
+  # this very file, and reduced to a check that says what to do.
+  for (ty in c("scatter", "scatter_straight", "scatter_straight_markers",
+               "scatter_smooth", "scatter_smooth_markers"))
+    expect_error(xl_chart(ty, xl_chart_series(values = "B1:B5")),
+                 "no `categories`", label = ty)
+  # with them, every scatter type writes
+  for (ty in c("scatter", "scatter_straight", "scatter_smooth"))
+    expect_true(inherits(xl_chart(ty, xl_chart_series(values = "B1:B5",
+                                                      categories = "A1:A5")),
+                         "xl_chart"), info = ty)
+  # and no other family is affected
+  expect_s3_class(xl_chart("column", xl_chart_series(values = "A1:A5")),
+                  "xl_chart")
+})
+
+test_that("every chart type writes a file without crashing", {
+  # the scatter crash reached the C layer, where a bad assumption is a
+  # segfault rather than a failed expectation, so every type is exercised
+  # end to end
+  for (ty in names(.LXW_CHART_TYPE)) {
+    se <- if (identical(.CHART_FAMILY(ty), "scatter"))
+      xl_chart_series(values = list(cols = "qty"),
+                      categories = list(cols = "fruit"))
+    else xl_chart_series(values = list(cols = "qty"))
+    expect_silent(write_tmp(list(Data = xl_sheet(crange_sales,
+                                                 chart = xl_chart(ty, se)))))
+  }
 })

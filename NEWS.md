@@ -79,6 +79,28 @@
   turns off the memory-efficient row-streaming mode, which libxlsxwriter does
   not support alongside tables.
 
+* **Charts** via `xl_sheet(chart = xl_chart(...))` and `xl_chart_series()`, in
+  all 22 of the types Excel offers. A series names its values, categories and
+  name either as an A1 range (`"Data!B2:B10"`) or by column
+  (`list(cols = "revenue")`), so a range follows the data when rows are added
+  or a header is written; a range may name another sheet, and one that reaches
+  past the data is refused rather than plotted as blanks. Placement uses the
+  same vocabulary as an image (`at`, `scale`, `offset`, `position`,
+  `description`, `decorative`).
+
+  Series and titles are styled with the ordinary `xl_format()` groups:
+  `xl_border()` becomes the line, `xl_fill()` the fill or pattern, and
+  `xl_font()` the text, so one format object can style both a cell and a chart.
+  `xl_fill()` and `xl_border()` gained `transparency`, which charts honour and
+  cells ignore. Border styles a chart line cannot express, and format groups a
+  chart has no use for, are refused by name instead of being dropped silently.
+
+  Features that apply to only some chart types --- the doughnut hole, pie
+  rotation, up-down bars, high-low lines, the series gap and overlap, smoothing
+  --- are checked against the chart's type, because Excel discards them without
+  a word. A scatter series must have `categories`: they are its x axis, and
+  libxlsxwriter crashes without them.
+
 * `xl_filter_keep()` exposes the matching rule on its own: given a data frame
   and one or more `xl_filter()`s, it returns which rows Excel would leave
   visible, without writing anything. `xl_sheet(filter =)` uses it to decide

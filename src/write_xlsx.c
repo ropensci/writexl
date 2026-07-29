@@ -502,6 +502,148 @@ static void apply_background(cell_write_ctx *ctx, SEXP opts){
   }
 }
 
+/* --- Charts --------------------------------------------------------------- */
+/*
+ * A chart's styling arrives as the pieces .chart_format_payload() produced --
+ * any of line, fill, pattern and font -- rather than as a cell format.  The
+ * structs are stack locals here because libxlsxwriter copies them: see
+ * _chart_convert_line_args() and friends, which duplicate into the chart's own
+ * storage rather than retaining the pointer.
+ */
+static lxw_chart_line chart_line_of(SEXP p, int *set){
+  lxw_chart_line l;
+  SEXP e = list_get(p, "line");
+  memset(&l, 0, sizeof(l));
+  *set = 0;
+  if(e == R_NilValue || !Rf_isVectorList(e)) return l;
+  *set = 1;
+  if(payload_has(e, "color"))        l.color = (lxw_color_t) payload_int(e, "color");
+  if(payload_has(e, "none"))         l.none = 1;
+  if(payload_has(e, "dash_type"))    l.dash_type = (uint8_t) payload_int(e, "dash_type");
+  if(payload_has(e, "transparency")) l.transparency = (uint8_t) payload_int(e, "transparency");
+  return l;
+}
+
+static lxw_chart_fill chart_fill_of(SEXP p, int *set){
+  lxw_chart_fill f;
+  SEXP e = list_get(p, "fill");
+  memset(&f, 0, sizeof(f));
+  *set = 0;
+  if(e == R_NilValue || !Rf_isVectorList(e)) return f;
+  *set = 1;
+  if(payload_has(e, "color"))        f.color = (lxw_color_t) payload_int(e, "color");
+  if(payload_has(e, "none"))         f.none = 1;
+  if(payload_has(e, "transparency")) f.transparency = (uint8_t) payload_int(e, "transparency");
+  return f;
+}
+
+static lxw_chart_pattern chart_pattern_of(SEXP p, int *set){
+  lxw_chart_pattern pat;
+  SEXP e = list_get(p, "pattern");
+  memset(&pat, 0, sizeof(pat));
+  *set = 0;
+  if(e == R_NilValue || !Rf_isVectorList(e)) return pat;
+  *set = 1;
+  pat.fg_color = (lxw_color_t) payload_int(e, "fg_color");
+  pat.bg_color = (lxw_color_t) payload_int(e, "bg_color");
+  pat.type     = (uint8_t) payload_int(e, "type");
+  return pat;
+}
+
+/* Apply a format payload to one series. */
+static void style_series(lxw_chart_series *s, SEXP fmt){
+  int has;
+  lxw_chart_line line;
+  lxw_chart_fill fill;
+  lxw_chart_pattern pat;
+  if(fmt == R_NilValue || !Rf_isVectorList(fmt)) return;
+  line = chart_line_of(fmt, &has);
+  if(has) chart_series_set_line(s, &line);
+  fill = chart_fill_of(fmt, &has);
+  if(has) chart_series_set_fill(s, &fill);
+  pat = chart_pattern_of(fmt, &has);
+  if(has) chart_series_set_pattern(s, &pat);
+}
+
+/* The 0-based quad a resolved chart range carries. */
+static int chart_range_of(SEXP p, const char *key, int *out){
+  SEXP r = list_get(p, key);
+  SEXP q;
+  int i;
+  if(r == R_NilValue || Rf_length(r) < 4) return 0;
+  q = PROTECT(Rf_coerceVector(r, INTSXP));
+  for(i = 0; i < 4; i++) out[i] = INTEGER(q)[i];
+  UNPROTECT(1);
+  return 1;
+}
+
+static void apply_charts(cell_write_ctx *ctx, SEXP opts){
+  SEXP cs = list_get(opts, "charts");
+  if(cs == R_NilValue || !Rf_isVectorList(cs)) return;
+  for(R_xlen_t k = 0; k < Rf_length(cs); k++){
+    SEXP c = VECTOR_ELT(cs, k);
+    lxw_chart *chart = workbook_add_chart(ctx->workbook,
+                                          (uint8_t) payload_int(c, "type"));
+    SEXP ss = list_get(c, "series");
+    int r[4];
+    bail_if(chart == NULL, "failed to create chart");
+
+    if(ss != R_NilValue && Rf_isVectorList(ss)){
+      for(R_xlen_t i = 0; i < Rf_length(ss); i++){
+        SEXP se = VECTOR_ELT(ss, i);
+        lxw_chart_series *series = chart_add_series(chart, NULL, NULL);
+        bail_if(series == NULL, "failed to add chart series");
+        if(chart_range_of(se, "values_range", r))
+          chart_series_set_values(series, payload_str(se, "values_sheet"),
+                                  (lxw_row_t) r[0], (lxw_col_t) r[1],
+                                  (lxw_row_t) r[2], (lxw_col_t) r[3]);
+        if(chart_range_of(se, "categories_range", r))
+          chart_series_set_categories(series,
+                                      payload_str(se, "categories_sheet"),
+                                      (lxw_row_t) r[0], (lxw_col_t) r[1],
+                                      (lxw_row_t) r[2], (lxw_col_t) r[3]);
+        if(payload_has(se, "name"))
+          chart_series_set_name(series, payload_str(se, "name"));
+        else if(chart_range_of(se, "name_range", r))
+          chart_series_set_name_range(series, payload_str(se, "name_sheet"),
+                                      (lxw_row_t) r[0], (lxw_col_t) r[1]);
+        if(payload_has(se, "smooth"))
+          chart_series_set_smooth(series, LXW_TRUE);
+        if(payload_has(se, "invert_if_negative"))
+          chart_series_set_invert_if_negative(series);
+        style_series(series, list_get(se, "format"));
+      }
+    }
+
+    if(payload_has(c, "title_off"))
+      chart_title_off(chart);
+    else if(payload_has(c, "title"))
+      chart_title_set_name(chart, payload_str(c, "title"));
+    else if(chart_range_of(c, "title_range", r))
+      chart_title_set_name_range(chart, payload_str(c, "title_sheet"),
+                                 (lxw_row_t) r[0], (lxw_col_t) r[1]);
+
+    if(payload_has(c, "style"))
+      chart_set_style(chart, (uint8_t) payload_int(c, "style"));
+
+    lxw_chart_options o;
+    memset(&o, 0, sizeof(o));
+    if(payload_has(c, "x_scale"))  o.x_scale  = payload_dbl(c, "x_scale");
+    if(payload_has(c, "y_scale"))  o.y_scale  = payload_dbl(c, "y_scale");
+    if(payload_has(c, "x_offset")) o.x_offset = payload_int(c, "x_offset");
+    if(payload_has(c, "y_offset")) o.y_offset = payload_int(c, "y_offset");
+    if(payload_has(c, "object_position"))
+      o.object_position = (uint8_t) payload_int(c, "object_position");
+    o.description = (char *) payload_str(c, "description");
+    if(payload_has(c, "decorative")) o.decorative = 1;
+
+    assert_lxw(worksheet_insert_chart_opt(ctx->sheet,
+                                         (lxw_row_t) payload_int(c, "row"),
+                                         (lxw_col_t) payload_int(c, "col"),
+                                         chart, &o));
+  }
+}
+
 static void apply_images(cell_write_ctx *ctx, SEXP opts){
   SEXP ims = list_get(opts, "images");
   if(ims == R_NilValue || !Rf_isVectorList(ims)) return;
@@ -1490,6 +1632,7 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
     apply_merges(&ctx, opts);
     apply_tables(&ctx, opts);
     apply_images(&ctx, opts);
+    apply_charts(&ctx, opts);
     apply_background(&ctx, opts);
 
     if(warn_unlocked)
