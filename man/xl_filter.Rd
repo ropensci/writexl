@@ -91,6 +91,8 @@ Other writexl:
 \code{\link[=is_xl_comment]{is_xl_comment()}},
 \code{\link[=is_xl_format]{is_xl_format()}},
 \code{\link[=xl_cell_general]{xl_cell_general()}},
+\code{\link[=xl_chart]{xl_chart()}},
+\code{\link[=xl_chart_series]{xl_chart_series()}},
 \code{\link[=xl_color]{xl_color()}},
 \code{\link{xl_colrow_spec}},
 \code{\link[=xl_comment]{xl_comment()}},

@@ -26,7 +26,10 @@ api_arg_positions <- function() {
 # worksheet *column's* character width have nothing to do with each other.
 FALSE_FRIENDS <- list(
   c("xl_comment", "xl_col_spec"),
-  c("xl_comment", "xl_row_spec")
+  c("xl_comment", "xl_row_spec"),
+  # `name` in xl_hyperlink() is the deprecated alias for `value`, kept last on
+  # purpose; in xl_chart_series() it is the series label shown in the legend.
+  c("xl_hyperlink", "xl_chart_series")
 )
 
 is_false_friend <- function(a, b) {
