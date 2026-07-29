@@ -188,7 +188,7 @@
 #' @param multi_range A further set of ranges the rule also covers, as an Excel
 #'   multi-range string such as `"B3:K6 B9:K12"`.
 #' @return An `xl_conditional` object.
-#' @family writexl
+#' @family worksheet features
 #' @seealso [xl_sheet], [xl_format]
 #' @name xl_conditional
 #' @examples

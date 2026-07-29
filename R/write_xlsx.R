@@ -28,6 +28,7 @@
 #'   \code{\link{xl_properties}(header_format = )}.
 #' @param use_zip64 use \href{https://en.wikipedia.org/wiki/Zip_(file_format)#ZIP64}{zip64}
 #' to enable support for 4GB+ xlsx files. Not all platforms can read this.
+#' @family workbook settings
 #' @examples # Roundtrip example with single excel sheet named 'mysheet'
 #' tmp <- write_xlsx(list(mysheet = iris))
 #' readxl::read_xlsx(tmp)

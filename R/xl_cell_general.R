@@ -72,7 +72,7 @@
 #'   `value`, `formula`, `hyperlink`, `format`, `comment`, `array`, `dynamic`
 #'   and `array_range`.
 #'
-#' @family writexl
+#' @family cell content
 #' @seealso [xl_formula()], [xl_hyperlink()], [write_xlsx()]
 #' @export
 #' @examples

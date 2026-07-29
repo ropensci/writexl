@@ -85,32 +85,10 @@ tmp <- write_xlsx(list(
 \seealso{
 [xl_sheet], [xl_page_setup]
 
-Other writexl:
-\code{\link[=is_xl_comment]{is_xl_comment()}},
-\code{\link[=is_xl_format]{is_xl_format()}},
-\code{\link[=xl_cell_general]{xl_cell_general()}},
-\code{\link[=xl_chart]{xl_chart()}},
-\code{\link[=xl_chart_series]{xl_chart_series()}},
-\code{\link[=xl_color]{xl_color()}},
+Other worksheet layout:
 \code{\link{xl_colrow_spec}},
-\code{\link[=xl_comment]{xl_comment()}},
-\code{\link{xl_conditional}},
-\code{\link[=xl_filter]{xl_filter()}},
-\code{\link[=xl_filter_keep]{xl_filter_keep()}},
-\code{\link[=xl_format]{xl_format()}},
-\code{\link{xl_format_groups}},
-\code{\link[=xl_formula]{xl_formula()}},
-\code{\link[=xl_image]{xl_image()}},
-\code{\link[=xl_merge]{xl_merge()}},
 \code{\link[=xl_outline]{xl_outline()}},
 \code{\link[=xl_page_setup]{xl_page_setup()}},
-\code{\link[=xl_properties]{xl_properties()}},
-\code{\link[=xl_rich_run]{xl_rich_run()}},
-\code{\link[=xl_rich_string]{xl_rich_string()}},
-\code{\link[=xl_sheet]{xl_sheet()}},
-\code{\link[=xl_table]{xl_table()}},
-\code{\link[=xl_table_column]{xl_table_column()}},
-\code{\link[=xl_validation]{xl_validation()}},
-\code{\link[=xl_workbook]{xl_workbook()}}
+\code{\link[=xl_sheet]{xl_sheet()}}
 }
-\concept{writexl}
+\concept{worksheet layout}

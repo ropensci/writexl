@@ -13,7 +13,7 @@
 #' Test whether an object is an `xl_comment`
 #' @param x An object.
 #' @return `TRUE` if `x` inherits from `"xl_comment"`.
-#' @family writexl
+#' @family cell content
 #' @export
 is_xl_comment <- function(x) inherits(x, "xl_comment")
 
@@ -49,7 +49,7 @@ is_xl_comment <- function(x) inherits(x, "xl_comment")
 #'   comment sits one row up and one column right of its cell).
 #' @param x_offset,y_offset Pixel offset of the box from its anchor.
 #' @return An `xl_comment` object.
-#' @family writexl
+#' @family cell content
 #' @seealso [xl_cell_general], [xl_format]
 #' @export
 #' @examples

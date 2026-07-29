@@ -89,7 +89,7 @@
 #' @param format An [xl_format] applied to the column's data cells.
 #' @param header_format An [xl_format] applied to the column's header cell.
 #' @return An `xl_table_column` object.
-#' @family writexl
+#' @family worksheet features
 #' @seealso [xl_table], [xl_sheet]
 #' @export
 #' @examples
@@ -181,7 +181,7 @@ print.xl_table_column <- function(x, ...) {
 #' @param columns One [xl_table_column()], or a list of them, overriding
 #'   individual columns.
 #' @return An `xl_table` object.
-#' @family writexl
+#' @family worksheet features
 #' @seealso [xl_table_column], [xl_sheet]
 #' @export
 #' @examples

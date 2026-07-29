@@ -268,7 +268,7 @@
 #' @param list Instead of a criteria, keep only rows whose value is in this
 #'   character vector.  Matched case-insensitively, as Excel does.
 #' @return An `xl_filter` object.
-#' @family writexl
+#' @family worksheet features
 #' @seealso [xl_sheet], [xl_filter_keep]
 #' @export
 #' @examples
@@ -359,7 +359,7 @@ print.xl_filter <- function(x, ...) {
 #'   columns combine with AND, as they do in Excel.
 #' @return A logical vector with one element per row of `data`, `TRUE` where
 #'   the row stays visible.
-#' @family writexl
+#' @family worksheet features
 #' @seealso [xl_filter], [xl_sheet]
 #' @export
 #' @examples

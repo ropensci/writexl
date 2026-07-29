@@ -51,3 +51,9 @@ workbook properties" vignette and \code{\link{xl_format}}.
 tmp <- write_xlsx(list(mysheet = iris))
 readxl::read_xlsx(tmp)
 }
+\seealso{
+Other workbook settings:
+\code{\link[=xl_properties]{xl_properties()}},
+\code{\link[=xl_workbook]{xl_workbook()}}
+}
+\concept{workbook settings}

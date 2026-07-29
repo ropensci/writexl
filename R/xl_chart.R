@@ -137,7 +137,7 @@
 #' @param smooth Draw the line smoothed.  Line and scatter charts only.
 #' @param invert_if_negative Fill negative values with the inverse colour.
 #' @return An `xl_chart_series` object.
-#' @family writexl
+#' @family images and charts
 #' @seealso [xl_chart]
 #' @export
 #' @examples
@@ -207,7 +207,7 @@ print.xl_chart_series <- function(x, ...) {
 #' @param decorative Mark the chart as decorative, so screen readers skip it.
 #' @param style Excel's built-in chart style, 1--48.
 #' @return An `xl_chart` object.
-#' @family writexl
+#' @family images and charts
 #' @seealso [xl_chart_series], [xl_sheet]
 #' @export
 #' @examples

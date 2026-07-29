@@ -301,7 +301,7 @@
 #'   and at most 1023 breaks are allowed.  Excel ignores manual breaks when
 #'   `fit_to` is set, which warns.
 #' @return An `xl_page_setup` object.
-#' @family writexl
+#' @family worksheet layout
 #' @seealso [xl_sheet], [write_xlsx]
 #' @export
 #' @examples

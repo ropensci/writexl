@@ -28,7 +28,7 @@
 #' @param auto_style Apply Excel's automatic outline styling to the grouped
 #'   rows and columns.
 #' @return An `xl_outline` object, for [xl_sheet()]'s `outline` argument.
-#' @family writexl
+#' @family worksheet layout
 #' @seealso [xl_sheet], [xl_colrow_spec]
 #' @export
 #' @examples
