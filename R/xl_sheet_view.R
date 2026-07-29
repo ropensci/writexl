@@ -59,7 +59,7 @@
 #'   columns the divider is placed correctly but the anchor cell may be a row or
 #'   two out.
 #' @return An `xl_sheet_view` object.
-#' @family writexl
+#' @family worksheet layout
 #' @seealso [xl_sheet], [xl_page_setup]
 #' @export
 #' @examples

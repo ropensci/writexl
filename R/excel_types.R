@@ -34,7 +34,7 @@
 #'   returns `NA` for those cells.  Use `xl_hyperlink()` instead when
 #'   round-tripping through readxl is required.
 #'
-#' @family writexl
+#' @family cell content
 #' @param x character vector to be interpreted as formula
 #' @param format An optional [xl_format] (or list of `xl_format`, one per
 #'   element) applied to the cells.  See [xl_format].

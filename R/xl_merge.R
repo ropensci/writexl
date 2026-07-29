@@ -36,7 +36,7 @@
 #' @param format An optional [xl_format] applied to the whole merged range.
 #'   Merged cells usually want `xl_align(horizontal = "center")`.
 #' @return An `xl_merge` object.
-#' @family writexl
+#' @family worksheet features
 #' @seealso [xl_sheet], [xl_format]
 #' @export
 #' @examples

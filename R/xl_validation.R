@@ -137,7 +137,7 @@
 #' @param dropdown Logical; show the in-cell dropdown arrow for a `list`
 #'   validation.  `TRUE` by default.
 #' @return An `xl_validation` object.
-#' @family writexl
+#' @family worksheet features
 #' @seealso [xl_sheet]
 #' @export
 #' @examples

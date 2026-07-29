@@ -55,7 +55,7 @@
 #' nothing is mislabelled.  When the time zones differ, all datetimes are
 #' converted to UTC with a warning.  Supplying your own `datetime_format`
 #' overrides the label in either case.
-#' @family writexl
+#' @family workbook settings
 #' @seealso [xl_workbook], [write_xlsx]
 #' @export
 #' @examples
@@ -137,7 +137,7 @@ print.xl_properties <- function(x, ...) {
 #' @param properties An [xl_properties] object.
 #' @inheritParams write_xlsx
 #' @return An `xl_workbook` object.
-#' @family writexl
+#' @family workbook settings
 #' @seealso [xl_properties], [xl_sheet], [write_xlsx]
 #' @export
 #' @examples

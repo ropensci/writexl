@@ -115,7 +115,7 @@
 #' @param x A single color: an R color name, a hex string, or an integer.
 #'   `NA` returns `NA_integer_` (an unset color).
 #' @return A single integer in `0x000000`..`0xFFFFFF`, or `NA_integer_`.
-#' @family writexl
+#' @family cell formatting
 #' @export
 #' @examples
 #' xl_color("red")
@@ -155,7 +155,7 @@ new_xl_format <- function(font = NULL, fill = NULL, border = NULL, align = NULL,
 #' Test whether an object is an `xl_format`
 #' @param x An object.
 #' @return `TRUE` if `x` inherits from `"xl_format"`.
-#' @family writexl
+#' @family cell formatting
 #' @export
 is_xl_format <- function(x) inherits(x, "xl_format")
 
@@ -191,7 +191,7 @@ is_xl_format <- function(x) inherits(x, "xl_format")
 #' @param scheme Font scheme string (advanced).
 #' @return An [xl_format] object.
 #' @name xl_format_groups
-#' @family writexl
+#' @family cell formatting
 #' @seealso [xl_format], [xl_color]
 #' @examples
 #' xl_font(bold = TRUE, color = "navy", size = 12)
@@ -357,7 +357,7 @@ xl_protection <- function(locked = NA, hidden = NA) {
 #'   prefixed with a single quote in Excel).
 #' @param hyperlink Logical; apply the internal hyperlink style flag (advanced).
 #' @return A combined [xl_format] object.
-#' @family writexl
+#' @family cell formatting
 #' @seealso [xl_font], [xl_fill], [xl_border], [xl_align], [xl_num_format],
 #'   [xl_protection], [xl_color]
 #' @export

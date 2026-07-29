@@ -46,7 +46,7 @@
 #'   default cell format.  Combine groups with `+` (e.g.
 #'   `xl_font(bold = TRUE) + xl_fill(background = "yellow")`).
 #' @return An `xl_col_spec` / `xl_row_spec` object (also an [xl_format]).
-#' @family writexl
+#' @family worksheet layout
 #' @seealso [xl_sheet], [xl_format]
 #' @examples
 #' xl_col_spec("revenue", width = 14, format = xl_num_format("#,##0.00"))
@@ -213,7 +213,7 @@ xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
 #'   `formula_unlocked`, `empty_cell_reference`, `list_data_validation`,
 #'   `calculated_column`, `two_digit_text_year`.
 #' @return An `xl_sheet` object.
-#' @family writexl
+#' @family worksheet layout
 #' @seealso [xl_col_spec], [xl_row_spec], [write_xlsx]
 #' @export
 #' @examples

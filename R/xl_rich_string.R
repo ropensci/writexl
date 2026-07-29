@@ -24,7 +24,7 @@
 #'   (see [xl_font()]); a run has no fill, border, alignment or number format,
 #'   and supplying one warns.  `NULL` draws the run in the cell's own font.
 #' @return An `xl_rich_run` object.
-#' @family writexl
+#' @family cell content
 #' @seealso [xl_rich_string], [xl_format]
 #' @export
 #' @examples
@@ -58,7 +58,7 @@ xl_rich_run <- function(text, format = NULL) {
 #'   [xl_rich_run()] carries its own font.  Lists of either are flattened, so
 #'   runs can be assembled programmatically.
 #' @return An `xl_rich_string` object: a list of runs.
-#' @family writexl
+#' @family cell content
 #' @seealso [xl_rich_run], [xl_cell_general], [xl_font]
 #' @export
 #' @examples

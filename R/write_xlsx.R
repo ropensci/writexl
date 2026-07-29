@@ -43,6 +43,7 @@
 #'   varies with the data, and is lowest for text that repeats. Streaming saves
 #'   memory but produces slightly larger files, so it is not used for workbooks
 #'   small enough that the saving would not be noticed.
+#' @family workbook settings
 #' @examples # Roundtrip example with single excel sheet named 'mysheet'
 #' tmp <- write_xlsx(list(mysheet = iris))
 #' readxl::read_xlsx(tmp)

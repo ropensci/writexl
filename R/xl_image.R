@@ -205,7 +205,7 @@
 #' @param format An [xl_format] for the cell holding an embedded image.  Only
 #'   meaningful with `embed = TRUE`.
 #' @return An `xl_image` object.
-#' @family writexl
+#' @family images and charts
 #' @seealso [xl_sheet]
 #' @export
 #' @examples
