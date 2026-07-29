@@ -36,10 +36,13 @@
 #'   merged ranges, tables, embedded images and multi-cell array formulas ---
 #'   turn it off regardless, with a warning if `TRUE` was asked for, because
 #'   the alternative is a file that opens cleanly and is missing cells.
-#' @param constant_memory_threshold how much extra memory (in bytes) not
-#'   streaming would have to cost before streaming is worth it. Default 128
-#'   MiB. Streaming saves memory but produces slightly larger files, so it is
-#'   not used for workbooks small enough that the saving would not be noticed.
+#' @param constant_memory_threshold how much extra memory not streaming would
+#'   have to cost, in bytes, before streaming is worth it. Default 128 MiB.
+#'   The cost is *estimated* from the number of cells in the workbook, using a
+#'   fixed per-cell figure calibrated against a range of data; the true cost
+#'   varies with the data, and is lowest for text that repeats. Streaming saves
+#'   memory but produces slightly larger files, so it is not used for workbooks
+#'   small enough that the saving would not be noticed.
 #' @examples # Roundtrip example with single excel sheet named 'mysheet'
 #' tmp <- write_xlsx(list(mysheet = iris))
 #' readxl::read_xlsx(tmp)
@@ -93,7 +96,6 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
   .check_drawing_order(sheets, names(dfs))
   cm <- .resolve_constant_memory(dfs, props, sheets, constant_memory,
                                  constant_memory_threshold)
-  if (!is.null(cm$note)) message(cm$note)
   ret <- .Call(C_write_data_frame_list, dfs, path, col_names, format_headers,
                use_zip64, reg$table, sheets, header_id,
                .properties_payload(props, cm$on))

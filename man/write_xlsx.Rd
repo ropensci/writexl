@@ -39,10 +39,13 @@ merged ranges, tables, embedded images and multi-cell array formulas ---
 turn it off regardless, with a warning if `TRUE` was asked for, because
 the alternative is a file that opens cleanly and is missing cells.}
 
-\item{constant_memory_threshold}{how much extra memory (in bytes) not
-streaming would have to cost before streaming is worth it. Default 128
-MiB. Streaming saves memory but produces slightly larger files, so it is
-not used for workbooks small enough that the saving would not be noticed.}
+\item{constant_memory_threshold}{how much extra memory not streaming would
+have to cost, in bytes, before streaming is worth it. Default 128 MiB.
+The cost is *estimated* from the number of cells in the workbook, using a
+fixed per-cell figure calibrated against a range of data; the true cost
+varies with the data, and is lowest for text that repeats. Streaming saves
+memory but produces slightly larger files, so it is not used for workbooks
+small enough that the saving would not be noticed.}
 }
 \description{
 Writes a data frame to an xlsx file. To create an xlsx with (multiple) named

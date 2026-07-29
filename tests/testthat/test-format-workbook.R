@@ -290,14 +290,17 @@ test_that("the constant_memory decision follows its five rules in order", {
   clear <- list(list(merges = NULL))
 
   # 1. FALSE wins outright, without consulting anything else
-  expect_equal(.resolve_constant_memory(big, list(), blocked, FALSE)$on, 0L)
-  expect_match(.resolve_constant_memory(big, list(), blocked, FALSE)$reasons,
-               "constant_memory = FALSE")
+  # FALSE returns before the blacklist is even consulted, so it is silent too
+  expect_silent(r <- .resolve_constant_memory(big, list(), blocked, FALSE))
+  expect_equal(r$on, 0L)
+  expect_match(r$reasons, "constant_memory = FALSE")
 
-  # 2. the blacklist is absolute -- TRUE cannot override it, only be told
-  expect_equal(.resolve_constant_memory(big, list(), blocked)$on, 0L)
-  expect_warning(r <- .resolve_constant_memory(big, list(), blocked, TRUE),
-                 "cannot be honoured")
+  # 2. the blacklist is absolute -- TRUE cannot override it, only be told.
+  # (These also emit the size suggestion, which its own test covers.)
+  expect_equal(suppressMessages(
+    .resolve_constant_memory(big, list(), blocked))$on, 0L)
+  expect_warning(r <- suppressMessages(
+    .resolve_constant_memory(big, list(), blocked, TRUE)), "cannot be honoured")
   expect_equal(r$on, 0L)
 
   # 3. TRUE overrides the size estimate
@@ -326,12 +329,24 @@ test_that("the suggestion appears only when streaming would have mattered", {
   small <- list(data.frame(a = 1:5))
   big <- list(data.frame(matrix(1, nrow = 130000, ncol = 12)))
   blocked <- list(list(merges = list(1)))
-  # a small workbook blocked by a feature has nothing to act on
-  expect_null(.resolve_constant_memory(small, list(), blocked)$note)
+  # a small workbook blocked by a feature has nothing to act on, so says nothing
+  expect_silent(.resolve_constant_memory(small, list(), blocked))
   # a large one is told what it cost, and why
-  note <- .resolve_constant_memory(big, list(), blocked)$note
-  expect_match(note, "merged range")
-  expect_match(note, "MB more memory")
+  expect_message(.resolve_constant_memory(big, list(), blocked), "merged range")
+  expect_message(.resolve_constant_memory(big, list(), blocked),
+                 "MB more memory")
+})
+
+test_that("the decision is silent whenever there is nothing to report", {
+  # write_xlsx() is called constantly on small frames; a message on every one
+  # would be noise, so only a refusal that cost something speaks
+  small <- list(data.frame(a = 1:5))
+  clear <- list(list(merges = NULL))
+  expect_silent(.resolve_constant_memory(small, list(), clear))
+  expect_silent(.resolve_constant_memory(small, list(), clear, TRUE))
+  expect_silent(.resolve_constant_memory(small, list(), clear, FALSE))
+  big <- list(data.frame(matrix(1, nrow = 130000, ncol = 12)))
+  expect_silent(.resolve_constant_memory(big, list(), clear))
 })
 
 test_that("an invalid constant_memory request is refused", {

@@ -210,7 +210,7 @@ print.xl_workbook <- function(x, ...) {
                                      threshold = 128 * 1024^2) {
   request <- .val_flag(request, "constant_memory")
   if (identical(request, FALSE))
-    return(list(on = 0L, reasons = "constant_memory = FALSE", note = NULL))
+    return(list(on = 0L, reasons = "constant_memory = FALSE"))
   reasons <- character(0)
   # A multi-cell array formula range is padded by libxlsxwriter, and it skips
   # that padding entirely when row streaming is on -- silently, returning
@@ -261,23 +261,26 @@ print.xl_workbook <- function(x, ...) {
     if (isTRUE(request))
       warning("`constant_memory = TRUE` cannot be honoured: ", reasons[1L],
               ". Row streaming is off.", call. = FALSE)
-    # The suggestion: only worth making when streaming would have saved enough
-    # to notice.  Below that there is nothing for the reader to act on.
-    note <- if (est >= threshold)
-      sprintf(paste0("Row streaming is off because of %s. This workbook is ",
-                     "estimated to use about %.0f MB more memory as a result."),
-              reasons[1L], est / 1024^2)
-    else NULL
-    return(list(on = 0L, reasons = reasons, note = note))
+    # The suggestion is emitted here rather than handed back: this is the only
+    # place that knows both why streaming was refused and what it cost, and a
+    # caller could only re-derive that.  It is worth saying only when streaming
+    # would have saved enough to notice -- below that there is nothing for the
+    # reader to act on.
+    if (est >= threshold)
+      message(sprintf(
+        paste0("Row streaming is off because of %s. This workbook is ",
+               "estimated to use about %.0f MB more memory as a result."),
+        reasons[1L], est / 1024^2))
+    return(list(on = 0L, reasons = reasons))
   }
   if (isTRUE(request))
-    return(list(on = 1L, reasons = character(0), note = NULL))
+    return(list(on = 1L, reasons = character(0)))
   if (est < threshold)
-    return(list(on = 0L, note = NULL, reasons = sprintf(
+    return(list(on = 0L, reasons = sprintf(
       paste0("an estimated %.0f MB of extra memory, below the %.0f MB ",
              "threshold at which row streaming starts to pay"),
       est / 1024^2, threshold / 1024^2)))
-  list(on = 1L, reasons = character(0), note = NULL)
+  list(on = 1L, reasons = character(0))
 }
 
 # Break a Date/POSIXct out into the fields lxw_datetime carries.  The value has
