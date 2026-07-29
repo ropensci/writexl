@@ -10,7 +10,9 @@ write_xlsx(
   path = tempfile(fileext = ".xlsx"),
   col_names = TRUE,
   format_headers = TRUE,
-  use_zip64 = FALSE
+  use_zip64 = FALSE,
+  constant_memory = NA,
+  constant_memory_threshold = 128 * 1024^2
 )
 }
 \arguments{
@@ -27,6 +29,23 @@ The default header format is bold and centered; change it with
 
 \item{use_zip64}{use \href{https://en.wikipedia.org/wiki/Zip_(file_format)#ZIP64}{zip64}
 to enable support for 4GB+ xlsx files. Not all platforms can read this.}
+
+\item{constant_memory}{stream rows to disk instead of building the whole
+workbook in memory. `NA` (the default) decides per workbook: on for large
+data, off for small, and always off when a feature needs it off. `TRUE`
+forces it on for a workbook that would otherwise be judged too small;
+`FALSE` forces it off. Features that cannot be written while streaming ---
+merged ranges, tables, embedded images and multi-cell array formulas ---
+turn it off regardless, with a warning if `TRUE` was asked for, because
+the alternative is a file that opens cleanly and is missing cells.}
+
+\item{constant_memory_threshold}{how much extra memory not streaming would
+have to cost, in bytes, before streaming is worth it. Default 128 MiB.
+The cost is *estimated* from the number of cells in the workbook, using a
+fixed per-cell figure calibrated against a range of data; the true cost
+varies with the data, and is lowest for text that repeats. Streaming saves
+memory but produces slightly larger files, so it is not used for workbooks
+small enough that the saving would not be noticed.}
 }
 \description{
 Writes a data frame to an xlsx file. To create an xlsx with (multiple) named

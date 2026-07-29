@@ -290,6 +290,20 @@ test_that("a column format reaches the data cells", {
                '<c r="B2" s=', fixed = TRUE)
 })
 
+test_that("a column format reaches both the column plan and the table part", {
+  # Upstream (jmcnamara/libxlsxwriter#520) confirms the column plan is the
+  # supported way to format a table's data cells, and adds that the table
+  # column's own format is still needed "for strict correctness with Excel",
+  # where it becomes dataDxfId.  Neither half is redundant; this pins both, so
+  # a later tidy-up cannot drop the one that looks superfluous.
+  p <- write_tmp(list(Sales = xl_sheet(sdf, table = xl_table(
+    columns = xl_table_column("qty", format = xl_num_format("$#,##0.00"))))))
+  w <- xlsx_part(p, "xl/worksheets/sheet1.xml", raw = TRUE)
+  tbl <- xlsx_part(p, "xl/tables/table1.xml", raw = TRUE)
+  expect_match(w, '<col min="2" max="2"', fixed = TRUE)      # the column plan
+  expect_match(tbl, "dataDxfId=", fixed = TRUE)              # strict correctness
+})
+
 test_that("a column format merges over an xl_col_spec format", {
   # the table column is the more specific of the two, so it wins on conflict
   # while leaving the rest of the column's format in place
@@ -320,8 +334,10 @@ test_that("a table turns off constant memory", {
                                  list(list(tables = list(1))))
   expect_equal(cm$on, 0L)
   expect_match(cm$reasons, "does not support tables while row streaming")
+  # request = TRUE isolates the feature's effect from the size rule
   expect_equal(.resolve_constant_memory(list(D = sdf), list(),
-                                        list(list(tables = NULL)))$on, 1L)
+                                        list(list(tables = NULL)),
+                                        request = TRUE)$on, 1L)
 })
 
 test_that("a table needs a data row", {

@@ -552,10 +552,10 @@ sheet_data <- function(path) {
 }
 
 # A one-formula sheet: column A holds data, column B the formula cell.
-array_sheet <- function(...) {
+array_sheet <- function(..., .cm = NA) {
   df <- data.frame(x = 1:2)
   df$f <- xl_cell_general(formula = c("=SUM(A1:A2)", NA), ...)
-  write_tmp(df)
+  write_tmp(df, constant_memory = .cm)
 }
 
 test_that("a single-cell array formula is stored as an array over its own cell", {
@@ -615,7 +615,9 @@ test_that("a multi-cell range turns row streaming off, and says why", {
   # observable end to end: with streaming off, strings move to the shared table
   expect_false(is.null(xlsx_part(write_tmp(df), "xl/sharedStrings.xml")))
   # a single-cell array formula leaves streaming on
-  expect_true(is.null(xlsx_part(array_sheet(array = TRUE),
+  # asked for explicitly: a frame this small would not stream on size alone
+  expect_true(is.null(xlsx_part(array_sheet(array = TRUE,
+                                            .cm = TRUE),
                                 "xl/sharedStrings.xml")))
 })
 
