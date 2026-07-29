@@ -376,8 +376,15 @@ test_that("only an embedded image costs row streaming", {
   df <- data.frame(a = 1:4)
   plan_float <- list(list(images = list(list(embed = 0L))))
   plan_embed <- list(list(images = list(list(embed = 1L))))
-  expect_equal(.resolve_constant_memory(list(D = df), list(), plan_float)$on, 1L)
-  cm <- .resolve_constant_memory(list(D = df), list(), plan_embed)
+  # request = TRUE isolates the question: does the feature itself force it
+  # off?  Without it a frame this small would be off for size alone.
+  expect_equal(.resolve_constant_memory(list(D = df), list(), plan_float,
+                                        request = TRUE)$on, 1L)
+  # the request cannot be honoured, and says so rather than failing quietly
+  expect_warning(
+    cm <- .resolve_constant_memory(list(D = df), list(), plan_embed,
+                                   request = TRUE),
+    "cannot be honoured")
   expect_equal(cm$on, 0L)
   expect_match(cm$reasons, "embedded image")
 })

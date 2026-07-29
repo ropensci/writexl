@@ -21,6 +21,18 @@
 #     or indexes columns of the sheet's data frame and `rows` gives 1-based
 #     *data* row indices (row 1 is the first data row, ignoring the header).
 #
+# Either spelling may name a sheet -- "Data!A1:B5", "'My Sheet'!A1:B5", or a
+# `sheet` element in the list form -- but almost nothing wants one.  An
+# autofilter, a merge, a validation, a conditional format, a table, an image
+# anchor and a print area all apply to the sheet they are on; a sheet name
+# there is a misunderstanding, not a refinement.  Only a chart series can
+# genuinely point at another sheet.
+#
+# So the sheet is *parsed* centrally and *allowed* selectively: callers opt in
+# with allow_sheet = TRUE, and everything else reports the mistake instead of
+# ignoring it.  Parsing it in one place keeps the quoting rules (and their
+# error messages) from being reinvented per feature.
+#
 # The header offset is applied here, so C never has to know whether a header
 # row was written.
 # -----------------------------------------------------------------------------
@@ -206,6 +218,30 @@
   .check_range_span(c(first_row, cols[1L] - 1L, last_row, cols[2L] - 1L), arg)
 }
 
+# Split a sheet qualifier off a range string.  Excel quotes a sheet name that
+# contains spaces or punctuation, and doubles an apostrophe inside it:
+#   Data!A1:B5      'My Sheet'!A1:B5      'It''s'!A1
+.split_sheet_ref <- function(x) {
+  if (startsWith(x, "'")) {
+    m <- regmatches(x, regexec("^'((?:[^']|'')*)'!(.*)$", x))[[1L]]
+    if (length(m) == 3L)
+      return(list(sheet = gsub("''", "'", m[2L], fixed = TRUE), rest = m[3L]))
+    return(list(sheet = NULL, rest = x))
+  }
+  i <- regexpr("!", x, fixed = TRUE)
+  if (i > 0L)
+    return(list(sheet = substr(x, 1L, i - 1L), rest = substring(x, i + 1L)))
+  list(sheet = NULL, rest = x)
+}
+
+# Reject a sheet qualifier where one cannot mean anything.
+.reject_sheet <- function(sheet, arg) {
+  if (is.null(sheet)) return(invisible(NULL))
+  stop(sprintf(paste0("`%s` may not name a sheet (got \"%s!\"): it applies to ",
+                      "the sheet it is on. Drop the sheet name."),
+               arg, sheet), call. = FALSE)
+}
+
 # Resolve any accepted range spelling to 0-based
 # c(first_row, first_col, last_row, last_col).
 #
@@ -213,14 +249,33 @@
 # `header_offset` supply the sheet context needed by the data-frame-relative
 # and whole-column/whole-row forms.  `allow_cell = FALSE` rejects a bare cell
 # reference for arguments documented as taking a rectangle.
+# `allow_sheet = TRUE` accepts a sheet qualifier and returns it as the "sheet"
+# attribute of the quad; otherwise a sheet name is an error.  See the note at
+# the top of this file for why it is opt-in.
 .xl_resolve_range <- function(x, arg = "range", df = NULL, header_offset = 1L,
-                              allow_cell = TRUE) {
-  if (is.list(x) && !is.data.frame(x))
-    return(.resolve_range_spec(x, arg, df, header_offset))
-  if (is.character(x) && length(x) == 1L && !is.na(x))
-    return(.resolve_range_string(x, arg, df, header_offset, allow_cell))
-  stop(sprintf(paste0('`%s` must be an Excel range string like "A1:D51" or a ',
-                      "list(rows = , cols = ) spec"), arg), call. = FALSE)
+                              allow_cell = TRUE, allow_sheet = FALSE) {
+  sheet <- NULL
+  if (is.list(x) && !is.data.frame(x)) {
+    if (!is.null(x[["sheet"]])) {
+      sheet <- x[["sheet"]]
+      if (!is.character(sheet) || length(sheet) != 1L || is.na(sheet))
+        stop(sprintf("`%s$sheet` must be a single sheet name", arg),
+             call. = FALSE)
+      x <- x[setdiff(names(x), "sheet")]
+    }
+    if (!allow_sheet) .reject_sheet(sheet, arg)
+    out <- .resolve_range_spec(x, arg, df, header_offset)
+  } else if (is.character(x) && length(x) == 1L && !is.na(x)) {
+    sp <- .split_sheet_ref(x)
+    sheet <- sp$sheet
+    if (!allow_sheet) .reject_sheet(sheet, arg)
+    out <- .resolve_range_string(sp$rest, arg, df, header_offset, allow_cell)
+  } else {
+    stop(sprintf(paste0('`%s` must be an Excel range string like "A1:D51" or a ',
+                        "list(rows = , cols = ) spec"), arg), call. = FALSE)
+  }
+  if (allow_sheet && !is.null(sheet)) attr(out, "sheet") <- sheet
+  out
 }
 
 # Parse an Excel range ("A1:D51") into 0-based c(first_row, first_col,

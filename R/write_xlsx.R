@@ -28,11 +28,25 @@
 #'   \code{\link{xl_properties}(header_format = )}.
 #' @param use_zip64 use \href{https://en.wikipedia.org/wiki/Zip_(file_format)#ZIP64}{zip64}
 #' to enable support for 4GB+ xlsx files. Not all platforms can read this.
+#' @param constant_memory stream rows to disk instead of building the whole
+#'   workbook in memory. `NA` (the default) decides per workbook: on for large
+#'   data, off for small, and always off when a feature needs it off. `TRUE`
+#'   forces it on for a workbook that would otherwise be judged too small;
+#'   `FALSE` forces it off. Features that cannot be written while streaming ---
+#'   merged ranges, tables, embedded images and multi-cell array formulas ---
+#'   turn it off regardless, with a warning if `TRUE` was asked for, because
+#'   the alternative is a file that opens cleanly and is missing cells.
+#' @param constant_memory_threshold how much extra memory (in bytes) not
+#'   streaming would have to cost before streaming is worth it. Default 128
+#'   MiB. Streaming saves memory but produces slightly larger files, so it is
+#'   not used for workbooks small enough that the saving would not be noticed.
 #' @examples # Roundtrip example with single excel sheet named 'mysheet'
 #' tmp <- write_xlsx(list(mysheet = iris))
 #' readxl::read_xlsx(tmp)
 write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
-                       format_headers = TRUE, use_zip64 = FALSE){
+                       format_headers = TRUE, use_zip64 = FALSE,
+                       constant_memory = NA,
+                       constant_memory_threshold = 128 * 1024^2){
   # Resolve the input to an xl_workbook.  A bare data frame / xl_sheet / list
   # is wrapped in a workbook with default properties; an explicit xl_workbook
   # overrides col_names/format_headers.
@@ -77,7 +91,9 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
   # Ordering matters to libxlsxwriter's drawing numbering, so this spans the
   # whole workbook rather than any one sheet
   .check_drawing_order(sheets, names(dfs))
-  cm <- .resolve_constant_memory(dfs, props, sheets)
+  cm <- .resolve_constant_memory(dfs, props, sheets, constant_memory,
+                                 constant_memory_threshold)
+  if (!is.null(cm$note)) message(cm$note)
   ret <- .Call(C_write_data_frame_list, dfs, path, col_names, format_headers,
                use_zip64, reg$table, sheets, header_id,
                .properties_payload(props, cm$on))

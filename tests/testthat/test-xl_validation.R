@@ -256,8 +256,13 @@ test_that("validation does not disturb the cells or need streaming off", {
   p <- write_tmp(list(D = xl_sheet(df,
     validation = xl_validation("A2:A4", type = "integer", min = 1, max = 10))))
   expect_equal(as.data.frame(readxl::read_xlsx(p)), df)
-  # validations are written at packaging time, so row streaming stays on
-  expect_true(is.null(xlsx_part(p, "xl/sharedStrings.xml")))
+  # validations are written at packaging time, so row streaming stays on when
+  # it is asked for -- a frame this small would not stream on size alone
+  expect_true(is.null(xlsx_part(
+    write_tmp(list(D = xl_sheet(df, validation = xl_validation(
+      "A2:A4", type = "integer", min = 1, max = 10))),
+      constant_memory = TRUE),
+    "xl/sharedStrings.xml")))
 })
 
 test_that("the print method runs", {

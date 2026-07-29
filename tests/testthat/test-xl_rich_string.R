@@ -3,10 +3,13 @@
 sheet_xml <- function(path) xlsx_part(path, "xl/worksheets/sheet1.xml", raw = TRUE)
 
 # A one-cell sheet whose column B holds the given rich string.
+# constant_memory = TRUE throughout: these tests are about the inline-string
+# form used while streaming, which a frame this small would not otherwise get
+# (row streaming is only chosen when it would save enough memory to matter).
 rich_sheet <- function(rs, ...) {
   df <- data.frame(x = 1L)
   df$r <- xl_cell_general(value = rs, ...)
-  write_tmp(df)
+  write_tmp(df, constant_memory = TRUE)
 }
 
 # ── xl_rich_run() ─────────────────────────────────────────────────────────────

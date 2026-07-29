@@ -187,7 +187,30 @@ print.xl_workbook <- function(x, ...) {
 # Resolve the constant-memory flag for a workbook, from the sheets it is about
 # to write.  Returns the C-side integer flag plus the reasons (if any) the mode
 # had to be turned off.
-.resolve_constant_memory <- function(dfs, props, sheets = NULL) {
+# The extra memory libxlsxwriter uses per cell when it is NOT streaming, in
+# bytes.  Measured against nycflights13 at several sizes and column mixes: 37
+# B/cell for highly repetitive text (the shared-string table deduplicates it)
+# rising to 112 for mixed columns at ~10M cells.  The high end is used, so the
+# estimate errs towards keeping streaming on -- which at scale is also the
+# faster path, not just the leaner one.
+.CM_BYTES_PER_CELL <- 110
+
+# Decide whether to stream rows to disk.
+#
+#   1. constant_memory = FALSE  -> off, without even looking at the rest.
+#   2. a blacklisted feature    -> off.  Nothing overrides this: each of these
+#      either fails outright under streaming or, for a multi-cell array range,
+#      writes a file that opens cleanly and is quietly missing cells.
+#   3. constant_memory = TRUE   -> on, overriding the size estimate.
+#   4. estimated extra memory below `threshold` -> off.  Streaming only pays
+#      for itself on large data, and not streaming also yields a smaller file,
+#      since repeated strings are shared rather than written inline.
+#   5. otherwise -> on.
+.resolve_constant_memory <- function(dfs, props, sheets = NULL, request = NA,
+                                     threshold = 128 * 1024^2) {
+  request <- .val_flag(request, "constant_memory")
+  if (identical(request, FALSE))
+    return(list(on = 0L, reasons = "constant_memory = FALSE", note = NULL))
   reasons <- character(0)
   # A multi-cell array formula range is padded by libxlsxwriter, and it skips
   # that padding entirely when row streaming is on -- silently, returning
@@ -228,7 +251,33 @@ print.xl_workbook <- function(x, ...) {
     reasons <- c(reasons, sprintf(
       paste0("%d embedded image(s): an embedded image writes a cell, which ",
              "row streaming does not allow above the current row"), n_embed))
-  list(on = as.integer(!length(reasons)), reasons = reasons)
+  # Cells are counted across the whole workbook: libxlsxwriter holds every
+  # sheet's cell table until the file is closed, not one sheet at a time.
+  cells <- sum(vapply(dfs, function(df)
+    as.numeric(nrow(df)) * as.numeric(ncol(df)), numeric(1)))
+  est <- cells * .CM_BYTES_PER_CELL
+
+  if (length(reasons)) {
+    if (isTRUE(request))
+      warning("`constant_memory = TRUE` cannot be honoured: ", reasons[1L],
+              ". Row streaming is off.", call. = FALSE)
+    # The suggestion: only worth making when streaming would have saved enough
+    # to notice.  Below that there is nothing for the reader to act on.
+    note <- if (est >= threshold)
+      sprintf(paste0("Row streaming is off because of %s. This workbook is ",
+                     "estimated to use about %.0f MB more memory as a result."),
+              reasons[1L], est / 1024^2)
+    else NULL
+    return(list(on = 0L, reasons = reasons, note = note))
+  }
+  if (isTRUE(request))
+    return(list(on = 1L, reasons = character(0), note = NULL))
+  if (est < threshold)
+    return(list(on = 0L, note = NULL, reasons = sprintf(
+      paste0("an estimated %.0f MB of extra memory, below the %.0f MB ",
+             "threshold at which row streaming starts to pay"),
+      est / 1024^2, threshold / 1024^2)))
+  list(on = 1L, reasons = character(0), note = NULL)
 }
 
 # Break a Date/POSIXct out into the fields lxw_datetime carries.  The value has

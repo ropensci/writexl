@@ -151,8 +151,12 @@ test_that("de-hardcoded defaults match the previous behavior (regression)", {
 
 # --- constant memory --------------------------------------------------------
 
-test_that("constant memory resolves to on", {
-  cm <- .resolve_constant_memory(list(data.frame(a = 1)), xl_properties())
+test_that("constant memory is off for small data, on when asked for", {
+  # a one-cell frame saves nothing by streaming, so the default is off; the
+  # request is what separates "nothing forbids it" from "it is worth it"
+  small <- list(data.frame(a = 1))
+  expect_equal(.resolve_constant_memory(small, xl_properties())$on, 0L)
+  cm <- .resolve_constant_memory(small, xl_properties(), request = TRUE)
   expect_equal(cm$on, 1L)
   expect_equal(cm$reasons, character(0))
   expect_equal(.properties_payload(xl_properties())$constant_memory, 1L)
@@ -166,7 +170,8 @@ test_that("workbooks write the same content with constant memory on and off", {
                    flag = c(TRUE, FALSE, NA),
                    when = as.Date("2020-01-01") + 0:2,
                    stringsAsFactors = FALSE)
-  on_path <- write_tmp(list(D = xl_sheet(df, autofilter = TRUE, freeze = "A2")))
+  on_path <- write_tmp(list(D = xl_sheet(df, autofilter = TRUE, freeze = "A2")),
+                       constant_memory = TRUE)
   # No feature writexl writes today turns the mode off, so drive the off path by
   # mocking the resolver.  It must stay exercised: the C side and libxlsxwriter
   # behave differently with row streaming disabled, and a phase that needs the
@@ -275,4 +280,62 @@ test_that("the other custom property types are unaffected", {
   expect_match(cust, "9.5")
   expect_match(cust, "<vt:bool>true")
   expect_match(cust, "<vt:filetime>2020-01-02T00:00:00Z", fixed = TRUE)
+})
+
+test_that("the constant_memory decision follows its five rules in order", {
+  small <- list(data.frame(a = 1:5))
+  # ~1.4M cells, comfortably past the default threshold at 110 B/cell
+  big <- list(data.frame(matrix(1, nrow = 130000, ncol = 12)))
+  blocked <- list(list(merges = list(1)))
+  clear <- list(list(merges = NULL))
+
+  # 1. FALSE wins outright, without consulting anything else
+  expect_equal(.resolve_constant_memory(big, list(), blocked, FALSE)$on, 0L)
+  expect_match(.resolve_constant_memory(big, list(), blocked, FALSE)$reasons,
+               "constant_memory = FALSE")
+
+  # 2. the blacklist is absolute -- TRUE cannot override it, only be told
+  expect_equal(.resolve_constant_memory(big, list(), blocked)$on, 0L)
+  expect_warning(r <- .resolve_constant_memory(big, list(), blocked, TRUE),
+                 "cannot be honoured")
+  expect_equal(r$on, 0L)
+
+  # 3. TRUE overrides the size estimate
+  expect_equal(.resolve_constant_memory(small, list(), clear, TRUE)$on, 1L)
+
+  # 4. size decides when nothing else does
+  expect_equal(.resolve_constant_memory(small, list(), clear)$on, 0L)
+  expect_match(.resolve_constant_memory(small, list(), clear)$reasons,
+               "below the .* threshold")
+  expect_equal(.resolve_constant_memory(big, list(), clear)$on, 1L)
+  # ... and the threshold is what moves that line
+  expect_equal(.resolve_constant_memory(big, list(), clear, NA,
+                                        threshold = 4 * 1024^3)$on, 0L)
+})
+
+test_that("cells are counted across the whole workbook", {
+  # libxlsxwriter holds every sheet's cell table until close, so two sheets of
+  # half the size must decide the same way as one of the full size
+  half <- data.frame(matrix(1, nrow = 65000, ncol = 12))
+  clear <- list(list(merges = NULL))
+  expect_equal(.resolve_constant_memory(list(half), list(), clear)$on, 0L)
+  expect_equal(.resolve_constant_memory(list(half, half), list(), clear)$on, 1L)
+})
+
+test_that("the suggestion appears only when streaming would have mattered", {
+  small <- list(data.frame(a = 1:5))
+  big <- list(data.frame(matrix(1, nrow = 130000, ncol = 12)))
+  blocked <- list(list(merges = list(1)))
+  # a small workbook blocked by a feature has nothing to act on
+  expect_null(.resolve_constant_memory(small, list(), blocked)$note)
+  # a large one is told what it cost, and why
+  note <- .resolve_constant_memory(big, list(), blocked)$note
+  expect_match(note, "merged range")
+  expect_match(note, "MB more memory")
+})
+
+test_that("an invalid constant_memory request is refused", {
+  expect_error(.resolve_constant_memory(list(data.frame(a = 1)), list(), NULL,
+                                        "yes"),
+               "must be a single logical")
 })
