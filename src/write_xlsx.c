@@ -592,6 +592,114 @@ static int chart_range_of(SEXP p, const char *key, int *out){
   return 1;
 }
 
+/* Apply one axis payload.  Everything the chart type forbids was refused in R,
+   so anything present here is legal for this axis. */
+static void apply_axis(lxw_chart_axis *axis, SEXP a){
+  int has;
+  lxw_chart_line line;
+  lxw_chart_fill fill;
+  lxw_chart_pattern pat;
+  lxw_chart_font font;
+  int r[4];
+
+  if(a == R_NilValue || !Rf_isVectorList(a)) return;
+
+  if(payload_has(a, "name"))
+    chart_axis_set_name(axis, payload_str(a, "name"));
+  else if(chart_range_of(a, "name_range", r))
+    chart_axis_set_name_range(axis, payload_str(a, "name_sheet"),
+                              (lxw_row_t) r[0], (lxw_col_t) r[1]);
+
+  font = chart_font_of(list_get(a, "name_font"), &has);
+  if(has) chart_axis_set_name_font(axis, &font);
+  font = chart_font_of(list_get(a, "num_font"), &has);
+  if(has) chart_axis_set_num_font(axis, &font);
+  if(payload_has(a, "num_format"))
+    chart_axis_set_num_format(axis, payload_str(a, "num_format"));
+
+  if(payload_has(a, "name_x")){
+    lxw_chart_layout lay;
+    memset(&lay, 0, sizeof(lay));
+    lay.x = payload_dbl(a, "name_x");
+    lay.y = payload_dbl(a, "name_y");
+    chart_axis_set_name_layout(axis, &lay);
+  }
+
+  line = chart_line_of(a, &has);
+  if(has) chart_axis_set_line(axis, &line);
+  fill = chart_fill_of(a, &has);
+  if(has) chart_axis_set_fill(axis, &fill);
+  pat = chart_pattern_of(a, &has);
+  if(has) chart_axis_set_pattern(axis, &pat);
+
+  if(payload_has(a, "off"))     chart_axis_off(axis);
+  if(payload_has(a, "reverse")) chart_axis_set_reverse(axis);
+
+  if(payload_has(a, "min")) chart_axis_set_min(axis, payload_dbl(a, "min"));
+  if(payload_has(a, "max")) chart_axis_set_max(axis, payload_dbl(a, "max"));
+  if(payload_has(a, "log_base"))
+    chart_axis_set_log_base(axis, (uint16_t) payload_int(a, "log_base"));
+  if(payload_has(a, "major_unit"))
+    chart_axis_set_major_unit(axis, payload_dbl(a, "major_unit"));
+  if(payload_has(a, "minor_unit"))
+    chart_axis_set_minor_unit(axis, payload_dbl(a, "minor_unit"));
+  if(payload_has(a, "interval_unit"))
+    chart_axis_set_interval_unit(axis, (uint16_t) payload_int(a, "interval_unit"));
+  if(payload_has(a, "interval_tick"))
+    chart_axis_set_interval_tick(axis, (uint16_t) payload_int(a, "interval_tick"));
+  if(payload_has(a, "display_units"))
+    chart_axis_set_display_units(axis, (uint8_t) payload_int(a, "display_units"));
+  if(payload_has(a, "display_units_visible"))
+    chart_axis_set_display_units_visible(
+      axis, payload_int(a, "display_units_visible") ? LXW_TRUE : LXW_FALSE);
+
+  if(payload_has(a, "position"))
+    chart_axis_set_position(axis, (uint8_t) payload_int(a, "position"));
+  if(payload_has(a, "label_position"))
+    chart_axis_set_label_position(axis, (uint8_t) payload_int(a, "label_position"));
+  if(payload_has(a, "label_align"))
+    chart_axis_set_label_align(axis, (uint8_t) payload_int(a, "label_align"));
+  if(payload_has(a, "major_tick"))
+    chart_axis_set_major_tick_mark(axis, (uint8_t) payload_int(a, "major_tick"));
+  if(payload_has(a, "minor_tick"))
+    chart_axis_set_minor_tick_mark(axis, (uint8_t) payload_int(a, "minor_tick"));
+
+  if(payload_has(a, "crossing_min"))      chart_axis_set_crossing_min(axis);
+  else if(payload_has(a, "crossing_max")) chart_axis_set_crossing_max(axis);
+  else if(payload_has(a, "crossing"))
+    chart_axis_set_crossing(axis, payload_dbl(a, "crossing"));
+
+  if(payload_has(a, "major_gridlines"))
+    chart_axis_major_gridlines_set_visible(
+      axis, payload_int(a, "major_gridlines") ? LXW_TRUE : LXW_FALSE);
+  if(payload_has(a, "minor_gridlines"))
+    chart_axis_minor_gridlines_set_visible(
+      axis, payload_int(a, "minor_gridlines") ? LXW_TRUE : LXW_FALSE);
+  {
+    /* a gridline is a line of its own, keyed separately from the axis line */
+    SEXP g = list_get(a, "major_gridlines_line");
+    if(g != R_NilValue && Rf_isVectorList(g)){
+      lxw_chart_line gl;
+      memset(&gl, 0, sizeof(gl));
+      if(payload_has(g, "color"))        gl.color = (lxw_color_t) payload_int(g, "color");
+      if(payload_has(g, "none"))         gl.none = 1;
+      if(payload_has(g, "dash_type"))    gl.dash_type = (uint8_t) payload_int(g, "dash_type");
+      if(payload_has(g, "transparency")) gl.transparency = (uint8_t) payload_int(g, "transparency");
+      chart_axis_major_gridlines_set_line(axis, &gl);
+    }
+    g = list_get(a, "minor_gridlines_line");
+    if(g != R_NilValue && Rf_isVectorList(g)){
+      lxw_chart_line gl;
+      memset(&gl, 0, sizeof(gl));
+      if(payload_has(g, "color"))        gl.color = (lxw_color_t) payload_int(g, "color");
+      if(payload_has(g, "none"))         gl.none = 1;
+      if(payload_has(g, "dash_type"))    gl.dash_type = (uint8_t) payload_int(g, "dash_type");
+      if(payload_has(g, "transparency")) gl.transparency = (uint8_t) payload_int(g, "transparency");
+      chart_axis_minor_gridlines_set_line(axis, &gl);
+    }
+  }
+}
+
 static void apply_charts(cell_write_ctx *ctx, SEXP opts){
   SEXP cs = list_get(opts, "charts");
   if(cs == R_NilValue || !Rf_isVectorList(cs)) return;
@@ -647,6 +755,9 @@ static void apply_charts(cell_write_ctx *ctx, SEXP opts){
 
     if(payload_has(c, "style"))
       chart_set_style(chart, (uint8_t) payload_int(c, "style"));
+
+    apply_axis(chart->x_axis, list_get(c, "x_axis"));
+    apply_axis(chart->y_axis, list_get(c, "y_axis"));
 
     lxw_chart_options o;
     memset(&o, 0, sizeof(o));

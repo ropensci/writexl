@@ -63,6 +63,7 @@ xl_chart_series(values = "Data!B2:B10", categories = "Data!A2:A10",
 
 Other images and charts:
 \code{\link[=xl_chart]{xl_chart()}},
+\code{\link[=xl_chart_axis]{xl_chart_axis()}},
 \code{\link[=xl_image]{xl_image()}}
 }
 \concept{images and charts}

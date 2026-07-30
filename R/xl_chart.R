@@ -229,6 +229,9 @@ print.xl_chart_series <- function(x, ...) {
 #'   Excel would otherwise generate.
 #' @param title_format An [xl_format()] styling the title text.  A title is
 #'   text, so only the [xl_font()] group applies.
+#' @param x_axis,y_axis An [xl_chart_axis()] describing that axis.  Pie and
+#'   doughnut charts have none, and several axis options apply to a value or a
+#'   category axis only --- see [xl_chart_axis()].
 #' @param at The cell the chart's top-left corner is anchored to.
 #' @param scale Scale factor: one number for both axes, or `c(x, y)`.
 #' @param offset Offset from the anchor cell's corner in pixels, as `c(x, y)`.
@@ -245,6 +248,7 @@ print.xl_chart_series <- function(x, ...) {
 #' xl_chart("column", xl_chart_series(values = list(cols = "revenue")))
 #' xl_chart("pie", xl_chart_series(values = "Data!B2:B5"), title = "Share")
 xl_chart <- function(type, series, title = NULL, title_format = NULL,
+                     x_axis = NULL, y_axis = NULL,
                      at = "A1", scale = 1,
                      offset = NULL, position = "move_and_size",
                      description = NULL, decorative = FALSE, style = NA) {
@@ -257,6 +261,8 @@ xl_chart <- function(type, series, title = NULL, title_format = NULL,
   ss <- .chart_series_list(series)
   if (!length(ss))
     stop("a chart needs at least one series", call. = FALSE)
+  .check_axis(x_axis, "x", ty, "x_axis")
+  .check_axis(y_axis, "y", ty, "y_axis")
 
   for (i in seq_along(ss)) {
     p <- unclass(ss[[i]])
@@ -312,7 +318,7 @@ xl_chart <- function(type, series, title = NULL, title_format = NULL,
   }
 
   structure(.drop_null(list(
-    type = ty, series = ss, title = ttl,
+    type = ty, series = ss, title = ttl, x_axis = x_axis, y_axis = y_axis,
     at = at, scale = sc, offset = pair(offset, "offset", "of pixels as c(x, y)"),
     position = .val_enum(position, names(.LXW_OBJECT_POSITION), "position"),
     description = if (is.null(description)) NULL else {
@@ -439,6 +445,11 @@ print.xl_chart <- function(x, ...) {
         ent$title_range <- r$range
       }
     }
+
+    ent$x_axis <- .axis_payload(p[["x_axis"]], sprintf("chart[[%d]] x_axis", i),
+                                sheets, own, header_offset)
+    ent$y_axis <- .axis_payload(p[["y_axis"]], sprintf("chart[[%d]] y_axis", i),
+                                sheets, own, header_offset)
 
     ent$series <- lapply(seq_along(p[["series"]]), function(k) {
       q <- unclass(p[["series"]][[k]])

@@ -9,6 +9,8 @@ xl_chart(
   series,
   title = NULL,
   title_format = NULL,
+  x_axis = NULL,
+  y_axis = NULL,
   at = "A1",
   scale = 1,
   offset = NULL,
@@ -34,6 +36,10 @@ Excel would otherwise generate.}
 
 \item{title_format}{An [xl_format()] styling the title text.  A title is
 text, so only the [xl_font()] group applies.}
+
+\item{x_axis, y_axis}{An [xl_chart_axis()] describing that axis.  Pie and
+doughnut charts have none, and several axis options apply to a value or a
+category axis only --- see [xl_chart_axis()].}
 
 \item{at}{The cell the chart's top-left corner is anchored to.}
 
@@ -79,6 +85,7 @@ xl_chart("pie", xl_chart_series(values = "Data!B2:B5"), title = "Share")
 [xl_chart_series], [xl_sheet]
 
 Other images and charts:
+\code{\link[=xl_chart_axis]{xl_chart_axis()}},
 \code{\link[=xl_chart_series]{xl_chart_series()}},
 \code{\link[=xl_image]{xl_image()}}
 }

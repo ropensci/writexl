@@ -101,6 +101,25 @@
   chart line has no width for, format groups no chart shape has, a font on a
   series (a series is a shape, not text), and a fill or border on a title.
 
+  **Axes** via `xl_chart(x_axis =, y_axis =)` and `xl_chart_axis()`, covering
+  all 32 of libxlsxwriter's axis functions: the axis title and its font, tick
+  labels and their number format and font, bounds, log scale, major and minor
+  units and tick marks, tick-label position and alignment, category intervals,
+  crossing, reversal, display units, gridlines and their styling, the axis line
+  itself, and hiding the axis.
+
+  Options that apply to one *kind* of axis are refused on the other, since
+  Excel discards them silently. A scatter chart plots numbers against numbers,
+  so both its axes are value axes; every other type has a category x axis and a
+  value y axis, bar charts included --- Excel draws their categories up the
+  side, but the axes keep their names. So `min`, `max`, `log_base`,
+  `major_unit`, `minor_unit` and the display units are value-axis only, and
+  `position`, `label_align`, `interval_unit` and `interval_tick` are
+  category-axis only. Pie and doughnut charts have no axes at all. A test reads
+  the applicability out of the bundled `chart.h` and checks every function is
+  reached, so a function added upstream shows up as a failure rather than as a
+  gap.
+
   Features that apply to only some chart types --- the doughnut hole, pie
   rotation, up-down bars, high-low lines, the series gap and overlap, smoothing
   --- are checked against the chart's type, because Excel discards them without

@@ -37,6 +37,7 @@ dropdown's
 dropdowns
 flavours
 grDevices
+gridline
 gridlines
 honour
 libxlsxwriter
@@ -58,7 +59,9 @@ rtl
 scrollable
 specialised
 str
+styleable
 tempdir
+th
 unformatted
 uniques
 unstyled

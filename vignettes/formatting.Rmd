@@ -860,6 +860,42 @@ the font to attach to.
 
 `style` selects one of Excel's 48 built-in chart styles.
 
+### Axes
+
+`xl_chart_axis()` describes an axis, and covers everything libxlsxwriter can
+set on one — the title, tick labels and their number format, bounds, a log
+scale, tick marks and their spacing, gridlines, and the axis line itself. An
+axis has four styleable parts, so each format argument names the part it
+styles — `name_format`, `label_format`, `line_format`, and the two gridline
+ones:
+
+```{r}
+xl_chart("column", xl_chart_series(values = list(cols = "revenue")),
+         x_axis = xl_chart_axis(name = "Quarter", major_tick = "none"),
+         y_axis = xl_chart_axis(name = "Revenue", min = 0,
+                                num_format = "$#,##0",
+                                major_gridlines_format =
+                                  xl_border(all = "dotted", color = "gray")))
+```
+
+There are two kinds of axis, and several options belong to one of them. A
+**scatter** chart plots numbers against numbers, so both of its axes are value
+axes; every other type has a **category** x axis and a value y axis — bar
+charts included, since Excel draws their categories up the side but does not
+rename the axes.
+
+| | value axes | category axes |
+|---|---|---|
+| | `min`, `max`, `log_base`, `major_unit`, `minor_unit`, `display_units`, `display_units_visible` | `position`, `label_align`, `interval_unit`, `interval_tick` |
+
+Everything else applies to both. Setting a minimum on a category axis is
+accepted by Excel and then ignored, so writexl refuses it and names the axis
+that would work. Pie and doughnut charts have no axes at all.
+
+`visible = FALSE` hides an axis, `label_position = "none"` keeps the axis but
+drops its labels, and styling a gridline switches it on — a styled gridline
+that stays hidden is not something anyone means.
+
 ### Features that belong to some types only
 
 Excel discards a setting the chart type does not have without saying so, so

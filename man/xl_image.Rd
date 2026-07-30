@@ -98,6 +98,7 @@ if (nzchar(logo)) {
 
 Other images and charts:
 \code{\link[=xl_chart]{xl_chart()}},
+\code{\link[=xl_chart_axis]{xl_chart_axis()}},
 \code{\link[=xl_chart_series]{xl_chart_series()}}
 }
 \concept{images and charts}
