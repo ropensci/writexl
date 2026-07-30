@@ -53,7 +53,7 @@ string (`"#,##0"`) or an [xl_num_format()].}
 
 \item{line_format}{An [xl_format()] styling the axis line itself:
 [xl_border()] for the line, [xl_fill()] for the fill behind it.  An axis
-has four styleable parts, so none of them is just `format`.}
+has four parts that can be styled, so none of them is just `format`.}
 
 \item{visible}{`FALSE` hides the axis.}
 
@@ -73,10 +73,10 @@ Value axes only.}
 \item{display_units_visible}{Show the units caption Excel adds alongside
 `display_units`.  Value axes only.}
 
-\item{interval_unit}{Label every *n*th category.  Category axes only.}
+\item{interval_unit}{Label one category in every `n`.  Category axes only.}
 
-\item{interval_tick}{Put a tick mark on every *n*th category.  Category axes
-only.}
+\item{interval_tick}{Put a tick mark on one category in every `n`.
+Category axes only.}
 
 \item{position}{Whether the data sits `"on_tick"` or `"between"` the tick
 marks.  Category axes only.}

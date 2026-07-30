@@ -112,7 +112,7 @@
 #'   string (`"#,##0"`) or an [xl_num_format()].
 #' @param line_format An [xl_format()] styling the axis line itself:
 #'   [xl_border()] for the line, [xl_fill()] for the fill behind it.  An axis
-#'   has four styleable parts, so none of them is just `format`.
+#'   has four parts that can be styled, so none of them is just `format`.
 #' @param visible `FALSE` hides the axis.
 #' @param reverse Draw the axis in the opposite direction.
 #' @param min,max The axis bounds.  Value axes only.
@@ -124,9 +124,9 @@
 #'   `"billions"` and so on; see Details for the full set.  Value axes only.
 #' @param display_units_visible Show the units caption Excel adds alongside
 #'   `display_units`.  Value axes only.
-#' @param interval_unit Label every *n*th category.  Category axes only.
-#' @param interval_tick Put a tick mark on every *n*th category.  Category axes
-#'   only.
+#' @param interval_unit Label one category in every `n`.  Category axes only.
+#' @param interval_tick Put a tick mark on one category in every `n`.
+#'   Category axes only.
 #' @param position Whether the data sits `"on_tick"` or `"between"` the tick
 #'   marks.  Category axes only.
 #' @param label_position Where the tick labels go: `"next_to"`, `"high"`,

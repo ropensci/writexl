@@ -865,8 +865,8 @@ the font to attach to.
 `xl_chart_axis()` describes an axis, and covers everything libxlsxwriter can
 set on one — the title, tick labels and their number format, bounds, a log
 scale, tick marks and their spacing, gridlines, and the axis line itself. An
-axis has four styleable parts, so each format argument names the part it
-styles — `name_format`, `label_format`, `line_format`, and the two gridline
+axis has four parts that can be styled, so each format argument names the part
+it styles — `name_format`, `label_format`, `line_format`, and the two gridline
 ones:
 
 ```{r}

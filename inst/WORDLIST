@@ -28,8 +28,7 @@ clippy
 colour
 colours
 colrow
-colwidth
-cond
+colwidcond
 dev
 dont
 dropdown
@@ -59,9 +58,7 @@ rtl
 scrollable
 specialised
 str
-styleable
 tempdir
-th
 unformatted
 uniques
 unstyled
