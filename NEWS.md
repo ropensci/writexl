@@ -84,9 +84,11 @@
   name either as an A1 range (`"Data!B2:B10"`) or by column
   (`list(cols = "revenue")`), so a range follows the data when rows are added
   or a header is written; a range may name another sheet, and one that reaches
-  past the data is refused rather than plotted as blanks. Placement uses the
-  same vocabulary as an image (`at`, `scale`, `offset`, `position`,
-  `description`, `decorative`).
+  past the data is refused rather than plotted as blanks. A series name and a
+  chart title are always literal text unless given as a spec, and
+  `list(header = "revenue")` names the header cell a series is usually called
+  after. Placement uses the same vocabulary as an image (`at`, `scale`,
+  `offset`, `position`, `description`, `decorative`).
 
   Series and titles are styled with the ordinary `xl_format()` groups:
   `xl_border()` becomes the line, `xl_fill()` the fill or pattern, and

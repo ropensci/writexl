@@ -781,6 +781,23 @@ so adding a row or reordering the columns does not silently plot the wrong
 thing. `rows` narrows it: `list(cols = "revenue", rows = 1:2)` is the first two
 data rows.
 
+A series name and a chart title are the exception to the A1 form: a string there
+is always taken **literally**, because a series may legitimately be called
+`"Q1!"`. To take one from a cell, give a spec. `rows` counts *data* rows, so
+the header — where a column's label actually lives — has its own spelling:
+
+```{r}
+xl_chart("column",
+         xl_chart_series(values = list(cols = "revenue"),
+                         name = list(header = "revenue")),
+         title = list(header = "quarter"))
+```
+
+`list(header = )` names one column's header cell and stands alone; it takes an
+optional `sheet` like any other spec. On a workbook written with
+`col_names = FALSE` there is no such cell, and saying so is better than plotting
+the first data row as a label.
+
 Either form may name another sheet, which is how a chart gets a sheet to itself:
 
 ```{r}

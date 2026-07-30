@@ -26,8 +26,11 @@ percent-stacked, smoothed and marker variants.}
 \item{series}{One [xl_chart_series()], or a list of them.  Every series of a
 scatter chart must have `categories`, which are its x axis.}
 
-\item{title}{The chart title: a string, or a range holding one.  `FALSE`
-removes the title Excel would otherwise generate.}
+\item{title}{The chart title.  A string is always taken literally, so to
+take the title from a cell give a range spec ---
+`list(header = "revenue")` for a column's header cell, or
+`list(rows = 1, cols = 1)` for a data cell.  `FALSE` removes the title
+Excel would otherwise generate.}
 
 \item{title_format}{An [xl_format()] styling the title text.  A title is
 text, so only the [xl_font()] group applies.}

@@ -21,8 +21,9 @@ for a chart that numbers its points.}
 
 \item{name}{The series name, shown in the legend.  A string is always taken
 literally --- a series may legitimately be called `"Q1!"` --- so to take
-the name from a cell, give a range spec:
-`name = list(sheet = "Data", rows = 1, cols = 1)`.}
+the name from a cell, give a range spec: `name = list(header = "revenue")`
+for the column's own header, or `name = list(rows = 1, cols = 1)` for a
+data cell.}
 
 \item{format}{An [xl_format] styling the series --- its line and fill.  See
 [xl_chart()] for which format properties a chart can express.}
@@ -43,7 +44,9 @@ optional `sheet`:
 
 * `"Data!B2:B10"` --- an A1 range, sheet-qualified;
 * `list(cols = "revenue")` --- resolved against the chart's own sheet;
-* `list(sheet = "Data", cols = "revenue")` --- against another sheet.
+* `list(sheet = "Data", cols = "revenue")` --- against another sheet;
+* `list(header = "revenue")` --- that column's header cell, which is where
+  a series name usually lives.
 
 A range that selects no data is an error rather than an empty chart.
 }

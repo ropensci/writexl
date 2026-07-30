@@ -513,3 +513,49 @@ test_that("a series format may not set a font", {
                                format = xl_font(bold = TRUE)),
                "a shape and has no text")
 })
+
+# ── The header cell ───────────────────────────────────────────────────────────
+
+test_that("a name or title may come from a column's header cell", {
+  # the header is where a series name usually lives, and `rows` cannot reach it
+  # -- rows count data rows, so row 1 is the first row *under* the header
+  r <- cfile(chart = xl_chart("column",
+                              xl_chart_series(values = list(cols = "qty"),
+                                              name = list(header = "qty")),
+                              title = list(header = "fruit")))
+  expect_match(r$chart, "<c:f>Data!$B$1</c:f>", fixed = TRUE)
+  expect_match(r$chart, "<c:f>Data!$A$1</c:f>", fixed = TRUE)
+})
+
+test_that("a header cell may name its column by position, and another sheet", {
+  p <- chart_plan(list(
+    Chart = xl_sheet(data.frame(z = 1),
+                     chart = xl_chart("pie",
+                       xl_chart_series(values = list(sheet = "Data",
+                                                     cols = "qty"),
+                                       name = list(sheet = "Data",
+                                                   header = 2)))),
+    Data = crange_sales), sheet = "Chart")
+  nm <- p[[1L]]$series[[1L]]
+  expect_equal(nm$name_sheet, "Data")
+  # 0-based: the header row is 0, and column 2 is index 1
+  expect_equal(nm$name_range, c(0L, 1L, 0L, 1L))
+})
+
+test_that("a header spec stands alone, and needs a header row to exist", {
+  expect_error(xl_chart_series(values = "A1:A5",
+                               name = list(header = "qty", rows = 1)),
+               "stands alone")
+  expect_error(xl_chart_series(values = "A1:A5",
+                               name = list(header = c("a", "b"))),
+               "must name a single column")
+  # written without headers there is no such cell, and saying so beats
+  # silently plotting the first data row as the name
+  expect_error(
+    write_tmp(list(Data = xl_sheet(crange_sales,
+                                   chart = xl_chart("column",
+                                     xl_chart_series(values = list(cols = "qty"),
+                                                     name = list(header = "qty"))))),
+              col_names = FALSE),
+    "written without headers")
+})

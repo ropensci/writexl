@@ -95,10 +95,23 @@
       stop(sprintf(paste0("`%s` list must be named, e.g. ",
                           "list(sheet = \"Data\", cols = \"revenue\")"), arg),
            call. = FALSE)
-    unknown <- setdiff(nms, c("sheet", "rows", "cols"))
+    unknown <- setdiff(nms, c("sheet", "rows", "cols", "header"))
     if (length(unknown))
       stop(sprintf("unknown `%s` element(s): %s", arg,
                    paste(unknown, collapse = ", ")), call. = FALSE)
+    # `header` names one column's header cell.  It is its own element rather
+    # than `rows = 0` because `rows` counts data rows everywhere else in
+    # writexl, and because a sheet written without headers has no such cell at
+    # all -- which .resolve_chart_range() can then say plainly.
+    if (!is.null(x[["header"]])) {
+      if (!is.null(x[["rows"]]) || !is.null(x[["cols"]]))
+        stop(sprintf(paste0("`%s` gives `header` as well as rows/cols; ",
+                            "`header` is the header cell of one column, so it ",
+                            "stands alone."), arg), call. = FALSE)
+      if (length(x[["header"]]) != 1L || anyNA(x[["header"]]))
+        stop(sprintf("`%s$header` must name a single column", arg),
+             call. = FALSE)
+    }
     sheet <- x[["sheet"]]
     if (!is.null(sheet) &&
         (!is.character(sheet) || length(sheet) != 1L || is.na(sheet)))
@@ -121,7 +134,9 @@
 #'
 #' * `"Data!B2:B10"` --- an A1 range, sheet-qualified;
 #' * `list(cols = "revenue")` --- resolved against the chart's own sheet;
-#' * `list(sheet = "Data", cols = "revenue")` --- against another sheet.
+#' * `list(sheet = "Data", cols = "revenue")` --- against another sheet;
+#' * `list(header = "revenue")` --- that column's header cell, which is where
+#'   a series name usually lives.
 #'
 #' A range that selects no data is an error rather than an empty chart.
 #'
@@ -130,8 +145,9 @@
 #'   for a chart that numbers its points.
 #' @param name The series name, shown in the legend.  A string is always taken
 #'   literally --- a series may legitimately be called `"Q1!"` --- so to take
-#'   the name from a cell, give a range spec:
-#'   `name = list(sheet = "Data", rows = 1, cols = 1)`.
+#'   the name from a cell, give a range spec: `name = list(header = "revenue")`
+#'   for the column's own header, or `name = list(rows = 1, cols = 1)` for a
+#'   data cell.
 #' @param format An [xl_format] styling the series --- its line and fill.  See
 #'   [xl_chart()] for which format properties a chart can express.
 #' @param smooth Draw the line smoothed.  Line and scatter charts only.
@@ -202,8 +218,11 @@ print.xl_chart_series <- function(x, ...) {
 #'   percent-stacked, smoothed and marker variants.
 #' @param series One [xl_chart_series()], or a list of them.  Every series of a
 #'   scatter chart must have `categories`, which are its x axis.
-#' @param title The chart title: a string, or a range holding one.  `FALSE`
-#'   removes the title Excel would otherwise generate.
+#' @param title The chart title.  A string is always taken literally, so to
+#'   take the title from a cell give a range spec ---
+#'   `list(header = "revenue")` for a column's header cell, or
+#'   `list(rows = 1, cols = 1)` for a data cell.  `FALSE` removes the title
+#'   Excel would otherwise generate.
 #' @param title_format An [xl_format()] styling the title text.  A title is
 #'   text, so only the [xl_font()] group applies.
 #' @param at The cell the chart's top-left corner is anchored to.
@@ -337,6 +356,16 @@ print.xl_chart <- function(x, ...) {
                  arg, target, paste(sprintf("\"%s\"", names(sheets)),
                                     collapse = ", ")), call. = FALSE)
   df <- sheets[[target]]
+  if (is.list(spec) && !is.null(spec[["header"]])) {
+    if (header_offset < 1L)
+      stop(sprintf(paste0("`%s` names a header cell, but this workbook is ",
+                          "written without headers (col_names = FALSE), so ",
+                          "there is no header row."), arg), call. = FALSE)
+    col <- .resolve_col_index(spec[["header"]], names(df), arg)
+    # 0-based, and the header is the row above data row 1
+    return(list(sheet = target,
+                range = as.integer(c(0L, col - 1L, 0L, col - 1L))))
+  }
   q <- .xl_resolve_range(spec, arg = arg, df = df,
                          header_offset = header_offset, allow_cell = TRUE)
   # A range outside the data plots nothing, and Excel shows an empty chart with
