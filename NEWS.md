@@ -86,9 +86,11 @@
   or a header is written; a range may name another sheet, and one that reaches
   past the data is refused rather than plotted as blanks. A series name and a
   chart title are always literal text unless given as a spec, and
-  `list(header = "revenue")` names the header cell a series is usually called
-  after. Placement uses the same vocabulary as an image (`at`, `scale`,
-  `offset`, `position`, `description`, `decorative`).
+  `list(header = "revenue")` names a header cell. A series that plots a column
+  is named after that column's header unless told otherwise, as it is when you
+  chart a column with its header in Excel; `name = FALSE` leaves it unnamed.
+  Placement uses the same vocabulary as an image (`at`, `scale`, `offset`,
+  `position`, `description`, `decorative`).
 
   Series and titles are styled with the ordinary `xl_format()` groups:
   `xl_border()` becomes the line, `xl_fill()` the fill or pattern, and

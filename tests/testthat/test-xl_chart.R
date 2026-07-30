@@ -559,3 +559,81 @@ test_that("a header spec stands alone, and needs a header row to exist", {
               col_names = FALSE),
     "written without headers")
 })
+
+# ── The default series name ───────────────────────────────────────────────────
+
+test_that("a series plotting a column is named after that column's header", {
+  # Excel names a series this way when you chart a column with its header, and
+  # the alternative is a legend reading "Series 1"
+  p <- chart_plan(list(Data = xl_sheet(crange_sales, chart = xl_chart("column",
+    xl_chart_series(values = list(cols = "qty"))))))
+  s <- p[[1L]]$series[[1L]]
+  expect_equal(s$name_sheet, "Data")
+  expect_equal(s$name_range, c(0L, 1L, 0L, 1L))   # header row, column qty
+  expect_null(s$name)
+  # and it reaches the file as a reference, not as copied text
+  expect_match(cfile(chart = xl_chart("column",
+    xl_chart_series(values = list(cols = "qty"))))$chart,
+    "<c:f>Data!$B$1</c:f>", fixed = TRUE)
+})
+
+test_that("an explicit name still wins, in any spelling", {
+  nm <- function(...) {
+    p <- chart_plan(list(Data = xl_sheet(crange_sales,
+                                         chart = xl_chart("column",
+                                           xl_chart_series(...)))))
+    p[[1L]]$series[[1L]]
+  }
+  expect_equal(nm(values = list(cols = "qty"), name = "Quantity")$name,
+               "Quantity")
+  # another column's header
+  expect_equal(nm(values = list(cols = "qty"),
+                  name = list(header = "fruit"))$name_range,
+               c(0L, 0L, 0L, 0L))
+  # a data cell
+  expect_equal(nm(values = list(cols = "qty"),
+                  name = list(rows = 1, cols = "fruit"))$name_range,
+               c(1L, 0L, 1L, 0L))
+})
+
+test_that("name = FALSE leaves the series unnamed", {
+  p <- chart_plan(list(Data = xl_sheet(crange_sales, chart = xl_chart("column",
+    xl_chart_series(values = list(cols = "qty"), name = FALSE)))))
+  s <- p[[1L]]$series[[1L]]
+  expect_null(s$name)
+  expect_null(s$name_range)
+})
+
+test_that("the default only applies where a header is known to exist", {
+  no_name <- function(wb, ...) {
+    p <- chart_plan(wb, ...)
+    s <- p[[1L]]$series[[1L]]
+    expect_null(s$name)
+    expect_null(s$name_range)
+  }
+  # an A1 range says nothing about whether the row above it is a header
+  no_name(list(Data = xl_sheet(crange_sales, chart = xl_chart("column",
+    xl_chart_series(values = "Data!B2:B4")))))
+  # neither does a span of several columns
+  no_name(list(Data = xl_sheet(crange_sales, chart = xl_chart("column",
+    xl_chart_series(values = list(cols = c("fruit", "qty")))))))
+  # and a workbook written without headers has no header cell at all
+  s <- .resolve_charts(
+    xl_sheet(crange_sales,
+             chart = xl_chart("column",
+                              xl_chart_series(values = list(cols = "qty")))),
+    writexl:::normalize_df(crange_sales), .new_format_registry(), 0L,
+    xl_properties(), list(Data = writexl:::normalize_df(crange_sales)), "Data")
+  expect_null(s[[1L]]$series[[1L]]$name)
+  expect_null(s[[1L]]$series[[1L]]$name_range)
+})
+
+test_that("the default follows the sheet the values come from", {
+  p <- chart_plan(list(
+    Chart = xl_sheet(data.frame(z = 1),
+                     chart = xl_chart("pie",
+                       xl_chart_series(values = list(sheet = "Data",
+                                                     cols = "qty")))),
+    Data = crange_sales), sheet = "Chart")
+  expect_equal(p[[1L]]$series[[1L]]$name_sheet, "Data")
+})

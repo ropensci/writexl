@@ -19,11 +19,13 @@ xl_chart_series(
 \item{categories}{The range holding the labels to plot them against.  Omit
 for a chart that numbers its points.}
 
-\item{name}{The series name, shown in the legend.  A string is always taken
-literally --- a series may legitimately be called `"Q1!"` --- so to take
-the name from a cell, give a range spec: `name = list(header = "revenue")`
-for the column's own header, or `name = list(rows = 1, cols = 1)` for a
-data cell.}
+\item{name}{The series name, shown in the legend.  Left unset, a series that
+plots a column takes its name from that column's header cell, which is
+what Excel does when you chart a column along with its header; `FALSE`
+leaves it unnamed.  A string is always taken literally --- a series may
+legitimately be called `"Q1!"` --- so to take the name from another cell,
+give a range spec: `name = list(header = "cost")` for a different column's
+header, or `name = list(rows = 1, cols = 1)` for a data cell.}
 
 \item{format}{An [xl_format] styling the series --- its line and fill.  See
 [xl_chart()] for which format properties a chart can express.}
@@ -37,7 +39,8 @@ An `xl_chart_series` object.
 }
 \description{
 `xl_chart_series()` names the values a chart plots, and optionally the
-categories to plot them against and a name for the legend.
+categories to plot them against and a name for the legend.  A series that
+plots a column is named after that column's header unless told otherwise.
 
 Each range may live on a different sheet from the chart, so it takes an
 optional `sheet`:

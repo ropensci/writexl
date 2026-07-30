@@ -781,22 +781,37 @@ so adding a row or reordering the columns does not silently plot the wrong
 thing. `rows` narrows it: `list(cols = "revenue", rows = 1:2)` is the first two
 data rows.
 
-A series name and a chart title are the exception to the A1 form: a string there
-is always taken **literally**, because a series may legitimately be called
-`"Q1!"`. To take one from a cell, give a spec. `rows` counts *data* rows, so
-the header — where a column's label actually lives — has its own spelling:
+### Naming a series
+
+A series that plots a column is named after that column's **header cell**,
+which is what Excel does when you chart a column along with its header. So the
+legend usually needs no arguments at all:
+
+```{r}
+xl_chart("column", xl_chart_series(values = list(cols = "revenue")))
+```
+
+The header is referenced, not copied, so editing it in Excel renames the
+series. `name = FALSE` leaves the series unnamed (Excel then calls it
+"Series 1"), and anything else overrides the default.
+
+A series name and a chart title are the exception to the A1 form: a string
+there is always taken **literally**, because a series may legitimately be
+called `"Q1!"`. To take one from a cell, give a spec. `rows` counts *data*
+rows, so the header row has its own spelling:
 
 ```{r}
 xl_chart("column",
          xl_chart_series(values = list(cols = "revenue"),
-                         name = list(header = "revenue")),
+                         name = list(header = "cost")),   # another column's
          title = list(header = "quarter"))
 ```
 
 `list(header = )` names one column's header cell and stands alone; it takes an
-optional `sheet` like any other spec. On a workbook written with
-`col_names = FALSE` there is no such cell, and saying so is better than plotting
-the first data row as a label.
+optional `sheet` like any other spec. The default applies only where a header
+is known to exist — not to an A1 range, which says nothing about whether the
+row above it is a header, and not on a workbook written with
+`col_names = FALSE`, where naming one is an error rather than a guess.
 
 Either form may name another sheet, which is how a chart gets a sheet to itself:
 

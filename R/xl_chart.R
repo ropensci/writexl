@@ -127,7 +127,8 @@
 #'
 #' @description
 #' `xl_chart_series()` names the values a chart plots, and optionally the
-#' categories to plot them against and a name for the legend.
+#' categories to plot them against and a name for the legend.  A series that
+#' plots a column is named after that column's header unless told otherwise.
 #'
 #' Each range may live on a different sheet from the chart, so it takes an
 #' optional `sheet`:
@@ -143,11 +144,13 @@
 #' @param values The range holding the numbers to plot.
 #' @param categories The range holding the labels to plot them against.  Omit
 #'   for a chart that numbers its points.
-#' @param name The series name, shown in the legend.  A string is always taken
-#'   literally --- a series may legitimately be called `"Q1!"` --- so to take
-#'   the name from a cell, give a range spec: `name = list(header = "revenue")`
-#'   for the column's own header, or `name = list(rows = 1, cols = 1)` for a
-#'   data cell.
+#' @param name The series name, shown in the legend.  Left unset, a series that
+#'   plots a column takes its name from that column's header cell, which is
+#'   what Excel does when you chart a column along with its header; `FALSE`
+#'   leaves it unnamed.  A string is always taken literally --- a series may
+#'   legitimately be called `"Q1!"` --- so to take the name from another cell,
+#'   give a range spec: `name = list(header = "cost")` for a different column's
+#'   header, or `name = list(rows = 1, cols = 1)` for a data cell.
 #' @param format An [xl_format] styling the series --- its line and fill.  See
 #'   [xl_chart()] for which format properties a chart can express.
 #' @param smooth Draw the line smoothed.  Line and scatter charts only.
@@ -174,6 +177,7 @@ xl_chart_series <- function(values, categories = NULL, name = NULL,
                         accept = c("line", "fill", "pattern"),
                         part = "a chart series")
   nm <- if (is.null(name)) NULL
+        else if (identical(name, FALSE)) list(off = TRUE)
         else if (is.character(name) && length(name) == 1L && !is.na(name))
           list(text = name)
         else .chart_range(name, "name")
@@ -338,6 +342,17 @@ print.xl_chart <- function(x, ...) {
 # a range cannot be resolved until every sheet is known.  `sheets` maps sheet
 # name to the resolved data frame; `own` is the chart's own sheet, used when the
 # range names none.
+# The header cell of the single column a values spec names, or NULL when there
+# is no one column to take it from.
+.series_header_name <- function(values, header_offset) {
+  if (header_offset < 1L || is.null(values)) return(NULL)
+  spec <- values[["spec"]]
+  if (!is.list(spec)) return(NULL)             # an A1 range, not a column spec
+  cols <- spec[["cols"]]
+  if (is.null(cols) || length(cols) != 1L || anyNA(cols)) return(NULL)
+  list(spec = list(header = cols), sheet = values[["sheet"]])
+}
+
 .resolve_chart_range <- function(rng, arg, sheets, own, header_offset) {
   if (is.null(rng)) return(NULL)
   spec <- rng[["spec"]]
@@ -437,8 +452,14 @@ print.xl_chart <- function(x, ...) {
         se$categories_sheet <- cat_$sheet
         se$categories_range <- cat_$range
       }
+      # With no name of its own a series is "Series 1" in the legend, when the
+      # column it plots already has a label in its header -- which is the name
+      # Excel itself uses when you chart a column with its header.  Only for a
+      # column spec: an A1 range says nothing about whether the row above it is
+      # a header, so guessing there would be a guess.
       nm <- q[["name"]]
-      if (!is.null(nm)) {
+      if (is.null(nm)) nm <- .series_header_name(q[["values"]], header_offset)
+      if (!is.null(nm) && !isTRUE(nm[["off"]])) {
         if (!is.null(nm[["text"]])) se$name <- nm[["text"]]
         else {
           r <- .resolve_chart_range(nm, where("name"), sheets, own,
