@@ -28,7 +28,8 @@ clippy
 colour
 colours
 colrow
-colwidcond
+colwidth
+cond
 dev
 dont
 dropdown
@@ -59,6 +60,8 @@ scrollable
 specialised
 str
 tempdir
+trendline
+trendline's
 unformatted
 uniques
 unstyled

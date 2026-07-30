@@ -120,6 +120,22 @@
   reached, so a function added upstream shows up as a failure rather than as a
   gap.
 
+  **The parts of a series** --- `xl_chart_marker()` for the symbol at each
+  point, `xl_chart_labels()` and `xl_chart_label()` for the numbers printed
+  beside them, `xl_chart_trendline()` for a fit through the series,
+  `xl_chart_error_bars()` for `x_error_bars` and `y_error_bars`, and an
+  `xl_format()` per point in `points =` to colour one slice of a pie or one
+  bar of a column chart. Custom labels give a single point its own text, its
+  own styling, or `hide = TRUE`.
+
+  These carry three more restrictions libxlsxwriter documents and does not
+  enforce: the positions a data label may take depend on the chart type (the
+  whole table is in the header, and is checked), a moving average has no
+  forecast, equation or R-squared, an intercept applies only to exponential,
+  linear and polynomial fits, and an automatic marker cannot also be given a
+  size or a format. A test reads the function list out of the bundled
+  `chart.h`, so all 40 `chart_series_*()` functions are known to be reached.
+
   Features that apply to only some chart types --- the doughnut hole, pie
   rotation, up-down bars, high-low lines, the series gap and overlap, smoothing
   --- are checked against the chart's type, because Excel discards them without

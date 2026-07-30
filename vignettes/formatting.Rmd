@@ -896,6 +896,45 @@ that would work. Pie and doughnut charts have no axes at all.
 drops its labels, and styling a gridline switches it on — a styled gridline
 that stays hidden is not something anyone means.
 
+### The parts of a series
+
+A series can carry a marker at each point, labels beside them, a trendline
+through them, and error bars on them; individual points can be styled one at a
+time:
+
+```{r}
+xl_chart("line",
+         xl_chart_series(
+           values = list(cols = "revenue"),
+           marker = xl_chart_marker(type = "circle", size = 7),
+           labels = xl_chart_labels(num_format = "$#,##0",
+                                    position = "above"),
+           trendline = xl_chart_trendline("linear", equation = TRUE),
+           y_error_bars = xl_chart_error_bars("percentage", 5)))
+```
+
+`xl_chart_labels()` with no arguments prints each point's value, which is
+Excel's own default; `show_name`, `show_category` and `show_percentage` add the
+rest, and `separator` says what joins them. `custom =` takes a list of
+`xl_chart_label()`s, one per point, so a single label can be given its own text
+or removed with `hide = TRUE`. `points =` takes a list of `xl_format()`s the
+same way — one red slice in a pie, the rest left alone:
+
+```{r}
+xl_chart("pie", xl_chart_series(values = list(cols = "revenue"),
+                                points = list(xl_fill(background = "red"),
+                                              NULL, NULL, NULL)))
+```
+
+Four more of Excel's silent rules are checked here. Which **label positions**
+are available depends on the chart type — `"above"` and `"below"` on line and
+scatter charts, `"inside_base"` on bar and column, `"best_fit"` on pie and
+doughnut, `"center"` everywhere — and the error lists the ones this chart
+allows. A **moving average** has no forecast, equation or R-squared; an
+**intercept** applies to exponential, linear and polynomial fits only; and an
+**automatic marker** takes neither a size nor a format, since it is Excel's own
+default symbol for that series.
+
 ### Features that belong to some types only
 
 Excel discards a setting the chart type does not have without saying so, so

@@ -135,7 +135,11 @@ xl_chart_axis(name = "Revenue", min = 0, num_format = "$#,##0",
 
 Other images and charts:
 \code{\link[=xl_chart]{xl_chart()}},
+\code{\link[=xl_chart_error_bars]{xl_chart_error_bars()}},
+\code{\link[=xl_chart_labels]{xl_chart_labels()}},
+\code{\link[=xl_chart_marker]{xl_chart_marker()}},
 \code{\link[=xl_chart_series]{xl_chart_series()}},
+\code{\link[=xl_chart_trendline]{xl_chart_trendline()}},
 \code{\link[=xl_image]{xl_image()}}
 }
 \concept{images and charts}

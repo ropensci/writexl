@@ -153,6 +153,13 @@
 #'   header, or `name = list(rows = 1, cols = 1)` for a data cell.
 #' @param format An [xl_format] styling the series --- its line and fill.  See
 #'   [xl_chart()] for which format properties a chart can express.
+#' @param marker An [xl_chart_marker()] drawn at each point.
+#' @param labels An [xl_chart_labels()] printing the numbers beside the points.
+#' @param trendline An [xl_chart_trendline()] fitted through the series.
+#' @param x_error_bars,y_error_bars An [xl_chart_error_bars()] on each point.
+#' @param points An [xl_format()] per point, as a list, styling individual
+#'   points --- one slice of a pie, one bar of a column chart.  `NULL` in the
+#'   list leaves that point as it is.
 #' @param smooth Draw the line smoothed.  Line and scatter charts only.
 #' @param invert_if_negative Fill negative values with the inverse colour.
 #' @return An `xl_chart_series` object.
@@ -164,7 +171,9 @@
 #' xl_chart_series(values = "Data!B2:B10", categories = "Data!A2:A10",
 #'                 name = "2024")
 xl_chart_series <- function(values, categories = NULL, name = NULL,
-                            format = NULL, smooth = NA,
+                            format = NULL, marker = NULL, labels = NULL,
+                            trendline = NULL, x_error_bars = NULL,
+                            y_error_bars = NULL, points = NULL, smooth = NA,
                             invert_if_negative = NA) {
   if (missing(values) || is.null(values))
     stop("`values` must name the range holding the numbers to plot",
@@ -176,6 +185,12 @@ xl_chart_series <- function(values, categories = NULL, name = NULL,
   .chart_format_payload(format, "format",
                         accept = c("line", "fill", "pattern"),
                         part = "a chart series")
+  parts <- list(marker = marker, labels = labels, trendline = trendline,
+                x_error_bars = x_error_bars, y_error_bars = y_error_bars)
+  for (k in names(parts))
+    if (!is.null(parts[[k]]) && !inherits(parts[[k]], .PART_CLASS[[k]]))
+      stop(sprintf("`%s` must be an %s() object", k,
+                   sub("^xl", "xl", .PART_CLASS[[k]])), call. = FALSE)
   nm <- if (is.null(name)) NULL
         else if (identical(name, FALSE)) list(off = TRUE)
         else if (is.character(name) && length(name) == 1L && !is.na(name))
@@ -185,6 +200,9 @@ xl_chart_series <- function(values, categories = NULL, name = NULL,
     values = .chart_range(values, "values"),
     categories = .chart_range(categories, "categories"),
     name = nm, format = format,
+    marker = marker, labels = labels, trendline = trendline,
+    x_error_bars = x_error_bars, y_error_bars = y_error_bars,
+    points = .points_payload(points, "points"),
     smooth = .val_flag(smooth, "smooth"),
     invert_if_negative = .val_flag(invert_if_negative, "invert_if_negative")
   )), class = "xl_chart_series")
@@ -263,6 +281,8 @@ xl_chart <- function(type, series, title = NULL, title_format = NULL,
     stop("a chart needs at least one series", call. = FALSE)
   .check_axis(x_axis, "x", ty, "x_axis")
   .check_axis(y_axis, "y", ty, "y_axis")
+  for (i in seq_along(ss))
+    .check_series_parts(ss[[i]], ty, sprintf("series[[%d]]", i))
 
   for (i in seq_along(ss)) {
     p <- unclass(ss[[i]])
@@ -479,6 +499,12 @@ print.xl_chart <- function(x, ...) {
           se$name_range <- r$range
         }
       }
+      se$marker       <- .marker_payload(q[["marker"]])
+      se$labels       <- .labels_payload(q[["labels"]])
+      se$trendline    <- .trendline_payload(q[["trendline"]])
+      se$x_error_bars <- .error_bars_payload(q[["x_error_bars"]])
+      se$y_error_bars <- .error_bars_payload(q[["y_error_bars"]])
+      se$points       <- q[["points"]]
       if (isTRUE(q[["smooth"]]))             se$smooth <- 1L
       if (isTRUE(q[["invert_if_negative"]])) se$invert_if_negative <- 1L
       # a series is styled by its line and fill, translated from the ordinary
