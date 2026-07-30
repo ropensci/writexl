@@ -272,3 +272,19 @@ test_that("every chart_axis_*() function libxlsxwriter offers is called", {
   for (f in fns)
     expect_true(grepl(paste0(f, "("), called, fixed = TRUE), info = f)
 })
+
+test_that("the display-units caption is on unless it is turned off", {
+  # chart_axis_set_display_units() sets display_units_visible itself, so the
+  # caption comes with the rescaling and `TRUE` adds nothing.  Pinned because
+  # the argument would otherwise read as opt-in, and because a change upstream
+  # would silently flip what a workbook looks like.
+  on <- axis_xml(y_axis = xl_chart_axis(display_units = "thousands"))
+  expect_match(on, "<c:dispUnitsLbl>", fixed = TRUE)
+  same <- axis_xml(y_axis = xl_chart_axis(display_units = "thousands",
+                                          display_units_visible = TRUE))
+  expect_match(same, "<c:dispUnitsLbl>", fixed = TRUE)
+  off <- axis_xml(y_axis = xl_chart_axis(display_units = "thousands",
+                                         display_units_visible = FALSE))
+  expect_match(off, '<c:builtInUnit val="thousands"/>', fixed = TRUE)
+  expect_false(grepl("<c:dispUnitsLbl>", off, fixed = TRUE))
+})

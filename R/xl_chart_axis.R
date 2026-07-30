@@ -122,8 +122,10 @@
 #'   Value axes only.
 #' @param display_units Scale the labels by `"thousands"`, `"millions"`,
 #'   `"billions"` and so on; see Details for the full set.  Value axes only.
-#' @param display_units_visible Show the units caption Excel adds alongside
-#'   `display_units`.  Value axes only.
+#' @param display_units_visible Whether the caption naming the units --- the
+#'   small rotated "Millions" beside the axis --- is drawn.  Setting
+#'   `display_units` turns it **on**, as Excel does, so this is really for
+#'   `FALSE`: rescaled labels with no caption.  Value axes only.
 #' @param interval_unit Label one category in every `n`.  Category axes only.
 #' @param interval_tick Put a tick mark on one category in every `n`.
 #'   Category axes only.
