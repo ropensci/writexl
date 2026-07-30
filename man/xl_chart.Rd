@@ -8,6 +8,7 @@ xl_chart(
   type,
   series,
   title = NULL,
+  title_format = NULL,
   at = "A1",
   scale = 1,
   offset = NULL,
@@ -27,6 +28,9 @@ scatter chart must have `categories`, which are its x axis.}
 
 \item{title}{The chart title: a string, or a range holding one.  `FALSE`
 removes the title Excel would otherwise generate.}
+
+\item{title_format}{An [xl_format()] styling the title text.  A title is
+text, so only the [xl_font()] group applies.}
 
 \item{at}{The cell the chart's top-left corner is anchored to.}
 

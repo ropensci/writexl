@@ -152,6 +152,11 @@ xl_chart_series <- function(values, categories = NULL, name = NULL,
          call. = FALSE)
   if (!is.null(format) && !is_xl_format(format))
     stop("`format` must be an xl_format object", call. = FALSE)
+  # translated again at write time, when the payload is actually needed; done
+  # here too so a format a series cannot use is refused where it was written
+  .chart_format_payload(format, "format",
+                        accept = c("line", "fill", "pattern"),
+                        part = "a chart series")
   nm <- if (is.null(name)) NULL
         else if (is.character(name) && length(name) == 1L && !is.na(name))
           list(text = name)
@@ -199,6 +204,8 @@ print.xl_chart_series <- function(x, ...) {
 #'   scatter chart must have `categories`, which are its x axis.
 #' @param title The chart title: a string, or a range holding one.  `FALSE`
 #'   removes the title Excel would otherwise generate.
+#' @param title_format An [xl_format()] styling the title text.  A title is
+#'   text, so only the [xl_font()] group applies.
 #' @param at The cell the chart's top-left corner is anchored to.
 #' @param scale Scale factor: one number for both axes, or `c(x, y)`.
 #' @param offset Offset from the anchor cell's corner in pixels, as `c(x, y)`.
@@ -214,7 +221,8 @@ print.xl_chart_series <- function(x, ...) {
 #' @examples
 #' xl_chart("column", xl_chart_series(values = list(cols = "revenue")))
 #' xl_chart("pie", xl_chart_series(values = "Data!B2:B5"), title = "Share")
-xl_chart <- function(type, series, title = NULL, at = "A1", scale = 1,
+xl_chart <- function(type, series, title = NULL, title_format = NULL,
+                     at = "A1", scale = 1,
                      offset = NULL, position = "move_and_size",
                      description = NULL, decorative = FALSE, style = NA) {
   ty <- .val_enum(type, names(.LXW_CHART_TYPE), "type")
@@ -260,6 +268,25 @@ xl_chart <- function(type, series, title = NULL, at = "A1", scale = 1,
          else if (is.character(title) && length(title) == 1L && !is.na(title))
            list(text = title)
          else .chart_range(title, "title")
+  # A title's only styling in libxlsxwriter is its font, so a fill or a border
+  # here has nowhere to go; .chart_format_payload() says so by name.  Styling a
+  # title that has been switched off is a contradiction rather than a no-op.
+  if (!is.null(title_format)) {
+    if (isTRUE(ttl[["off"]]))
+      stop("`title_format` styles the title, but `title = FALSE` removes it",
+           call. = FALSE)
+    # The automatic title of a single-series chart is Excel's, not ours: with no
+    # `title` libxlsxwriter writes no <c:title> element, so the font would have
+    # nothing to attach to and would vanish without a word.
+    if (is.null(ttl))
+      stop(paste0("`title_format` styles the title, so give a `title` too. ",
+                  "The title Excel generates for a single-series chart is not ",
+                  "in the file, so there is nothing to style."), call. = FALSE)
+    ttl <- c(if (is.null(ttl)) list() else ttl,
+             list(format = .chart_format_payload(title_format, "title_format",
+                                                 accept = "font",
+                                                 part = "a chart title")))
+  }
 
   structure(.drop_null(list(
     type = ty, series = ss, title = ttl,
@@ -356,9 +383,12 @@ print.xl_chart <- function(x, ...) {
 
     ttl <- p[["title"]]
     if (!is.null(ttl)) {
+      ent$title_format <- ttl[["format"]]
       if (isTRUE(ttl[["off"]]))        ent$title_off <- 1L
       else if (!is.null(ttl[["text"]])) ent$title <- ttl[["text"]]
-      else {
+      # `title_format` alone leaves Excel's automatic title in place and only
+      # styles it, so there is no range to resolve
+      else if (!is.null(ttl[["spec"]])) {
         r <- .resolve_chart_range(ttl, sprintf("chart[[%d]] title", i),
                                   sheets, own, header_offset)
         ent$title_sheet <- r$sheet
@@ -393,7 +423,9 @@ print.xl_chart <- function(x, ...) {
       # a series is styled by its line and fill, translated from the ordinary
       # xl_format the caller gave -- see .chart_format_payload()
       if (!is.null(q[["format"]]))
-        se$format <- .chart_format_payload(q[["format"]], where("format"))
+        se$format <- .chart_format_payload(
+          q[["format"]], where("format"),
+          accept = c("line", "fill", "pattern"), part = "a chart series")
       se
     })
     ent

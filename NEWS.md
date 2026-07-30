@@ -90,10 +90,12 @@
 
   Series and titles are styled with the ordinary `xl_format()` groups:
   `xl_border()` becomes the line, `xl_fill()` the fill or pattern, and
-  `xl_font()` the text, so one format object can style both a cell and a chart.
-  `xl_fill()` and `xl_border()` gained `transparency`, which charts honour and
-  cells ignore. Border styles a chart line cannot express, and format groups a
-  chart has no use for, are refused by name instead of being dropped silently.
+  `xl_font()` the title text via `xl_chart(title_format =)`, so one format
+  object can style both a cell and a chart. `xl_fill()` and `xl_border()` gained
+  `transparency`, which charts honour and cells ignore. Anything the chart
+  cannot draw is refused by name rather than dropped silently: border styles a
+  chart line has no width for, format groups no chart shape has, a font on a
+  series (a series is a shape, not text), and a fill or border on a title.
 
   Features that apply to only some chart types --- the doughnut hole, pie
   rotation, up-down bars, high-low lines, the series gap and overlap, smoothing

@@ -550,6 +550,21 @@ static lxw_chart_pattern chart_pattern_of(SEXP p, int *set){
   return pat;
 }
 
+static lxw_chart_font chart_font_of(SEXP p, int *set){
+  lxw_chart_font f;
+  SEXP e = list_get(p, "font");
+  memset(&f, 0, sizeof(f));
+  *set = 0;
+  if(e == R_NilValue || !Rf_isVectorList(e)) return f;
+  *set = 1;
+  if(payload_has(e, "size"))      f.size = payload_dbl(e, "size");
+  if(payload_has(e, "color"))     f.color = (lxw_color_t) payload_int(e, "color");
+  if(payload_has(e, "bold"))      f.bold = LXW_TRUE;
+  if(payload_has(e, "italic"))    f.italic = LXW_TRUE;
+  if(payload_has(e, "underline")) f.underline = LXW_TRUE;
+  return f;
+}
+
 /* Apply a format payload to one series. */
 static void style_series(lxw_chart_series *s, SEXP fmt){
   int has;
@@ -613,6 +628,13 @@ static void apply_charts(cell_write_ctx *ctx, SEXP opts){
           chart_series_set_invert_if_negative(series);
         style_series(series, list_get(se, "format"));
       }
+    }
+
+    {
+      /* The title's only styling is its font; xl_chart() refuses the rest. */
+      int has;
+      lxw_chart_font tf = chart_font_of(list_get(c, "title_format"), &has);
+      if(has) chart_title_set_name_font(chart, &tf);
     }
 
     if(payload_has(c, "title_off"))

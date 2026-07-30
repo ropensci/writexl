@@ -461,3 +461,55 @@ test_that("every chart type writes a file without crashing", {
                                                  chart = xl_chart(ty, se)))))
   }
 })
+
+# ── The chart title's font ────────────────────────────────────────────────────
+
+test_that("a title format styles the title, and reaches the file", {
+  r <- cfile(chart = xl_chart("column", xl_chart_series(values = list(cols = "qty")),
+                              title = "Sales",
+                              title_format = xl_font(size = 14, bold = TRUE,
+                                                     color = "red")))
+  expect_match(r$chart, "<a:defRPr", fixed = TRUE)
+  # lxw_chart_font.size is in points and written in hundredths
+  expect_match(r$chart, 'sz="1400"', fixed = TRUE)
+  expect_match(r$chart, 'b="1"', fixed = TRUE)
+  expect_match(r$chart, "FF0000", fixed = TRUE)
+})
+
+test_that("a title format needs a title to attach to", {
+  # measured, not assumed: with no title libxlsxwriter writes no <c:title>
+  # element at all, so chart_title_set_name_font() has nothing to style and the
+  # font disappears silently.  The automatic title of a single-series chart is
+  # Excel's own and never reaches the file.
+  expect_error(xl_chart("column", xl_chart_series(values = "A1:A5"),
+                        title_format = xl_font(italic = TRUE)),
+               "give a `title` too", fixed = TRUE)
+  r <- cfile(chart = xl_chart("column",
+                              xl_chart_series(values = list(cols = "qty")),
+                              title_format = xl_font(italic = TRUE),
+                              title = "Sales"))
+  expect_match(r$chart, "<c:title>", fixed = TRUE)
+  expect_match(r$chart, 'i="1"', fixed = TRUE)
+})
+
+test_that("styling a title that has been removed is refused", {
+  expect_error(xl_chart("column", xl_chart_series(values = "A1:A5"),
+                        title = FALSE, title_format = xl_font(bold = TRUE)),
+               "`title = FALSE` removes it", fixed = TRUE)
+})
+
+test_that("a title format may not set a fill or a border", {
+  expect_error(xl_chart("column", xl_chart_series(values = "A1:A5"),
+                        title = "T", title_format = xl_fill(background = "red")),
+               "takes no fill")
+  expect_error(xl_chart("column", xl_chart_series(values = "A1:A5"),
+                        title = "T", title_format = xl_border(all = "thin")),
+               "takes no line")
+})
+
+test_that("a series format may not set a font", {
+  # refused where it was written, not at write time
+  expect_error(xl_chart_series(values = list(cols = "qty"),
+                               format = xl_font(bold = TRUE)),
+               "a shape and has no text")
+})

@@ -69,9 +69,29 @@
   protection = "a chart shape cannot be locked or hidden"
 )
 
+# Not every chart part takes every piece.  A series is a shape and has no text,
+# so libxlsxwriter gives it a line, a fill and a pattern but no font; a title is
+# text and only takes a font.  Passing a group the target cannot use has to be
+# an error, because libxlsxwriter has nowhere to put it and would drop it in
+# silence -- the caller would see an unstyled chart and no reason why.
+.CHART_PART_CANNOT <- c(
+  font    = paste0("a font, but %s is a shape and has no text -- set the font ",
+                   "on the chart title"),
+  line    = "a border, but %s takes no line",
+  fill    = "a fill, but %s takes no fill",
+  pattern = "a pattern fill, but %s takes no fill"
+)
+
+.CHART_PART_GROUP <- c(font = "xl_font()", line = "xl_border()",
+                       fill = "xl_fill()", pattern = "xl_fill()")
+
 # Translate an xl_format into the pieces a chart understands.  Returns a list
-# with any of `line`, `fill`, `pattern` and `font`, each ready for C.
-.chart_format_payload <- function(fmt, arg) {
+# with any of `line`, `fill`, `pattern` and `font`, each ready for C.  `accept`
+# names the pieces this particular chart part can use, and `part` names it for
+# the error message.
+.chart_format_payload <- function(fmt, arg,
+                                  accept = c("line", "fill", "pattern", "font"),
+                                  part = "a chart series") {
   if (is.null(fmt)) return(NULL)
   if (!is_xl_format(fmt))
     stop(sprintf("`%s` must be an xl_format object", arg), call. = FALSE)
@@ -148,8 +168,16 @@
     if (length(ent)) out$line <- ent
   }
 
+  extra <- setdiff(names(out), accept)
+  if (length(extra))
+    stop(sprintf("`%s` sets %s. Use %s instead.", arg,
+                 sprintf(.CHART_PART_CANNOT[[extra[[1L]]]], part),
+                 paste(unique(.CHART_PART_GROUP[accept]), collapse = " or ")),
+         call. = FALSE)
+
   if (!length(out))
-    stop(sprintf(paste0("`%s` is an empty format; give a font, a fill or a ",
-                        "border for the chart to use."), arg), call. = FALSE)
+    stop(sprintf("`%s` is an empty format; give %s for the chart to use.", arg,
+                 paste(unique(.CHART_PART_GROUP[accept]), collapse = " or ")),
+         call. = FALSE)
   out
 }
