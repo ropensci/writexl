@@ -31,7 +31,7 @@ xl_font(
   font_only = NA
 )
 
-xl_fill(background = NA, foreground = NA, pattern = NA)
+xl_fill(background = NA, foreground = NA, pattern = NA, transparency = NA)
 
 xl_border(
   all = NA,
@@ -46,7 +46,8 @@ xl_border(
   bottom_color = NA,
   diagonal = NA,
   diagonal_style = NA,
-  diagonal_color = NA
+  diagonal_color = NA,
+  transparency = NA
 )
 
 xl_align(
@@ -86,6 +87,10 @@ font flags.}
 \item{pattern}{Fill pattern, e.g. `"solid"`, `"light-gray"` (18 choices).
 When `background` is supplied and `pattern` is unset, a `"solid"` pattern
 is assumed.}
+
+\item{transparency}{Percentage transparency, 0--100.  **Charts only**: Excel
+has no transparency for a cell's fill or border, so this is ignored
+everywhere except a chart's line and fill (see [xl_chart()]).}
 
 \item{all}{Border style applied to all four sides at once (one of `"none"`,
 `"thin"`, `"medium"`, `"dashed"`, `"dotted"`, `"thick"`, `"double"`,

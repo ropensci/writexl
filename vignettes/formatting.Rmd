@@ -745,3 +745,82 @@ floating images first, and give embedded images a workbook of their own.
 
 Only embedded images cost the memory-efficient row-streaming mode; ordinary
 floating images leave it on, so a large sheet with a logo stays fast.
+
+## Charts
+
+`xl_chart()` puts a chart on a sheet; `xl_chart_series()` says what it plots.
+The chart is anchored to a cell in the same vocabulary an image uses:
+
+```{r}
+sales <- data.frame(quarter = c("Q1", "Q2", "Q3", "Q4"),
+                    revenue = c(120, 145, 133, 180))
+sheet <- xl_sheet(sales,
+                  chart = xl_chart("column",
+                                   xl_chart_series(values = list(cols = "revenue"),
+                                                   categories = list(cols = "quarter"),
+                                                   name = "2024"),
+                                   title = "Revenue by quarter", at = "D2"))
+path <- write_xlsx(list(Sales = sheet), tempfile(fileext = ".xlsx"))
+```
+
+All 22 chart types Excel offers are available: `"column"`, `"bar"`, `"line"`,
+`"pie"`, `"doughnut"`, `"area"`, `"scatter"`, `"radar"`, and the stacked,
+percent-stacked, smoothed and marker variants.
+
+### Naming a range
+
+A series range can be written either way:
+
+* **by column**, `list(cols = "revenue")` — the whole column of the sheet's own
+  data, header excluded;
+* **as A1 text**, `"B2:B5"` or `"Data!B2:B5"`.
+
+Prefer the column form. It is checked against the data frame, it moves with the
+column rather than with a letter, and it accounts for the header row on its own,
+so adding a row or reordering the columns does not silently plot the wrong
+thing. `rows` narrows it: `list(cols = "revenue", rows = 1:2)` is the first two
+data rows.
+
+Either form may name another sheet, which is how a chart gets a sheet to itself:
+
+```{r}
+overview <- xl_sheet(data.frame(note = "See the chart"),
+                     chart = xl_chart("line",
+                                      xl_chart_series(values = list(sheet = "Sales",
+                                                                    cols = "revenue"),
+                                                      categories = list(sheet = "Sales",
+                                                                        cols = "quarter"))))
+```
+
+A range that reaches past the data is an error, not a chart with blanks on the
+end — a chart of a range that does not hold the numbers you meant looks
+plausible, which is the worst way for it to be wrong.
+
+A scatter series must have `categories`: a scatter plots values *against*
+categories, so they are its x axis.
+
+### Styling a chart
+
+Charts reuse the format groups from the top of this vignette. `xl_border()`
+becomes the line, `xl_fill()` the fill or pattern, and `xl_font()` the text, so
+one format object can style a cell and a chart alike:
+
+```{r}
+xl_chart("line", xl_chart_series(values = list(cols = "revenue"),
+                                 format = xl_border(all = "dashed", color = "#4472C4") +
+                                          xl_font(size = 9)))
+```
+
+`xl_fill()` and `xl_border()` take `transparency`, a percentage that charts
+honour and cells ignore. Chart lines have fewer dash styles than cell borders
+do, and a chart has no use for a number format or an alignment; both are refused
+by name rather than dropped, so a style that cannot be drawn is not mistaken for
+one that was. `style` selects one of Excel's 48 built-in chart styles.
+
+### Features that belong to some types only
+
+Excel discards a setting the chart type does not have without saying so, so
+writexl checks first and names the types that would work. Only a doughnut has a
+`hole_size`; only pie and doughnut `rotation`; up-down bars and high-low lines
+are line-only; the series gap and overlap are bar and column only; smoothing is
+line and scatter only; and pie and doughnut charts have no axes at all.

@@ -237,16 +237,22 @@ xl_font <- function(bold = NA, italic = NA, color = NA, size = NA, name = NA,
 #'   When `background` is supplied and `pattern` is unset, a `"solid"` pattern
 #'   is assumed.
 #' @export
-xl_fill <- function(background = NA, foreground = NA, pattern = NA) {
+xl_fill <- function(background = NA, foreground = NA, pattern = NA,
+                    transparency = NA) {
   bg  <- .val_color(background, "background")
   fg  <- .val_color(foreground, "foreground")
   pat <- .val_enum(pattern, names(.LXW$pattern), "pattern")
   if (is.null(pat) && !is.null(bg) && is.null(fg)) pat <- "solid"
-  fill <- .drop_null(list(background = bg, foreground = fg, pattern = pat))
+  fill <- .drop_null(list(background = bg, foreground = fg, pattern = pat,
+                          transparency = .val_int(transparency, "transparency",
+                                                  min = 0, max = 100)))
   new_xl_format(fill = if (length(fill)) fill else NULL)
 }
 
 #' @rdname xl_format_groups
+#' @param transparency Percentage transparency, 0--100.  **Charts only**: Excel
+#'   has no transparency for a cell's fill or border, so this is ignored
+#'   everywhere except a chart's line and fill (see [xl_chart()]).
 #' @param all Border style applied to all four sides at once (one of `"none"`,
 #'   `"thin"`, `"medium"`, `"dashed"`, `"dotted"`, `"thick"`, `"double"`,
 #'   `"hair"`, `"medium-dashed"`, `"dash-dot"`, `"medium-dash-dot"`,
@@ -258,7 +264,8 @@ xl_fill <- function(background = NA, foreground = NA, pattern = NA) {
 xl_border <- function(all = NA, left = NA, right = NA, top = NA, bottom = NA,
                       color = NA, left_color = NA, right_color = NA,
                       top_color = NA, bottom_color = NA, diagonal = NA,
-                      diagonal_style = NA, diagonal_color = NA) {
+                      diagonal_style = NA, diagonal_color = NA,
+                      transparency = NA) {
   bchoice <- names(.LXW$border)
   all_s   <- .val_enum(all, bchoice, "all")
   all_c   <- .val_color(color, "color")
@@ -273,7 +280,8 @@ xl_border <- function(all = NA, left = NA, right = NA, top = NA, bottom = NA,
     bottom_color   = .val_color(bottom_color, "bottom_color") %||% all_c,
     diagonal       = .val_enum(diagonal, names(.LXW$diagonal), "diagonal"),
     diagonal_style = .val_enum(diagonal_style, bchoice, "diagonal_style"),
-    diagonal_color = .val_color(diagonal_color, "diagonal_color")
+    diagonal_color = .val_color(diagonal_color, "diagonal_color"),
+    transparency   = .val_int(transparency, "transparency", min = 0, max = 100)
   ))
   new_xl_format(border = if (length(border)) border else NULL)
 }
