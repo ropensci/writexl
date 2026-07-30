@@ -22,7 +22,8 @@ xl_chart(
 `"doughnut"`, `"area"`, `"scatter"`, `"radar"`, and the stacked,
 percent-stacked, smoothed and marker variants.}
 
-\item{series}{One [xl_chart_series()], or a list of them.}
+\item{series}{One [xl_chart_series()], or a list of them.  Every series of a
+scatter chart must have `categories`, which are its x axis.}
 
 \item{title}{The chart title: a string, or a range holding one.  `FALSE`
 removes the title Excel would otherwise generate.}
