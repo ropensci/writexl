@@ -914,8 +914,9 @@ xl_chart("line",
 ```
 
 `xl_chart_labels()` with no arguments prints each point's value, which is
-Excel's own default; `show_name`, `show_category` and `show_percentage` add the
-rest, and `separator` says what joins them. `custom =` takes a list of
+Excel's own default. Naming any part means the label holds **exactly** the
+parts named, so `show_percentage = TRUE` alone gives a percentage with no value
+beside it; `separator` says what joins them when there is more than one. `custom =` takes a list of
 `xl_chart_label()`s, one per point, so a single label can be given its own text
 or removed with `hide = TRUE`. `points =` takes a list of `xl_format()`s the
 same way — one red slice in a pie, the rest left alone:

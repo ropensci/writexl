@@ -24,7 +24,9 @@ xl_chart_label(value = NULL, hide = NA, format = NULL)
 \arguments{
 \item{show_value, show_name, show_category, show_percentage}{What each label
 holds: the point's value, the series name, the category, and the value as
-a percentage of the series.  Giving none of them shows the value.
+a percentage of the series.  Naming any of them means the label holds
+exactly those, so `show_percentage = TRUE` alone gives a percentage and
+nothing else; naming none of them leaves Excel's default, the value.
 Percentages are meaningful on pie and doughnut charts.}
 
 \item{show_legend_key}{Print the series' legend swatch in each label.}

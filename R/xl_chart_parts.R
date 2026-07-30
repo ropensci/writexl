@@ -118,7 +118,9 @@ xl_chart_marker <- function(type = NULL, size = NA, format = NULL) {
 #'
 #' @param show_value,show_name,show_category,show_percentage What each label
 #'   holds: the point's value, the series name, the category, and the value as
-#'   a percentage of the series.  Giving none of them shows the value.
+#'   a percentage of the series.  Naming any of them means the label holds
+#'   exactly those, so `show_percentage = TRUE` alone gives a percentage and
+#'   nothing else; naming none of them leaves Excel's default, the value.
 #'   Percentages are meaningful on pie and doughnut charts.
 #' @param show_legend_key Print the series' legend swatch in each label.
 #' @param num_format A number format for the labels, as an Excel format string
@@ -404,8 +406,13 @@ xl_chart_error_bars <- function(type, value = NA, direction = NULL,
   if (is.null(l)) return(NULL)
   p <- unclass(l)
   ent <- list(on = 1L)
+  # Excel puts the value in a label unless told otherwise, so asking for the
+  # percentage alone has to switch the value off -- otherwise a label reads
+  # "10, 11.8%" when only "11.8%" was asked for.  Naming any part at all means
+  # the label holds exactly the parts named.
   shown <- c("show_name", "show_category", "show_value")
-  if (any(vapply(shown, function(k) !is.null(p[[k]]), logical(1))))
+  asked <- c(shown, "show_percentage")
+  if (any(vapply(asked, function(k) !is.null(p[[k]]), logical(1))))
     ent$options <- as.integer(vapply(shown, function(k) isTRUE(p[[k]]),
                                      logical(1)))
   if (isTRUE(p[["show_percentage"]])) ent$percentage <- 1L

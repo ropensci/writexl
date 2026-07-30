@@ -126,7 +126,9 @@
   `xl_chart_error_bars()` for `x_error_bars` and `y_error_bars`, and an
   `xl_format()` per point in `points =` to colour one slice of a pie or one
   bar of a column chart. Custom labels give a single point its own text, its
-  own styling, or `hide = TRUE`.
+  own styling, or `hide = TRUE`. A label holds exactly the parts named, so
+  `show_percentage = TRUE` gives a percentage rather than Excel's
+  "10, 11.8%"; naming none of them leaves Excel's default, the value.
 
   These carry three more restrictions libxlsxwriter documents and does not
   enforce: the positions a data label may take depend on the chart type (the

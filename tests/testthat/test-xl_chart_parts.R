@@ -82,10 +82,31 @@ test_that("every label option reaches the file", {
   expect_false(grepl("showSerName", x, fixed = TRUE))
 })
 
-test_that("percentage labels reach a pie chart", {
-  x <- part_xml(labels = xl_chart_labels(show_percentage = TRUE),
-                type = "pie")
-  expect_match(x, '<c:showPercent val="1"/>', fixed = TRUE)
+test_that("a label holds exactly the parts named, and the value otherwise", {
+  # Excel puts the value in every label unless told otherwise, so asking for
+  # the percentage alone used to produce "10, 11.8%" -- found in Excel, and
+  # the reason naming any part now names them all
+  only_pc <- part_xml(labels = xl_chart_labels(show_percentage = TRUE),
+                      type = "pie")
+  expect_match(only_pc, '<c:showPercent val="1"/>', fixed = TRUE)
+  expect_false(grepl("showVal", only_pc, fixed = TRUE))
+
+  # naming nothing leaves Excel's default
+  expect_match(part_xml(labels = xl_chart_labels(), type = "pie"),
+               '<c:showVal val="1"/>', fixed = TRUE)
+
+  # and both together, when both are asked for
+  both <- part_xml(labels = xl_chart_labels(show_value = TRUE,
+                                            show_percentage = TRUE),
+                   type = "pie")
+  expect_match(both, '<c:showVal val="1"/>', fixed = TRUE)
+  expect_match(both, '<c:showPercent val="1"/>', fixed = TRUE)
+
+  # naming the category alone drops the value too
+  cat_only <- part_xml(labels = xl_chart_labels(show_category = TRUE),
+                       type = "pie")
+  expect_match(cat_only, '<c:showCatName val="1"/>', fixed = TRUE)
+  expect_false(grepl("showVal", cat_only, fixed = TRUE))
 })
 
 test_that("a label position is refused where the chart type has no such place", {
