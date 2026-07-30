@@ -7,7 +7,7 @@
 xl_chart_axis(
   name = NULL,
   name_format = NULL,
-  name_at = NULL,
+  name_layout = NULL,
   label_format = NULL,
   num_format = NULL,
   line_format = NULL,
@@ -42,8 +42,9 @@ xl_chart_axis(
 \item{name_format}{An [xl_format()] styling the axis title.  A title is
 text, so only the [xl_font()] group applies.}
 
-\item{name_at}{Where to put the axis title, as `c(x, y)` fractions of the
-chart, each above 0 and at most 1.  Excel places it for you otherwise.}
+\item{name_layout}{Where to put the axis title by hand, as `c(x, y)`
+fractions of the chart, each above 0 and at most 1.  Excel places it for
+you otherwise.}
 
 \item{label_format}{An [xl_format()] styling the tick labels --- the
 [xl_font()] group only.}
@@ -137,8 +138,10 @@ Other images and charts:
 \code{\link[=xl_chart]{xl_chart()}},
 \code{\link[=xl_chart_error_bars]{xl_chart_error_bars()}},
 \code{\link[=xl_chart_labels]{xl_chart_labels()}},
+\code{\link[=xl_chart_legend]{xl_chart_legend()}},
 \code{\link[=xl_chart_marker]{xl_chart_marker()}},
 \code{\link[=xl_chart_series]{xl_chart_series()}},
+\code{\link[=xl_chart_table]{xl_chart_table()}},
 \code{\link[=xl_chart_trendline]{xl_chart_trendline()}},
 \code{\link[=xl_image]{xl_image()}}
 }

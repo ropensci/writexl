@@ -936,10 +936,49 @@ allows. A **moving average** has no forecast, equation or R-squared; an
 **automatic marker** takes neither a size nor a format, since it is Excel's own
 default symbol for that series.
 
+### The chart as a whole
+
+The legend, the table of numbers beneath the chart, and the two areas the chart
+is drawn in are all reachable:
+
+```{r}
+xl_chart("column", xl_chart_series(values = list(cols = "revenue")),
+         legend = xl_chart_legend(position = "bottom",
+                                  format = xl_font(size = 8)),
+         data_table = xl_chart_table(show_keys = TRUE),
+         plot_area_format = xl_fill(background = "#F8F8F8"),
+         chart_area_format = xl_border(all = "thin", color = "gray"))
+```
+
+`xl_chart_legend(position = "none")` removes the legend, and `delete_series`
+leaves one series out of the key while still plotting it — how a helper series
+is kept out of the way.
+
+Anything placed by hand takes a `layout` rather than an `at`: `title_layout`,
+`plot_area_layout`, `xl_chart_axis(name_layout =)` and
+`xl_chart_legend(layout =)` are fractions of the chart's own width and height,
+where `at` means a cell everywhere else in writexl.
+
+`show_blanks` decides what an empty cell does — leave a `"gap"`, plot it as
+`"zero"`, or run `"connected"` across it — and `show_hidden_data` plots rows and
+columns Excel would otherwise leave out.
+
 ### Features that belong to some types only
 
 Excel discards a setting the chart type does not have without saying so, so
 writexl checks first and names the types that would work. Only a doughnut has a
-`hole_size`; only pie and doughnut `rotation`; up-down bars and high-low lines
-are line-only; the series gap and overlap are bar and column only; smoothing is
-line and scatter only; and pie and doughnut charts have no axes at all.
+`hole_size`; only pie and doughnut `rotation`; `drop_lines` are line and area;
+`high_low_lines` and `up_down_bars` are line-only; `series_gap` and
+`series_overlap` are bar and column only; smoothing is line and scatter only;
+and pie and doughnut charts have no axes at all.
+
+```{r}
+xl_chart("line",
+         list(xl_chart_series(values = list(cols = "revenue"), name = "a"),
+              xl_chart_series(values = list(cols = "revenue"), name = "b")),
+         high_low_lines = TRUE,
+         up_down_bars = list(up = xl_fill(background = "green"),
+                             down = xl_fill(background = "red")))
+```
+
+Each of those takes `TRUE` for Excel's own drawing, or a format to style it.

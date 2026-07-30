@@ -104,8 +104,9 @@
 #'   `list(header = "revenue")`.
 #' @param name_format An [xl_format()] styling the axis title.  A title is
 #'   text, so only the [xl_font()] group applies.
-#' @param name_at Where to put the axis title, as `c(x, y)` fractions of the
-#'   chart, each above 0 and at most 1.  Excel places it for you otherwise.
+#' @param name_layout Where to put the axis title by hand, as `c(x, y)`
+#'   fractions of the chart, each above 0 and at most 1.  Excel places it for
+#'   you otherwise.
 #' @param label_format An [xl_format()] styling the tick labels --- the
 #'   [xl_font()] group only.
 #' @param num_format A number format for the tick labels, as an Excel format
@@ -155,7 +156,7 @@
 #' xl_chart_axis(name = "Quarter")
 #' xl_chart_axis(name = "Revenue", min = 0, num_format = "$#,##0",
 #'               major_gridlines = FALSE)
-xl_chart_axis <- function(name = NULL, name_format = NULL, name_at = NULL,
+xl_chart_axis <- function(name = NULL, name_format = NULL, name_layout = NULL,
                           label_format = NULL, num_format = NULL,
                           line_format = NULL, visible = NA, reverse = NA,
                           min = NA, max = NA, log_base = NA,
@@ -201,12 +202,12 @@ xl_chart_axis <- function(name = NULL, name_format = NULL, name_at = NULL,
       stop("`crossing` must be a number, \"min\" or \"max\"", call. = FALSE)
   }
 
-  at <- name_at
+  at <- name_layout
   if (!is.null(at)) {
     if (!is.numeric(at) || length(at) != 2L || anyNA(at) ||
         any(at <= 0) || any(at > 1))
-      stop(paste0("`name_at` must be c(x, y), each above 0 and at most 1 -- ",
-                  "they are fractions of the chart's width and height"),
+      stop(paste0("`name_layout` must be c(x, y), each above 0 and at most 1 ",
+                  "-- they are fractions of the chart's width and height"),
            call. = FALSE)
     at <- as.numeric(at)
   }
@@ -218,7 +219,7 @@ xl_chart_axis <- function(name = NULL, name_format = NULL, name_at = NULL,
     name_format = .chart_format_payload(name_format, "name_format",
                                         accept = "font",
                                         part = "an axis title"),
-    name_at = at,
+    name_layout = at,
     label_format = .chart_format_payload(label_format, "label_format",
                                          accept = "font",
                                          part = "an axis tick label"),
@@ -309,9 +310,9 @@ print.xl_chart_axis <- function(x, ...) {
   ent$name_font  <- p[["name_format"]]
   ent$num_font   <- p[["label_format"]]
   ent$num_format <- p[["num_format"]]
-  if (!is.null(p[["name_at"]])) {
-    ent$name_x <- p[["name_at"]][[1L]]
-    ent$name_y <- p[["name_at"]][[2L]]
+  if (!is.null(p[["name_layout"]])) {
+    ent$name_x <- p[["name_layout"]][[1L]]
+    ent$name_y <- p[["name_layout"]][[2L]]
   }
   ent$line    <- p[["line_format"]][["line"]]
   ent$fill    <- p[["line_format"]][["fill"]]

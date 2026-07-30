@@ -33,9 +33,13 @@
   radar = 20L, radar_markers = 21L, radar_filled = 22L
 )
 
+# NONE is 0, not one past the end: chart_legend_set_position() rejects
+# anything above OVERLAY_TOP_RIGHT, so "none" as 9 was refused with a warning
+# and the legend stayed put.  Written in the enum's own order to keep it
+# checkable against the header.
 .LXW_CHART_LEGEND <- c(
-  right = 1L, left = 2L, top = 3L, bottom = 4L, top_right = 5L,
-  overlay_right = 6L, overlay_left = 7L, overlay_top_right = 8L, none = 9L
+  none = 0L, right = 1L, left = 2L, top = 3L, bottom = 4L, top_right = 5L,
+  overlay_right = 6L, overlay_left = 7L, overlay_top_right = 8L
 )
 
 # --- Which features a chart type supports ------------------------------------
@@ -247,6 +251,36 @@ print.xl_chart_series <- function(x, ...) {
 #'   Excel would otherwise generate.
 #' @param title_format An [xl_format()] styling the title text.  A title is
 #'   text, so only the [xl_font()] group applies.
+#' @param title_layout Where to put the title by hand, as `c(x, y)` fractions
+#'   of the chart.  Excel places it for you otherwise.
+#' @param title_overlay Let the title sit over the plot rather than above it.
+#' @param legend An [xl_chart_legend()] moving, styling or removing the legend.
+#' @param data_table An [xl_chart_table()] printing the plotted numbers in a
+#'   grid beneath the chart.
+#' @param plot_area_format,chart_area_format An [xl_format()] styling the plot
+#'   area --- the panel the data is drawn in --- and the chart area around it:
+#'   [xl_border()] for the line, [xl_fill()] for the fill or pattern.
+#' @param plot_area_layout Where to put the plot area by hand, as `c(x, y)`
+#'   or `c(x, y, width, height)` fractions of the chart.
+#' @param drop_lines Drop lines from each point to the category axis: `TRUE`,
+#'   or an [xl_format()] giving the line to draw them with.  Line and area
+#'   charts.
+#' @param high_low_lines A line joining the highest and lowest series at each
+#'   category, the same way.  Line charts.
+#' @param up_down_bars Bars between the first and last series at each category:
+#'   `TRUE`, or `list(up = , down = )` with an [xl_format()] for either bar.
+#'   Line charts.
+#' @param hole_size The size of a doughnut's hole, 10 to 90 percent.
+#' @param rotation Where a pie or doughnut starts, 0 to 360 degrees clockwise
+#'   from the top.
+#' @param series_gap The gap between category groups on a bar or column chart,
+#'   0 to 500 percent of a bar's width.
+#' @param series_overlap How far bars of one category overlap, -100 to 100
+#'   percent.  100 stacks them, -100 pushes them apart.
+#' @param show_blanks What an empty cell does to the plot: leave a `"gap"`,
+#'   plot it as `"zero"`, or join across it with `"connected"`.
+#' @param show_hidden_data Plot data from rows and columns that are hidden.
+#'   Excel leaves them out otherwise.
 #' @param x_axis,y_axis An [xl_chart_axis()] describing that axis.  Pie and
 #'   doughnut charts have none, and several axis options apply to a value or a
 #'   category axis only --- see [xl_chart_axis()].
@@ -266,7 +300,15 @@ print.xl_chart_series <- function(x, ...) {
 #' xl_chart("column", xl_chart_series(values = list(cols = "revenue")))
 #' xl_chart("pie", xl_chart_series(values = "Data!B2:B5"), title = "Share")
 xl_chart <- function(type, series, title = NULL, title_format = NULL,
+                     title_layout = NULL, title_overlay = NA,
                      x_axis = NULL, y_axis = NULL,
+                     legend = NULL, data_table = NULL,
+                     plot_area_format = NULL, plot_area_layout = NULL,
+                     chart_area_format = NULL,
+                     drop_lines = NA, high_low_lines = NA, up_down_bars = NA,
+                     hole_size = NA, rotation = NA,
+                     series_gap = NA, series_overlap = NA,
+                     show_blanks = NULL, show_hidden_data = NA,
                      at = "A1", scale = 1,
                      offset = NULL, position = "move_and_size",
                      description = NULL, decorative = FALSE, style = NA) {
@@ -281,6 +323,26 @@ xl_chart <- function(type, series, title = NULL, title_format = NULL,
     stop("a chart needs at least one series", call. = FALSE)
   .check_axis(x_axis, "x", ty, "x_axis")
   .check_axis(y_axis, "y", ty, "y_axis")
+  for (nm in c("legend", "data_table"))
+    if (!is.null(get(nm)) && !inherits(get(nm), paste0("xl_chart_",
+                                                       sub("data_", "", nm))))
+      stop(sprintf("`%s` must be an xl_chart_%s() object", nm,
+                   sub("data_", "", nm)), call. = FALSE)
+
+  # the six that belong to one family; the matrix has known which since the
+  # first chart landed, and these are the arguments that reach it
+  drop_l <- .chart_line_switch(drop_lines, "drop_lines")
+  high_l <- .chart_line_switch(high_low_lines, "high_low_lines")
+  updown <- .chart_up_down(up_down_bars, "up_down_bars")
+  hole <- .val_int(hole_size, "hole_size", min = 10, max = 90)
+  rot <- .val_int(rotation, "rotation", min = 0, max = 360)
+  gap <- .val_int(series_gap, "series_gap", min = 0, max = 500)
+  ovl <- .val_int(series_overlap, "series_overlap", min = -100, max = 100)
+  for (f in list(list(drop_l, "drop_lines"), list(high_l, "high_low_lines"),
+                 list(updown, "up_down_bars"), list(hole, "hole_size"),
+                 list(rot, "rotation"), list(gap, "series_gap"),
+                 list(ovl, "series_overlap")))
+    if (!is.null(f[[1L]])) .check_chart_feature(ty, f[[2L]], f[[2L]])
   for (i in seq_along(ss))
     .check_series_parts(ss[[i]], ty, sprintf("series[[%d]]", i))
 
@@ -337,8 +399,24 @@ xl_chart <- function(type, series, title = NULL, title_format = NULL,
                                                  part = "a chart title")))
   }
 
+  ttl <- .chart_title_extras(ttl, title_layout, title_overlay)
+
   structure(.drop_null(list(
     type = ty, series = ss, title = ttl, x_axis = x_axis, y_axis = y_axis,
+    legend = legend, data_table = data_table,
+    plot_area_format = .chart_format_payload(
+      plot_area_format, "plot_area_format",
+      accept = c("line", "fill", "pattern"), part = "a plot area"),
+    plot_area_layout = .chart_layout(plot_area_layout,
+                                     "plot_area_layout"),
+    chart_area_format = .chart_format_payload(
+      chart_area_format, "chart_area_format",
+      accept = c("line", "fill", "pattern"), part = "a chart area"),
+    drop_lines = drop_l, high_low_lines = high_l, up_down_bars = updown,
+    hole_size = hole, rotation = rot, series_gap = gap, series_overlap = ovl,
+    show_blanks = .val_enum(show_blanks, names(.LXW_CHART_BLANKS),
+                            "show_blanks"),
+    show_hidden_data = .val_flag(show_hidden_data, "show_hidden_data"),
     at = at, scale = sc, offset = pair(offset, "offset", "of pixels as c(x, y)"),
     position = .val_enum(position, names(.LXW_OBJECT_POSITION), "position"),
     description = if (is.null(description)) NULL else {
@@ -454,6 +532,8 @@ print.xl_chart <- function(x, ...) {
     ttl <- p[["title"]]
     if (!is.null(ttl)) {
       ent$title_format <- ttl[["format"]]
+      if (!is.null(ttl[["layout"]])) ent$title_layout <- ttl[["layout"]]
+      if (!is.null(ttl[["overlay"]])) ent$title_overlay <- ttl[["overlay"]]
       if (isTRUE(ttl[["off"]]))        ent$title_off <- 1L
       else if (!is.null(ttl[["text"]])) ent$title <- ttl[["text"]]
       # `title_format` alone leaves Excel's automatic title in place and only
@@ -465,6 +545,28 @@ print.xl_chart <- function(x, ...) {
         ent$title_range <- r$range
       }
     }
+
+    ent$legend     <- .legend_payload(p[["legend"]])
+    ent$data_table <- .chart_table_payload(p[["data_table"]])
+    for (k in c("plot_area_format", "chart_area_format")) {
+      f <- p[[k]]
+      if (is.null(f)) next
+      pre <- sub("_format$", "", k)
+      ent[[paste0(pre, "_line")]]    <- f[["line"]]
+      ent[[paste0(pre, "_fill")]]    <- f[["fill"]]
+      ent[[paste0(pre, "_pattern")]] <- f[["pattern"]]
+    }
+    ent$plot_area_layout <- p[["plot_area_layout"]]
+    ent$drop_lines     <- p[["drop_lines"]]
+    ent$high_low_lines <- p[["high_low_lines"]]
+    ent$up_down_bars   <- p[["up_down_bars"]]
+    ent$hole_size      <- p[["hole_size"]]
+    ent$rotation       <- p[["rotation"]]
+    ent$series_gap     <- p[["series_gap"]]
+    ent$series_overlap <- p[["series_overlap"]]
+    if (!is.null(p[["show_blanks"]]))
+      ent$show_blanks <- unname(.LXW_CHART_BLANKS[[p[["show_blanks"]]]])
+    if (isTRUE(p[["show_hidden_data"]])) ent$show_hidden_data <- 1L
 
     ent$x_axis <- .axis_payload(p[["x_axis"]], sprintf("chart[[%d]] x_axis", i),
                                 sheets, own, header_offset)

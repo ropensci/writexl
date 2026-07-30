@@ -138,11 +138,25 @@
   size or a format. A test reads the function list out of the bundled
   `chart.h`, so all 40 `chart_series_*()` functions are known to be reached.
 
-  Features that apply to only some chart types --- the doughnut hole, pie
-  rotation, up-down bars, high-low lines, the series gap and overlap, smoothing
-  --- are checked against the chart's type, because Excel discards them without
-  a word. A scatter series must have `categories`: they are its x axis, and
-  libxlsxwriter crashes without them.
+  **The chart itself** --- `xl_chart_legend()` moves, styles or removes the
+  legend and can leave a series out of the key; `xl_chart_table()` prints the
+  plotted numbers in a grid beneath the chart; `plot_area_format` and
+  `chart_area_format` style the panel and the surround; `title_layout`,
+  `plot_area_layout` and `xl_chart_legend(layout =)` place those parts by hand;
+  `show_blanks` says what an empty cell does to the plot, and
+  `show_hidden_data` plots rows Excel would leave out.
+
+  The six options that belong to one family of chart --- the doughnut hole, pie
+  rotation, drop lines, high-low lines, up-down bars, and the bar gap and
+  overlap --- are now reachable, and the feature matrix that has known about
+  them since the first charts refuses them elsewhere. `drop_lines` and
+  `high_low_lines` take `TRUE` or an `xl_format()` giving their line;
+  `up_down_bars` takes `TRUE` or `list(up =, down =)`.
+
+  Features that apply to only some chart types are checked against the chart's
+  type throughout, because Excel discards them without a word. A scatter series
+  must have `categories`: they are its x axis, and libxlsxwriter crashes
+  without them.
 
 * `xl_filter_keep()` exposes the matching rule on its own: given a data frame
   and one or more `xl_filter()`s, it returns which rows Excel would leave

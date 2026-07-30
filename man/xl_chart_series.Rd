@@ -84,7 +84,9 @@ Other images and charts:
 \code{\link[=xl_chart_axis]{xl_chart_axis()}},
 \code{\link[=xl_chart_error_bars]{xl_chart_error_bars()}},
 \code{\link[=xl_chart_labels]{xl_chart_labels()}},
+\code{\link[=xl_chart_legend]{xl_chart_legend()}},
 \code{\link[=xl_chart_marker]{xl_chart_marker()}},
+\code{\link[=xl_chart_table]{xl_chart_table()}},
 \code{\link[=xl_chart_trendline]{xl_chart_trendline()}},
 \code{\link[=xl_image]{xl_image()}}
 }

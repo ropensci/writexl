@@ -106,8 +106,9 @@ test_that("axis arguments are validated", {
   expect_error(xl_chart_axis(crossing = c(1, 2)),
                "must be a number, \"min\" or \"max\"")
   expect_error(xl_chart_axis(num_format = 42), "must be an Excel format string")
-  expect_error(xl_chart_axis(name_at = c(0, 0.5)), "each above 0 and at most 1")
-  expect_error(xl_chart_axis(name_at = 0.5), "must be c\\(x, y\\)")
+  expect_error(xl_chart_axis(name_layout = c(0, 0.5)),
+               "each above 0 and at most 1")
+  expect_error(xl_chart_axis(name_layout = 0.5), "must be c\\(x, y\\)")
   expect_error(xl_chart("column", xl_chart_series(values = "A1"),
                         x_axis = "bottom"),
                "must be an xl_chart_axis")
@@ -174,7 +175,7 @@ test_that("every axis option reaches the chart XML", {
                            major_gridlines = TRUE, minor_gridlines = TRUE,
                            minor_gridlines_format = xl_border(all = "dotted",
                                                               color = "blue"),
-                           name_at = c(0.02, 0.4)))
+                           name_layout = c(0.02, 0.4)))
   want <- c(
     "Quarter",                              # name
     "<c:f>Data!$B$1</c:f>",                 # name from a header cell
@@ -195,7 +196,7 @@ test_that("every axis option reaches the chart XML", {
     "<c:majorGridlines/>", "<c:minorGridlines>",
     '<a:prstDash val="dot"/>',              # the minor gridline's own line
     "0000FF",                               # and its colour
-    "<c:manualLayout>",                     # name_at
+    "<c:manualLayout>",                     # name_layout
     'sz="1200"', 'i="1"'                    # the two fonts
   )
   for (w in want) expect_true(grepl(w, x, fixed = TRUE), info = w)
