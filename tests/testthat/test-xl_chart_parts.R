@@ -83,9 +83,8 @@ test_that("every label option reaches the file", {
 })
 
 test_that("a label holds exactly the parts named, and the value otherwise", {
-  # Excel puts the value in every label unless told otherwise, so asking for
-  # the percentage alone used to produce "10, 11.8%" -- found in Excel, and
-  # the reason naming any part now names them all
+  # Excel puts the value in every label unless told otherwise, so the
+  # percentage alone would otherwise read "10, 11.8%"
   only_pc <- part_xml(labels = xl_chart_labels(show_percentage = TRUE),
                       type = "pie")
   expect_match(only_pc, '<c:showPercent val="1"/>', fixed = TRUE)

@@ -3,14 +3,14 @@
 # that belong to one family of chart
 # =============================================================================
 #
-# The last 26 chart_*() functions.  Two constructors -- the legend and the data
-# table -- and the rest are arguments of xl_chart(), because they are single
-# values rather than objects with parts of their own.
+# Two constructors -- the legend and the data table -- and a set of xl_chart()
+# arguments for the rest, which are single values rather than objects with
+# parts of their own.
 #
-# Six of them apply to one family only, and the feature matrix in xl_chart.R
-# already knows which: the doughnut hole, pie rotation, up-down bars, high-low
-# lines, drop lines, and the bar gap and overlap.  Excel drops the rest without
-# a word.
+# Six apply to one family of chart only: the doughnut hole, pie rotation,
+# up-down bars, high-low lines, drop lines, and the bar gap and overlap.
+# .CHART_FEATURE_FAMILIES in xl_chart.R holds which, since Excel drops the
+# rest without a word.
 # -----------------------------------------------------------------------------
 
 .LXW_CHART_BLANKS <- c(gap = 0L, zero = 1L, connected = 2L)
@@ -175,7 +175,7 @@ xl_chart_table <- function(show_keys = NA, horizontal = NA, vertical = NA,
   .drop_null(ent)
 }
 
-# The title carries its own layout and overlay alongside its text and font, so
+# The title carries its layout and overlay alongside its text and font, so
 # that .chart_list() has one place to look.
 .chart_title_extras <- function(ttl, layout, overlay) {
   lay <- .chart_layout(layout, "title_layout", size_ok = FALSE)

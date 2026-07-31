@@ -248,9 +248,9 @@ test_that("an axis name may come from another sheet", {
 # ── Coverage of the C API ─────────────────────────────────────────────────────
 
 test_that("every chart_axis_*() function libxlsxwriter offers is called", {
-  # A mechanical gate rather than a promise in prose: a function added upstream,
-  # or one dropped from apply_axis() by a careless edit, fails here.  Skipped
-  # where the sources are not alongside the tests (an installed package).
+  # A mechanical gate rather than a promise in prose: a function added
+  # upstream, or one dropped from apply_axis(), fails here.  Skipped where the
+  # sources are not alongside the tests, as in an installed package.
   hdr <- NULL
   for (p in c("../../src/libxlsxwriter/include/xlsxwriter/chart.h",
               "../../../src/libxlsxwriter/include/xlsxwriter/chart.h"))
@@ -277,8 +277,8 @@ test_that("every chart_axis_*() function libxlsxwriter offers is called", {
 test_that("the display-units caption is on unless it is turned off", {
   # chart_axis_set_display_units() sets display_units_visible itself, so the
   # caption comes with the rescaling and `TRUE` adds nothing.  Pinned because
-  # the argument would otherwise read as opt-in, and because a change upstream
-  # would silently flip what a workbook looks like.
+  # the argument reads as opt-in, and because a change upstream would silently
+  # alter every such chart.
   on <- axis_xml(y_axis = xl_chart_axis(display_units = "thousands"))
   expect_match(on, "<c:dispUnitsLbl>", fixed = TRUE)
   same <- axis_xml(y_axis = xl_chart_axis(display_units = "thousands",

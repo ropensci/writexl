@@ -27,9 +27,8 @@
 #     refused rather than one side being picked.
 # -----------------------------------------------------------------------------
 
-# Cell border style -> chart dash type.  Only exact equivalents are listed; the
-# rest are refused by .chart_dash(), which is the point of keeping this table
-# short rather than approximating.
+# Cell border style -> chart dash type.  Only exact equivalents are listed;
+# .chart_dash() refuses the rest rather than approximating them.
 .CHART_DASH <- c(
   thin       = 0L,   # LXW_CHART_LINE_DASH_SOLID
   dashed     = 3L,   # DASH
@@ -69,11 +68,10 @@
   protection = "a chart shape cannot be locked or hidden"
 )
 
-# Not every chart part takes every piece.  A series is a shape and has no text,
-# so libxlsxwriter gives it a line, a fill and a pattern but no font; a title is
-# text and only takes a font.  Passing a group the target cannot use has to be
-# an error, because libxlsxwriter has nowhere to put it and would drop it in
-# silence -- the caller would see an unstyled chart and no reason why.
+# Not every chart part takes every piece.  A series is a shape and has no
+# text, so it takes a line, a fill and a pattern but no font; a title is text
+# and takes only a font.  A group the target cannot use has nowhere to go, so
+# it is an error rather than a silent drop.
 .CHART_PART_CANNOT <- c(
   font    = paste0("a font, but %s is a shape and has no text -- set the font ",
                    "on the chart title"),

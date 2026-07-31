@@ -20,8 +20,7 @@
 #     axes are not renamed.
 #
 # .check_axis_option() refuses an option the axis cannot use, naming the axis
-# that can.  That is the whole reason this file is bigger than a list of
-# setters.
+# that can.
 # -----------------------------------------------------------------------------
 
 .LXW_AXIS_POSITION <- c(on_tick = 1L, between = 2L)
@@ -178,9 +177,8 @@ xl_chart_axis <- function(name = NULL, name_format = NULL, name_layout = NULL,
     stop(paste0("`name_format` styles the axis title, so give a `name` too. ",
                 "An axis with no title has nothing to style."), call. = FALSE)
 
-  # A number format is an ordinary Excel format string here, not an xl_format:
-  # chart_axis_set_num_format() takes the string itself.  Accepting the
-  # constructor as well saves remembering which one this argument wants.
+  # chart_axis_set_num_format() takes the format string itself rather than an
+  # xl_format; the constructor is accepted too so either spelling works.
   nf <- num_format
   if (is_xl_format(nf)) {
     grp <- unclass(nf)
@@ -275,8 +273,8 @@ print.xl_chart_axis <- function(x, ...) {
 
 # --- Resolution --------------------------------------------------------------
 
-# Everything about an axis that the chart's type decides, checked where the
-# caller wrote it rather than at write time.
+# Everything about an axis that the chart's type decides.  Checked here so it
+# is refused where the caller wrote it rather than at write time.
 .check_axis <- function(ax, which, type, arg) {
   if (is.null(ax)) return(invisible(NULL))
   if (!inherits(ax, "xl_chart_axis"))
@@ -288,8 +286,8 @@ print.xl_chart_axis <- function(x, ...) {
   invisible(NULL)
 }
 
-# One axis -> the payload C reads.  Everything type-dependent was checked by
-# .check_axis() when the chart was built.
+# One axis -> the payload C reads.  Anything type-dependent has already been
+# checked by .check_axis().
 .axis_payload <- function(ax, arg, sheets, own, header_offset) {
   if (is.null(ax)) return(NULL)
   p <- unclass(ax)
@@ -305,8 +303,8 @@ print.xl_chart_axis <- function(x, ...) {
       ent$name_range <- r$range
     }
   }
-  # the payload itself, not its $font: chart_font_of() in C looks the font up
-  # by key, the same way it reads a series format
+  # the payload itself, not its $font: chart_font_of() looks the font up by
+  # key, the same way it reads a series format
   ent$name_font  <- p[["name_format"]]
   ent$num_font   <- p[["label_format"]]
   ent$num_format <- p[["num_format"]]
@@ -354,8 +352,7 @@ print.xl_chart_axis <- function(x, ...) {
     ent$major_gridlines <- as.integer(p[["major_gridlines"]])
   if (!is.null(p[["minor_gridlines"]]))
     ent$minor_gridlines <- as.integer(p[["minor_gridlines"]])
-  # a gridline that is styled but never switched on is invisible, and setting
-  # the line is the clearest possible statement that it was meant to show
+  # a gridline styled but never switched on would be invisible
   for (g in c("major", "minor")) {
     ln <- p[[paste0(g, "_gridlines_format")]][["line"]]
     if (is.null(ln)) next

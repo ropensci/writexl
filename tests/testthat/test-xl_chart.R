@@ -1,5 +1,5 @@
-# Charts.  This file covers the constructors, the chart-type feature matrix and
-# range specs; what reaches the file is tested once apply_charts() lands.
+# Charts: the constructors, the chart-type feature matrix, range specs, and
+# what reaches the chart XML.
 
 # ── Chart types ───────────────────────────────────────────────────────────────
 
@@ -432,8 +432,7 @@ test_that("every relationship a chart adds resolves", {
 test_that("a scatter series must have categories", {
   # not a style preference: libxlsxwriter's _chart_write_cat() reads
   # series->categories->has_string_cache before its own NULL guard, so a
-  # scatter series without categories segfaults.  Found by bisecting a crash in
-  # this very file, and reduced to a check that says what to do.
+  # scatter series without categories segfaults.
   for (ty in c("scatter", "scatter_straight", "scatter_straight_markers",
                "scatter_smooth", "scatter_smooth_markers"))
     expect_error(xl_chart(ty, xl_chart_series(values = "B1:B5")),
@@ -449,9 +448,8 @@ test_that("a scatter series must have categories", {
 })
 
 test_that("every chart type writes a file without crashing", {
-  # the scatter crash reached the C layer, where a bad assumption is a
-  # segfault rather than a failed expectation, so every type is exercised
-  # end to end
+  # at the C layer a bad assumption is a segfault rather than a failed
+  # expectation, so every type is exercised end to end
   for (ty in names(.LXW_CHART_TYPE)) {
     se <- if (identical(.CHART_FAMILY(ty), "scatter"))
       xl_chart_series(values = list(cols = "qty"),
@@ -477,10 +475,9 @@ test_that("a title format styles the title, and reaches the file", {
 })
 
 test_that("a title format needs a title to attach to", {
-  # measured, not assumed: with no title libxlsxwriter writes no <c:title>
-  # element at all, so chart_title_set_name_font() has nothing to style and the
-  # font disappears silently.  The automatic title of a single-series chart is
-  # Excel's own and never reaches the file.
+  # with no title libxlsxwriter writes no <c:title> element at all, so
+  # chart_title_set_name_font() has nothing to style.  The automatic title of
+  # a single-series chart is Excel's own and never reaches the file.
   expect_error(xl_chart("column", xl_chart_series(values = "A1:A5"),
                         title_format = xl_font(italic = TRUE)),
                "give a `title` too", fixed = TRUE)
@@ -508,7 +505,7 @@ test_that("a title format may not set a fill or a border", {
 })
 
 test_that("a series format may not set a font", {
-  # refused where it was written, not at write time
+  # refused by the constructor, not at write time
   expect_error(xl_chart_series(values = list(cols = "qty"),
                                format = xl_font(bold = TRUE)),
                "a shape and has no text")

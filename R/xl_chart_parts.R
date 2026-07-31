@@ -3,13 +3,12 @@
 # and individual points
 # =============================================================================
 #
-# Thirty-one more chart_series_*() functions, in five groups.  Each group is one
-# constructor, and each takes a `format` translated by .chart_format_payload()
-# into whichever of line / fill / pattern / font that part can use -- a
-# trendline is a line and takes nothing else, a data label is a shape with text
-# and takes all four.
+# Five constructors over the chart_series_*() functions.  Each takes a
+# `format` translated by .chart_format_payload() into whichever of line / fill
+# / pattern / font that part can use: a trendline is a line and takes nothing
+# else, a data label is a shape with text and takes all four.
 #
-# Three restrictions are documented in chart.h and enforced nowhere:
+# Four restrictions are documented in chart.h and enforced nowhere:
 #
 #   * the positions a data label may take depend on the chart type, and the
 #     header carries the whole table (Line/Scatter, Bar/Column, Pie/Doughnut,
@@ -368,8 +367,8 @@ xl_chart_error_bars <- function(type, value = NA, direction = NULL,
                  x_error_bars = "xl_chart_error_bars",
                  y_error_bars = "xl_chart_error_bars")
 
-# The parts are validated on their own; this is what needs the chart's type,
-# and so cannot be checked until the series is put into a chart.
+# What needs the chart's type, and so cannot be checked until the series is
+# put into a chart.  The parts validate themselves otherwise.
 .check_series_parts <- function(se, type, arg) {
   p <- unclass(se)
   if (!is.null(p[["labels"]]))
@@ -407,9 +406,8 @@ xl_chart_error_bars <- function(type, value = NA, direction = NULL,
   p <- unclass(l)
   ent <- list(on = 1L)
   # Excel puts the value in a label unless told otherwise, so asking for the
-  # percentage alone has to switch the value off -- otherwise a label reads
-  # "10, 11.8%" when only "11.8%" was asked for.  Naming any part at all means
-  # the label holds exactly the parts named.
+  # percentage alone has to switch the value off -- a label would otherwise
+  # read "10, 11.8%".  Naming any part means the label holds exactly those.
   shown <- c("show_name", "show_category", "show_value")
   asked <- c(shown, "show_percentage")
   if (any(vapply(asked, function(k) !is.null(p[[k]]), logical(1))))

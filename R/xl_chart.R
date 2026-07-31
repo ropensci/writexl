@@ -17,7 +17,6 @@
 # Charts themselves produce a drawing part, so they do not desync
 # libxlsxwriter's drawing-id counter -- but they are *victims* of it in the
 # same way a floating image is, which .check_drawing_order() accounts for.
-# Verified against libxlsxwriter 1.2.4 before any of this was written.
 # -----------------------------------------------------------------------------
 
 # The chart types, named as Excel names them rather than as the enum spells it.
@@ -33,10 +32,9 @@
   radar = 20L, radar_markers = 21L, radar_filled = 22L
 )
 
-# NONE is 0, not one past the end: chart_legend_set_position() rejects
-# anything above OVERLAY_TOP_RIGHT, so "none" as 9 was refused with a warning
-# and the legend stayed put.  Written in the enum's own order to keep it
-# checkable against the header.
+# In the enum's own order, so it can be read against the header.  NONE is 0
+# rather than one past the end, and chart_legend_set_position() rejects
+# anything above OVERLAY_TOP_RIGHT.
 .LXW_CHART_LEGEND <- c(
   none = 0L, right = 1L, left = 2L, top = 3L, bottom = 4L, top_right = 5L,
   overlay_right = 6L, overlay_left = 7L, overlay_top_right = 8L
@@ -103,10 +101,8 @@
     if (length(unknown))
       stop(sprintf("unknown `%s` element(s): %s", arg,
                    paste(unknown, collapse = ", ")), call. = FALSE)
-    # `header` names one column's header cell.  It is its own element rather
-    # than `rows = 0` because `rows` counts data rows everywhere else in
-    # writexl, and because a sheet written without headers has no such cell at
-    # all -- which .resolve_chart_range() can then say plainly.
+    # `header` names one column's header cell.  Its own element rather than
+    # `rows = 0`, because `rows` counts data rows everywhere else in writexl.
     if (!is.null(x[["header"]])) {
       if (!is.null(x[["rows"]]) || !is.null(x[["cols"]]))
         stop(sprintf(paste0("`%s` gives `header` as well as rows/cols; ",
@@ -184,8 +180,8 @@ xl_chart_series <- function(values, categories = NULL, name = NULL,
          call. = FALSE)
   if (!is.null(format) && !is_xl_format(format))
     stop("`format` must be an xl_format object", call. = FALSE)
-  # translated again at write time, when the payload is actually needed; done
-  # here too so a format a series cannot use is refused where it was written
+  # Translated again at write time, when the payload is needed; here too so
+  # that a format a series cannot use is refused where it was written.
   .chart_format_payload(format, "format",
                         accept = c("line", "fill", "pattern"),
                         part = "a chart series")
@@ -329,8 +325,7 @@ xl_chart <- function(type, series, title = NULL, title_format = NULL,
       stop(sprintf("`%s` must be an xl_chart_%s() object", nm,
                    sub("data_", "", nm)), call. = FALSE)
 
-  # the six that belong to one family; the matrix has known which since the
-  # first chart landed, and these are the arguments that reach it
+  # the six that belong to one family, checked against the matrix below
   drop_l <- .chart_line_switch(drop_lines, "drop_lines")
   high_l <- .chart_line_switch(high_low_lines, "high_low_lines")
   updown <- .chart_up_down(up_down_bars, "up_down_bars")
@@ -350,11 +345,10 @@ xl_chart <- function(type, series, title = NULL, title_format = NULL,
     p <- unclass(ss[[i]])
     if (isTRUE(p[["smooth"]]))
       .check_chart_feature(ty, "smooth", sprintf("series[[%d]]$smooth", i))
-    # A scatter chart plots x against y, so a series with no categories has no
-    # x values.  It is also a hard requirement of libxlsxwriter: for a scatter
-    # series _chart_write_cat() reads series->categories->has_string_cache
-    # before its own NULL guard on ->formula, so omitting them segfaults rather
-    # than producing a poor chart.  Reduced from a crash to this check.
+    # A scatter plots x against y, so a series with no categories has no x
+    # values.  libxlsxwriter requires them too: _chart_write_cat() reads
+    # series->categories->has_string_cache before its own NULL guard on
+    # ->formula, so omitting them segfaults.
     if (identical(.CHART_FAMILY(ty), "scatter") && is.null(p[["categories"]]))
       stop(sprintf(paste0("`series[[%d]]` has no `categories`, which a \"%s\" ",
                           "chart needs: a scatter plots values against ",
@@ -379,16 +373,14 @@ xl_chart <- function(type, series, title = NULL, title_format = NULL,
          else if (is.character(title) && length(title) == 1L && !is.na(title))
            list(text = title)
          else .chart_range(title, "title")
-  # A title's only styling in libxlsxwriter is its font, so a fill or a border
-  # here has nowhere to go; .chart_format_payload() says so by name.  Styling a
-  # title that has been switched off is a contradiction rather than a no-op.
+  # A title's only styling is its font, so a fill or a border here has
+  # nowhere to go, and a title switched off has nothing to style.
   if (!is.null(title_format)) {
     if (isTRUE(ttl[["off"]]))
       stop("`title_format` styles the title, but `title = FALSE` removes it",
            call. = FALSE)
-    # The automatic title of a single-series chart is Excel's, not ours: with no
-    # `title` libxlsxwriter writes no <c:title> element, so the font would have
-    # nothing to attach to and would vanish without a word.
+    # The automatic title of a single-series chart is Excel's own: with no
+    # `title` there is no <c:title> element for the font to attach to.
     if (is.null(ttl))
       stop(paste0("`title_format` styles the title, so give a `title` too. ",
                   "The title Excel generates for a single-series chart is not ",
@@ -585,11 +577,10 @@ print.xl_chart <- function(x, ...) {
         se$categories_sheet <- cat_$sheet
         se$categories_range <- cat_$range
       }
-      # With no name of its own a series is "Series 1" in the legend, when the
-      # column it plots already has a label in its header -- which is the name
-      # Excel itself uses when you chart a column with its header.  Only for a
-      # column spec: an A1 range says nothing about whether the row above it is
-      # a header, so guessing there would be a guess.
+      # Unnamed, a series is "Series 1" in the legend while the column it
+      # plots already has a label in its header -- the name Excel itself uses.
+      # Column specs only: an A1 range says nothing about whether the row
+      # above it is a header.
       nm <- q[["name"]]
       if (is.null(nm)) nm <- .series_header_name(q[["values"]], header_offset)
       if (!is.null(nm) && !isTRUE(nm[["off"]])) {
@@ -609,8 +600,7 @@ print.xl_chart <- function(x, ...) {
       se$points       <- q[["points"]]
       if (isTRUE(q[["smooth"]]))             se$smooth <- 1L
       if (isTRUE(q[["invert_if_negative"]])) se$invert_if_negative <- 1L
-      # a series is styled by its line and fill, translated from the ordinary
-      # xl_format the caller gave -- see .chart_format_payload()
+      # a series is styled by its line and fill; see .chart_format_payload()
       if (!is.null(q[["format"]]))
         se$format <- .chart_format_payload(
           q[["format"]], where("format"),

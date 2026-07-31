@@ -25,9 +25,9 @@ ex_xml <- function(..., type = "column", series = ex_two()) {
 # ── The legend ────────────────────────────────────────────────────────────────
 
 test_that("the legend positions are libxlsxwriter's, with none at zero", {
-  # NONE is 0 and the rest run 1..8.  Written as 9 it was above the range
-  # chart_legend_set_position() accepts, so the call warned and the legend
-  # stayed where it was -- found by writing a workbook, not by reading the XML.
+  # NONE is 0 and the rest run 1..8.  Anything above the range
+  # chart_legend_set_position() accepts is refused there with a warning, and
+  # the legend stays where it is.
   expect_equal(.LXW_CHART_LEGEND[["none"]], 0L)
   expect_equal(unname(.LXW_CHART_LEGEND), 0:8)
   expect_equal(names(.LXW_CHART_LEGEND)[[1L]], "none")
@@ -240,8 +240,7 @@ test_that("every chart-level chart_*() function libxlsxwriter offers is called",
   fns <- unique(regmatches(decl, regexpr("chart_[a-z_0-9]+", decl)))
   # the axes and the series have gates of their own
   fns <- fns[!grepl("^chart_(series|axis)_", fns)]
-  # 26 landed here; the other five are the title and the built-in style, which
-  # came with the first charts
+  # the title and the built-in style are in here too
   expect_equal(length(fns), 31L)
 
   called <- paste(readLines(src), collapse = "\n")
