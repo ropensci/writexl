@@ -148,13 +148,16 @@ print.xl_properties <- function(x, ...) {
 #' tmp <- write_xlsx(wb)
 xl_workbook <- function(sheets, properties = xl_properties(),
                         col_names = TRUE, format_headers = TRUE) {
-  if (is.data.frame(sheets) || inherits(sheets, "xl_sheet"))
+  if (is.data.frame(sheets) || inherits(sheets, "xl_sheet") ||
+      inherits(sheets, "xl_chartsheet"))
     sheets <- list(sheets)
   ok <- is.list(sheets) &&
-    all(vapply(sheets, function(el) is.data.frame(el) || inherits(el, "xl_sheet"),
+    all(vapply(sheets, function(el) is.data.frame(el) ||
+                 inherits(el, "xl_sheet") || inherits(el, "xl_chartsheet"),
                logical(1)))
   if (!ok)
-    stop("`sheets` must be a data frame, an xl_sheet, or a list of them",
+    stop(paste0("`sheets` must be a data frame, an xl_sheet, an ",
+                "xl_chartsheet, or a list of them"),
          call. = FALSE)
   if (!inherits(properties, "xl_properties"))
     stop("`properties` must be an xl_properties object", call. = FALSE)

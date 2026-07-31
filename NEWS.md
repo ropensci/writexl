@@ -158,6 +158,14 @@
   must have `categories`: they are its x axis, and libxlsxwriter crashes
   without them.
 
+* **Chartsheets** via `xl_chartsheet()`, a tab holding one chart and no cells.
+  Give one to `write_xlsx()` in place of a data frame. Every range in its chart
+  must name the sheet it plots, since a chartsheet has no cells of its own for
+  a bare `list(cols = )` to resolve against. A chartsheet supports a subset of
+  what a worksheet does --- of `xl_page_setup()` the orientation, paper,
+  margins, header and footer; of `xl_sheet_view()` the four tab-state options
+  --- and the rest are refused by name rather than dropped.
+
 * `xl_filter_keep()` exposes the matching rule on its own: given a data frame
   and one or more `xl_filter()`s, it returns which rows Excel would leave
   visible, without writing anything. `xl_sheet(filter =)` uses it to decide

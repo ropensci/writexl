@@ -1076,90 +1076,189 @@ static void apply_axis(lxw_chart_axis *axis, SEXP a){
   }
 }
 
+/* The lxw_protection flags, from a payload of the same names.  Both a
+   worksheet and a chartsheet are protected with one of these. */
+static void fill_protection(lxw_protection *prot, SEXP po){
+  memset(prot, 0, sizeof(*prot));
+  prot->no_select_locked_cells   = (uint8_t) opt_scalar_int(po, "no_select_locked_cells", 0);
+  prot->no_select_unlocked_cells = (uint8_t) opt_scalar_int(po, "no_select_unlocked_cells", 0);
+  prot->format_cells      = (uint8_t) opt_scalar_int(po, "format_cells", 0);
+  prot->format_columns    = (uint8_t) opt_scalar_int(po, "format_columns", 0);
+  prot->format_rows       = (uint8_t) opt_scalar_int(po, "format_rows", 0);
+  prot->insert_columns    = (uint8_t) opt_scalar_int(po, "insert_columns", 0);
+  prot->insert_rows       = (uint8_t) opt_scalar_int(po, "insert_rows", 0);
+  prot->insert_hyperlinks = (uint8_t) opt_scalar_int(po, "insert_hyperlinks", 0);
+  prot->delete_columns    = (uint8_t) opt_scalar_int(po, "delete_columns", 0);
+  prot->delete_rows       = (uint8_t) opt_scalar_int(po, "delete_rows", 0);
+  prot->sort              = (uint8_t) opt_scalar_int(po, "sort", 0);
+  prot->autofilter        = (uint8_t) opt_scalar_int(po, "autofilter", 0);
+  prot->pivot_tables      = (uint8_t) opt_scalar_int(po, "pivot_tables", 0);
+  prot->scenarios         = (uint8_t) opt_scalar_int(po, "scenarios", 0);
+  prot->objects           = (uint8_t) opt_scalar_int(po, "objects", 0);
+}
+
+/* Create and configure a chart from its payload.  Where it is then placed --
+   a worksheet cell or a whole chartsheet -- is the caller's business. */
+static lxw_chart *build_chart(lxw_workbook *workbook, SEXP c){
+  lxw_chart *chart = workbook_add_chart(workbook,
+                                        (uint8_t) payload_int(c, "type"));
+  SEXP ss = list_get(c, "series");
+  int r[4];
+  bail_if(chart == NULL, "failed to create chart");
+
+  if(ss != R_NilValue && Rf_isVectorList(ss)){
+    for(R_xlen_t i = 0; i < Rf_length(ss); i++){
+      SEXP se = VECTOR_ELT(ss, i);
+      lxw_chart_series *series = chart_add_series(chart, NULL, NULL);
+      bail_if(series == NULL, "failed to add chart series");
+      if(chart_range_of(se, "values_range", r))
+        chart_series_set_values(series, payload_str(se, "values_sheet"),
+                                (lxw_row_t) r[0], (lxw_col_t) r[1],
+                                (lxw_row_t) r[2], (lxw_col_t) r[3]);
+      if(chart_range_of(se, "categories_range", r))
+        chart_series_set_categories(series,
+                                    payload_str(se, "categories_sheet"),
+                                    (lxw_row_t) r[0], (lxw_col_t) r[1],
+                                    (lxw_row_t) r[2], (lxw_col_t) r[3]);
+      if(payload_has(se, "name"))
+        chart_series_set_name(series, payload_str(se, "name"));
+      else if(chart_range_of(se, "name_range", r))
+        chart_series_set_name_range(series, payload_str(se, "name_sheet"),
+                                    (lxw_row_t) r[0], (lxw_col_t) r[1]);
+      if(payload_has(se, "smooth"))
+        chart_series_set_smooth(series, LXW_TRUE);
+      if(payload_has(se, "invert_if_negative"))
+        chart_series_set_invert_if_negative(series);
+      style_series(series, list_get(se, "format"));
+      apply_marker(series, list_get(se, "marker"));
+      apply_labels(series, list_get(se, "labels"));
+      apply_trendline(series, list_get(se, "trendline"));
+      apply_error_bars(series, list_get(se, "x_error_bars"),
+                       LXW_CHART_ERROR_BAR_AXIS_X);
+      apply_error_bars(series, list_get(se, "y_error_bars"),
+                       LXW_CHART_ERROR_BAR_AXIS_Y);
+      apply_points(series, list_get(se, "points"));
+    }
+  }
+
+  {
+    /* The title's only styling is its font; xl_chart() refuses the rest. */
+    int has;
+    lxw_chart_font tf = chart_font_of(list_get(c, "title_format"), &has);
+    if(has) chart_title_set_name_font(chart, &tf);
+  }
+
+  if(payload_has(c, "title_off"))
+    chart_title_off(chart);
+  else if(payload_has(c, "title"))
+    chart_title_set_name(chart, payload_str(c, "title"));
+  else if(chart_range_of(c, "title_range", r))
+    chart_title_set_name_range(chart, payload_str(c, "title_sheet"),
+                               (lxw_row_t) r[0], (lxw_col_t) r[1]);
+
+  if(payload_has(c, "style"))
+    chart_set_style(chart, (uint8_t) payload_int(c, "style"));
+
+  apply_chart_extras(chart, c);
+
+  apply_axis(chart->x_axis, list_get(c, "x_axis"));
+  apply_axis(chart->y_axis, list_get(c, "y_axis"));
+
+  return chart;
+}
+
+/* The placement options a chart carries, shared by both kinds of sheet. */
+static lxw_chart_options chart_options_of(SEXP c){
+  lxw_chart_options o;
+  memset(&o, 0, sizeof(o));
+  if(payload_has(c, "x_scale"))  o.x_scale  = payload_dbl(c, "x_scale");
+  if(payload_has(c, "y_scale"))  o.y_scale  = payload_dbl(c, "y_scale");
+  if(payload_has(c, "x_offset")) o.x_offset = payload_int(c, "x_offset");
+  if(payload_has(c, "y_offset")) o.y_offset = payload_int(c, "y_offset");
+  if(payload_has(c, "object_position"))
+    o.object_position = (uint8_t) payload_int(c, "object_position");
+  o.description = (char *) payload_str(c, "description");
+  if(payload_has(c, "decorative")) o.decorative = 1;
+  return o;
+}
+
 static void apply_charts(cell_write_ctx *ctx, SEXP opts){
   SEXP cs = list_get(opts, "charts");
   if(cs == R_NilValue || !Rf_isVectorList(cs)) return;
   for(R_xlen_t k = 0; k < Rf_length(cs); k++){
     SEXP c = VECTOR_ELT(cs, k);
-    lxw_chart *chart = workbook_add_chart(ctx->workbook,
-                                          (uint8_t) payload_int(c, "type"));
-    SEXP ss = list_get(c, "series");
-    int r[4];
-    bail_if(chart == NULL, "failed to create chart");
-
-    if(ss != R_NilValue && Rf_isVectorList(ss)){
-      for(R_xlen_t i = 0; i < Rf_length(ss); i++){
-        SEXP se = VECTOR_ELT(ss, i);
-        lxw_chart_series *series = chart_add_series(chart, NULL, NULL);
-        bail_if(series == NULL, "failed to add chart series");
-        if(chart_range_of(se, "values_range", r))
-          chart_series_set_values(series, payload_str(se, "values_sheet"),
-                                  (lxw_row_t) r[0], (lxw_col_t) r[1],
-                                  (lxw_row_t) r[2], (lxw_col_t) r[3]);
-        if(chart_range_of(se, "categories_range", r))
-          chart_series_set_categories(series,
-                                      payload_str(se, "categories_sheet"),
-                                      (lxw_row_t) r[0], (lxw_col_t) r[1],
-                                      (lxw_row_t) r[2], (lxw_col_t) r[3]);
-        if(payload_has(se, "name"))
-          chart_series_set_name(series, payload_str(se, "name"));
-        else if(chart_range_of(se, "name_range", r))
-          chart_series_set_name_range(series, payload_str(se, "name_sheet"),
-                                      (lxw_row_t) r[0], (lxw_col_t) r[1]);
-        if(payload_has(se, "smooth"))
-          chart_series_set_smooth(series, LXW_TRUE);
-        if(payload_has(se, "invert_if_negative"))
-          chart_series_set_invert_if_negative(series);
-        style_series(series, list_get(se, "format"));
-        apply_marker(series, list_get(se, "marker"));
-        apply_labels(series, list_get(se, "labels"));
-        apply_trendline(series, list_get(se, "trendline"));
-        apply_error_bars(series, list_get(se, "x_error_bars"),
-                         LXW_CHART_ERROR_BAR_AXIS_X);
-        apply_error_bars(series, list_get(se, "y_error_bars"),
-                         LXW_CHART_ERROR_BAR_AXIS_Y);
-        apply_points(series, list_get(se, "points"));
-      }
-    }
-
-    {
-      /* The title's only styling is its font; xl_chart() refuses the rest. */
-      int has;
-      lxw_chart_font tf = chart_font_of(list_get(c, "title_format"), &has);
-      if(has) chart_title_set_name_font(chart, &tf);
-    }
-
-    if(payload_has(c, "title_off"))
-      chart_title_off(chart);
-    else if(payload_has(c, "title"))
-      chart_title_set_name(chart, payload_str(c, "title"));
-    else if(chart_range_of(c, "title_range", r))
-      chart_title_set_name_range(chart, payload_str(c, "title_sheet"),
-                                 (lxw_row_t) r[0], (lxw_col_t) r[1]);
-
-    if(payload_has(c, "style"))
-      chart_set_style(chart, (uint8_t) payload_int(c, "style"));
-
-    apply_chart_extras(chart, c);
-
-    apply_axis(chart->x_axis, list_get(c, "x_axis"));
-    apply_axis(chart->y_axis, list_get(c, "y_axis"));
-
-    lxw_chart_options o;
-    memset(&o, 0, sizeof(o));
-    if(payload_has(c, "x_scale"))  o.x_scale  = payload_dbl(c, "x_scale");
-    if(payload_has(c, "y_scale"))  o.y_scale  = payload_dbl(c, "y_scale");
-    if(payload_has(c, "x_offset")) o.x_offset = payload_int(c, "x_offset");
-    if(payload_has(c, "y_offset")) o.y_offset = payload_int(c, "y_offset");
-    if(payload_has(c, "object_position"))
-      o.object_position = (uint8_t) payload_int(c, "object_position");
-    o.description = (char *) payload_str(c, "description");
-    if(payload_has(c, "decorative")) o.decorative = 1;
-
+    lxw_chart *chart = build_chart(ctx->workbook, c);
+    lxw_chart_options o = chart_options_of(c);
     assert_lxw(worksheet_insert_chart_opt(ctx->sheet,
-                                         (lxw_row_t) payload_int(c, "row"),
-                                         (lxw_col_t) payload_int(c, "col"),
-                                         chart, &o));
+                                          (lxw_row_t) payload_int(c, "row"),
+                                          (lxw_col_t) payload_int(c, "col"),
+                                          chart, &o));
+  }
+}
+
+/* A chartsheet: one chart filling a tab of its own, and the handful of sheet
+   settings lxw_chartsheet exposes. */
+static void apply_chartsheet(lxw_workbook *workbook, const char *name,
+                             SEXP opts){
+  SEXP cs = list_get(opts, "charts");
+  lxw_chartsheet *sheet = workbook_add_chartsheet(workbook, name);
+  assert_that(sheet, "failed to create chartsheet");
+
+  if(cs != R_NilValue && Rf_isVectorList(cs) && Rf_length(cs) > 0){
+    SEXP c = VECTOR_ELT(cs, 0);
+    lxw_chart *chart = build_chart(workbook, c);
+    lxw_chart_options o = chart_options_of(c);
+    assert_lxw(chartsheet_set_chart_opt(sheet, chart, &o));
+  }
+
+  if(payload_has(opts, "activate"))    chartsheet_activate(sheet);
+  if(payload_has(opts, "select"))      chartsheet_select(sheet);
+  if(payload_has(opts, "hide"))        chartsheet_hide(sheet);
+  if(payload_has(opts, "first_sheet")) chartsheet_set_first_sheet(sheet);
+  if(payload_has(opts, "tab_color"))
+    chartsheet_set_tab_color(sheet, (lxw_color_t) payload_int(opts, "tab_color"));
+  if(payload_has(opts, "zoom"))
+    chartsheet_set_zoom(sheet, (uint16_t) payload_int(opts, "zoom"));
+  if(payload_has(opts, "landscape")){
+    if(payload_int(opts, "landscape")) chartsheet_set_landscape(sheet);
+    else                               chartsheet_set_portrait(sheet);
+  }
+  if(payload_has(opts, "paper"))
+    chartsheet_set_paper(sheet, (uint8_t) payload_int(opts, "paper"));
+  {
+    SEXP m = list_get(opts, "margins");
+    if(m != R_NilValue && Rf_length(m) >= 4){
+      SEXP q = PROTECT(Rf_coerceVector(m, REALSXP));
+      chartsheet_set_margins(sheet, REAL(q)[0], REAL(q)[1],
+                             REAL(q)[2], REAL(q)[3]);
+      UNPROTECT(1);
+    }
+  }
+  if(payload_has(opts, "header") || payload_has(opts, "footer")){
+    lxw_header_footer_options hf;
+    memset(&hf, 0, sizeof(hf));
+    if(payload_has(opts, "header_margin"))
+      hf.margin = payload_dbl(opts, "header_margin");
+    if(payload_has(opts, "header"))
+      assert_lxw(chartsheet_set_header_opt(sheet, payload_str(opts, "header"),
+                                           &hf));
+    memset(&hf, 0, sizeof(hf));
+    if(payload_has(opts, "footer_margin"))
+      hf.margin = payload_dbl(opts, "footer_margin");
+    if(payload_has(opts, "footer"))
+      assert_lxw(chartsheet_set_footer_opt(sheet, payload_str(opts, "footer"),
+                                           &hf));
+  }
+  if(opt_scalar_int(opts, "protect", 0)){
+    const char *pw = payload_str(opts, "protect_password");
+    SEXP po = list_get(opts, "protect_options");
+    if(po == R_NilValue){
+      chartsheet_protect(sheet, pw, NULL);
+    } else {
+      lxw_protection prot;
+      fill_protection(&prot, po);
+      chartsheet_protect(sheet, pw, &prot);
+    }
   }
 }
 
@@ -1238,22 +1337,7 @@ static void apply_sheet_scalars(cell_write_ctx *ctx, SEXP opts){
       worksheet_protect(ctx->sheet, pw, NULL);
     } else {
       lxw_protection prot;
-      memset(&prot, 0, sizeof(prot));
-      prot.no_select_locked_cells   = (uint8_t) opt_scalar_int(po, "no_select_locked_cells", 0);
-      prot.no_select_unlocked_cells = (uint8_t) opt_scalar_int(po, "no_select_unlocked_cells", 0);
-      prot.format_cells      = (uint8_t) opt_scalar_int(po, "format_cells", 0);
-      prot.format_columns    = (uint8_t) opt_scalar_int(po, "format_columns", 0);
-      prot.format_rows       = (uint8_t) opt_scalar_int(po, "format_rows", 0);
-      prot.insert_columns    = (uint8_t) opt_scalar_int(po, "insert_columns", 0);
-      prot.insert_rows       = (uint8_t) opt_scalar_int(po, "insert_rows", 0);
-      prot.insert_hyperlinks = (uint8_t) opt_scalar_int(po, "insert_hyperlinks", 0);
-      prot.delete_columns    = (uint8_t) opt_scalar_int(po, "delete_columns", 0);
-      prot.delete_rows       = (uint8_t) opt_scalar_int(po, "delete_rows", 0);
-      prot.sort              = (uint8_t) opt_scalar_int(po, "sort", 0);
-      prot.autofilter        = (uint8_t) opt_scalar_int(po, "autofilter", 0);
-      prot.pivot_tables      = (uint8_t) opt_scalar_int(po, "pivot_tables", 0);
-      prot.scenarios         = (uint8_t) opt_scalar_int(po, "scenarios", 0);
-      prot.objects           = (uint8_t) opt_scalar_int(po, "objects", 0);
+      fill_protection(&prot, po);
       worksheet_protect(ctx->sheet, pw, &prot);
     }
   }
@@ -2067,11 +2151,18 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
        is not ours to validate. */
     if(sheet_name)
       assert_lxw(workbook_validate_sheet_name(workbook, sheet_name));
+
+    //per-sheet options (column/row geometry, freeze panes, ...)
+    SEXP opts = (sheets != R_NilValue && Rf_length(sheets) > s) ? VECTOR_ELT(sheets, s) : R_NilValue;
+
+    /* A chartsheet has no cells, so none of the row machinery below applies. */
+    if(opts != R_NilValue && payload_has(opts, "chartsheet")){
+      apply_chartsheet(workbook, sheet_name, opts);
+      continue;
+    }
+
     lxw_worksheet *sheet = workbook_add_worksheet(workbook, sheet_name);
     assert_that(sheet, "failed to create workbook");
-
-    //per-sheet worksheet options (column/row geometry, freeze panes, ...)
-    SEXP opts = (sheets != R_NilValue && Rf_length(sheets) > s) ? VECTOR_ELT(sheets, s) : R_NilValue;
 
     //get data frame
     lxw_row_t cursor = 0;

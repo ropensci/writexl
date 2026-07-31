@@ -181,3 +181,36 @@ test_that("an empty format names the groups the part could use", {
                                      accept = "font", part = "a chart title"),
                "give xl_font()", fixed = TRUE)
 })
+
+test_that("black reaches a chart, rather than reading as no colour at all", {
+  # every chart colour is truth-tested in libxlsxwriter -- `if (line->color)` --
+  # so plain black, which xl_color() gives as 0, would be taken for "unset" and
+  # the part drawn with Excel's default.  LXW_COLOR_BLACK is 0x1000000 for this
+  # reason, and LXW_COLOR_MASK strips the bit again on the way out.
+  expect_equal(.chart_color(xl_color("black")), 0x1000000L)
+  expect_equal(.chart_color(xl_color("navy")), xl_color("navy"))
+  expect_null(.chart_color(NULL))
+  for (f in list(xl_border(all = "thin", color = "black"),
+                 xl_fill(background = "black"),
+                 xl_font(color = "black")))
+    expect_true(any(vapply(cf(f), function(e) identical(e$color, 0x1000000L),
+                           logical(1))))
+  # a pattern's two colours go the same way
+  p <- cf(xl_fill(pattern = "gray-125", foreground = "black",
+                  background = "white"))$pattern
+  expect_equal(p$fg_color, 0x1000000L)
+})
+
+test_that("a black chart line is written as a black line", {
+  t <- tempfile(fileext = ".xlsx")
+  df <- data.frame(a = c("x", "y"), b = c(1, 2), stringsAsFactors = FALSE)
+  write_xlsx(list(Data = xl_sheet(df, chart = xl_chart("column",
+    xl_chart_series(values = list(cols = "b")),
+    plot_area_format = xl_border(all = "thin", color = "black")))), t)
+  d <- tempfile(); dir.create(d); utils::unzip(t, exdir = d)
+  x <- paste(readLines(list.files(file.path(d, "xl/charts"), pattern = "^chart",
+                                  full.names = TRUE)[1L], warn = FALSE),
+             collapse = "")
+  plot_area <- substr(x, regexpr("<c:plotArea>", x), regexpr("</c:plotArea>", x))
+  expect_match(plot_area, '<a:srgbClr val="000000"/>', fixed = TRUE)
+})
