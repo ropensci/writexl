@@ -27,6 +27,18 @@
 #     refused rather than one side being picked.
 # -----------------------------------------------------------------------------
 
+# A colour on its way into a chart struct.  Every chart colour is tested for
+# truth -- `if (line->color)` in _chart_write_a_ln(), and the same for fills and
+# fonts -- so plain black, which xl_color() gives as 0, reads as "no colour set"
+# and the part is drawn with Excel's default instead.  libxlsxwriter's own enum
+# spells black LXW_COLOR_BLACK = 0x1000000 for exactly this reason, and
+# LXW_COLOR_MASK strips the sentinel bit again on the way out.
+.chart_color <- function(x) {
+  if (is.null(x)) return(NULL)
+  i <- as.integer(x)
+  if (identical(i, 0L)) 0x1000000L else i
+}
+
 # Cell border style -> chart dash type.  Only exact equivalents are listed;
 # .chart_dash() refuses the rest rather than approximating them.
 .CHART_DASH <- c(
@@ -108,7 +120,7 @@
     fo <- f$font
     ent <- list()
     if (!is.null(fo$size))  ent$size <- as.numeric(fo$size)
-    if (!is.null(fo$color)) ent$color <- as.integer(fo$color)
+    if (!is.null(fo$color)) ent$color <- .chart_color(fo$color)
     if (isTRUE(fo$bold))    ent$bold <- 1L
     if (isTRUE(fo$italic))  ent$italic <- 1L
     # lxw_chart_font.underline is a flag, not Excel's five-way choice, so any
@@ -132,12 +144,12 @@
         stop(sprintf(paste0("`%s` sets a pattern, which a chart draws from a ",
                             "foreground and a background colour -- give both."),
                      arg), call. = FALSE)
-      out$pattern <- list(fg_color = as.integer(fi$foreground),
-                          bg_color = as.integer(fi$background),
+      out$pattern <- list(fg_color = .chart_color(fi$foreground),
+                          bg_color = .chart_color(fi$background),
                           type = unname(.LXW$pattern[[fi$pattern]]))
     } else {
       ent <- list()
-      if (!is.null(fi$background)) ent$color <- as.integer(fi$background)
+      if (!is.null(fi$background)) ent$color <- .chart_color(fi$background)
       if (identical(fi$pattern, "none")) ent$none <- 1L
       if (!is.null(fi$transparency))
         ent$transparency <- as.integer(fi$transparency)
@@ -160,7 +172,7 @@
       d <- .chart_dash(style, arg)
       if (!is.null(d)) ent$dash_type <- d
     }
-    if (length(cols)) ent$color <- as.integer(cols[[1L]])
+    if (length(cols)) ent$color <- .chart_color(cols[[1L]])
     if (!is.null(b$transparency))
       ent$transparency <- as.integer(b$transparency)
     if (length(ent)) out$line <- ent
