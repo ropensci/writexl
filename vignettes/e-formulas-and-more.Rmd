@@ -147,7 +147,7 @@ would otherwise write its own generic captions over them, and Excel treats a
 mismatch between the table part and the header cells as a corrupt file.
 
 Table names are made unique across the workbook. A table turns off the
-row-streaming mode described in [Worksheets and workbooks](sheets.html), and
+row-streaming mode described in [Worksheets and workbooks](c-worksheets-workbooks.html), and
 cannot sit on the same range as the sheet's own autofilter.
 
 ## Merged cells
@@ -164,7 +164,7 @@ does in Excel.
 
 ## Elsewhere
 
-* Styling any of this: [Formatting cells](formatting.html)
+* Styling any of this: [Formatting cells](b-formatting.html)
 * Sheet layout, printing, workbook properties: [Worksheets and
-  workbooks](sheets.html)
-* Charts, chartsheets, pictures: [Charts and images](charts.html)
+  workbooks](c-worksheets-workbooks.html)
+* Charts, chartsheets, pictures: [Charts and images](d-charts-images.html)

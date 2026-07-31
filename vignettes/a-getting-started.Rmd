@@ -69,23 +69,23 @@ The header row is written by default and styled bold; `col_names = FALSE` and
 The rest of the package is optional. Nothing below is needed to write a
 workbook, and each has a vignette of its own:
 
-* **[Formatting cells](formatting.html)** --- fonts, fills, borders, number
+* **[Formatting cells](b-formatting.html)** --- fonts, fills, borders, number
   formats and alignment, built from group constructors that combine with `+`,
   plus conditional formatting.
 
-* **[Worksheets and workbooks](sheets.html)** --- column widths and row
+* **[Worksheets and workbooks](c-worksheets-workbooks.html)** --- column widths and row
   heights, frozen panes, tab colours, printing and page setup, and the document
   properties.
 
-* **[Charts and images](charts.html)** --- all 22 chart types Excel offers,
+* **[Charts and images](d-charts-images.html)** --- all 22 chart types Excel offers,
   their axes, series parts and legends; chartsheets; and pictures placed on or
   in a sheet.
 
-* **[Formulas, tables and the rest](more.html)** --- formulas and array
+* **[Formulas, tables and the rest](e-formulas-and-more.html)** --- formulas and array
   formulas, hyperlinks, comments, rich strings, data validation, autofilters,
   worksheet tables and merged cells.
 
-* **[Everything at once](showcase.html)** --- one runnable script that
+* **[Everything at once](f-everything-at-once.html)** --- one runnable script that
   exercises the whole package into a couple of workbooks, for reviewing what it
   can do without reading five vignettes first.
 

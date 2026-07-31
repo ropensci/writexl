@@ -55,7 +55,7 @@ give a spec: `list(header = "cost")`, or `list(rows = 1, cols = 1)`.
 
 ### Styling
 
-Charts reuse the format objects from [Formatting cells](formatting.html).
+Charts reuse the format objects from [Formatting cells](b-formatting.html).
 `xl_border()` becomes the line, `xl_fill()` the fill or pattern, `xl_font()`
 the text:
 

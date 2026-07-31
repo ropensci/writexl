@@ -91,7 +91,7 @@ the header.
 Formats cascade. What Excel finally applies to a cell is the workbook's
 `default_format`, merged with the column or row format, merged with the cell's
 own. Identical results are written once, so styling thousands of cells stays
-compact. See [Worksheets and workbooks](sheets.html) for the workbook end of
+compact. See [Worksheets and workbooks](c-worksheets-workbooks.html) for the workbook end of
 that.
 
 ## Conditional formatting
@@ -139,8 +139,8 @@ Every one of these takes its range the same way as anything else in writexl:
 ## What is elsewhere
 
 * The same format objects style **charts**, translated to what a chart can
-  draw: [Charts and images](charts.html).
+  draw: [Charts and images](d-charts-images.html).
 * **Number formats** are ordinary Excel format strings --- anything the Custom
   box in Excel accepts.
 * `xl_protection()` only takes effect once the sheet itself is protected: see
-  [Worksheets and workbooks](sheets.html).
+  [Worksheets and workbooks](c-worksheets-workbooks.html).

@@ -54,11 +54,11 @@ Each of these has a vignette; none is needed to write a workbook.
 
 | | |
 |---|---|
-| **[Formatting cells](https://docs.ropensci.org/writexl/articles/formatting.html)** | Fonts, fills, borders, number formats and alignment, built from group constructors that combine with `+`. The same format object styles a cell, a column, a chart series or a conditional rule. Conditional formatting, colour scales, data bars and icon sets. |
-| **[Worksheets and workbooks](https://docs.ropensci.org/writexl/articles/sheets.html)** | Column widths and row heights in characters or pixels, frozen and split panes, tab colours and visibility, outlines, protection, page setup and printing, document properties, and the row-streaming mode for large workbooks. |
-| **[Charts and images](https://docs.ropensci.org/writexl/articles/charts.html)** | All 22 chart types Excel offers, with axes, markers, data labels, trendlines, error bars, legends and data tables; chartsheets; and pictures placed on a sheet, inside a cell, in a header or tiled behind the grid. |
-| **[Formulas, tables and the rest](https://docs.ropensci.org/writexl/articles/more.html)** | Formulas including array and dynamic array formulas, hyperlinks, comments, rich strings, mixed-type columns, data validation, autofilters that actually hide the rows, worksheet tables and merged cells. |
-| **[Everything at once](https://docs.ropensci.org/writexl/articles/showcase.html)** | One runnable script that exercises the whole package into two workbooks — the quickest way to see what it does without reading the other four. |
+| **[Formatting cells](https://docs.ropensci.org/writexl/articles/b-formatting.html)** | Fonts, fills, borders, number formats and alignment, built from group constructors that combine with `+`. The same format object styles a cell, a column, a chart series or a conditional rule. Conditional formatting, colour scales, data bars and icon sets. |
+| **[Worksheets and workbooks](https://docs.ropensci.org/writexl/articles/c-worksheets-workbooks.html)** | Column widths and row heights in characters or pixels, frozen and split panes, tab colours and visibility, outlines, protection, page setup and printing, document properties, and the row-streaming mode for large workbooks. |
+| **[Charts and images](https://docs.ropensci.org/writexl/articles/d-charts-images.html)** | All 22 chart types Excel offers, with axes, markers, data labels, trendlines, error bars, legends and data tables; chartsheets; and pictures placed on a sheet, inside a cell, in a header or tiled behind the grid. |
+| **[Formulas, tables and the rest](https://docs.ropensci.org/writexl/articles/e-formulas-and-more.html)** | Formulas including array and dynamic array formulas, hyperlinks, comments, rich strings, mixed-type columns, data validation, autofilters that actually hide the rows, worksheet tables and merged cells. |
+| **[Everything at once](https://docs.ropensci.org/writexl/articles/f-everything-at-once.html)** | One runnable script that exercises the whole package into two workbooks — the quickest way to see what it does without reading the other four. |
 
 A taste of how they fit together:
 
@@ -94,17 +94,36 @@ warns. Either way the zone itself is not in the file for `readxl` to hand back.
 
 ## Performance
 
-Writing `nycflights13::flights` — 336,776 rows by 19 columns:
+Writing `nycflights13::flights` — 336,776 rows by 19 columns — is faster than
+the `openxlsx2` implementation, for files of the same size:
 
 ```r
-system.time(writexl::write_xlsx(flights, tmp <- tempfile(fileext = ".xlsx")))
-##    user  system elapsed
-##    7.4     0.3     7.7
-file.size(tmp)
-## 29157011   (27.8 MB)
+library(nycflights13)
+bench <- function(f) median(replicate(2, {
+  p <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(p))
+  system.time(f(p))[["elapsed"]]
+}))
+
+bench(function(p) writexl::write_xlsx(flights, p))
+## 12.3
+bench(function(p) openxlsx2::write_xlsx(flights, p))
+## 19.6
 ```
+
+The output files are within a rounding error of each other:
+
+```r
+file.size(writexl::write_xlsx(flights, tempfile(fileext = ".xlsx")))
+## 29132216   (27.8 MB)
+
+p <- tempfile(fileext = ".xlsx"); openxlsx2::write_xlsx(flights, p); file.size(p)
+## 29297097   (27.9 MB)
+```
+
+Measured on R 4.6.1, writexl 1.5.4.9000, openxlsx2 1.28.
 
 For a workbook large enough to matter, `constant_memory = TRUE` streams each
 row to disk instead of holding the sheet in memory; left at its default writexl
 decides from the estimated cost. See
-[Worksheets and workbooks](https://docs.ropensci.org/writexl/articles/sheets.html).
+[Worksheets and workbooks](https://docs.ropensci.org/writexl/articles/c-worksheets-workbooks.html).

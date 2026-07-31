@@ -31,7 +31,7 @@ sales <- data.frame(
   stringsAsFactors = FALSE)
 ```
 
-## Formatting --- [vignette](formatting.html)
+## Formatting --- [vignette](b-formatting.html)
 
 ```{r}
 money <- xl_num_format("$#,##0") + xl_font(color = "darkgreen")
@@ -48,7 +48,7 @@ styled <- xl_sheet(
   freeze = "A2", tab_color = "steelblue")
 ```
 
-## Cell content --- [vignette](more.html)
+## Cell content --- [vignette](e-formulas-and-more.html)
 
 ```{r}
 cells <- data.frame(item = c("Widget", "Gadget", "Gizmo"),
@@ -78,7 +78,7 @@ content <- xl_sheet(
   ignore_errors = list(number_stored_as_text = "A2:A4"))
 ```
 
-## Worksheet features --- [vignette](more.html)
+## Worksheet features --- [vignette](e-formulas-and-more.html)
 
 ```{r}
 filtered <- xl_sheet(sales, filter = xl_filter("region", "==", "North"))
@@ -90,7 +90,7 @@ tabled <- xl_sheet(sales[, c("quarter", "revenue")],
                                                               total = "sum")))
 ```
 
-## Printing and the sheet view --- [vignette](sheets.html)
+## Printing and the sheet view --- [vignette](c-worksheets-workbooks.html)
 
 ```{r}
 printed <- xl_sheet(
@@ -104,7 +104,7 @@ printed <- xl_sheet(
   protect = list(password = "secret", sort = TRUE))
 ```
 
-## Charts --- [vignette](charts.html)
+## Charts --- [vignette](d-charts-images.html)
 
 ```{r}
 charted <- xl_sheet(
@@ -150,7 +150,7 @@ overview <- xl_chartsheet(
   tab_color = "red")
 ```
 
-## An image --- [vignette](charts.html)
+## An image --- [vignette](d-charts-images.html)
 
 ```{r}
 have_png <- isTRUE(capabilities("png")) &&
@@ -169,7 +169,7 @@ pictured <- xl_sheet(sales[, 1:2], image = xl_image(card, at = "D2",
 pictured <- xl_sheet(sales[, 1:2])
 ```
 
-## The workbook --- [vignette](sheets.html)
+## The workbook --- [vignette](c-worksheets-workbooks.html)
 
 ```{r}
 wb <- xl_workbook(
@@ -235,7 +235,7 @@ file.size(showcase)
 
 Open it and every feature above is visible in one place. For why any of it
 behaves as it does, follow the links back to
-[formatting](formatting.html),
-[worksheets and workbooks](sheets.html),
-[charts and images](charts.html), or
-[formulas, tables and the rest](more.html).
+[formatting](b-formatting.html),
+[worksheets and workbooks](c-worksheets-workbooks.html),
+[charts and images](d-charts-images.html), or
+[formulas, tables and the rest](e-formulas-and-more.html).

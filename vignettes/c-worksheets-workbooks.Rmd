@@ -168,7 +168,7 @@ half-written file.
 
 ## Elsewhere
 
-* Styling the cells themselves: [Formatting cells](formatting.html)
-* Charts, chartsheets and pictures: [Charts and images](charts.html)
+* Styling the cells themselves: [Formatting cells](b-formatting.html)
+* Charts, chartsheets and pictures: [Charts and images](d-charts-images.html)
 * Validation, filters, tables and merges: [Formulas, tables and the
-  rest](more.html)
+  rest](e-formulas-and-more.html)
