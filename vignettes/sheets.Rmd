@@ -1,0 +1,174 @@
+---
+title: "Worksheets and workbooks"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Worksheets and workbooks}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(writexl)
+```
+
+`xl_sheet()` wraps a data frame with everything that is true of the sheet
+rather than of a cell. `xl_workbook()` does the same one level up.
+
+## The sheet
+
+```{r}
+sheet <- xl_sheet(
+  data.frame(id = 1:3, note = c("a", "b", "c")),
+  cols      = xl_col_spec("note", width = 30),
+  freeze    = "A2",          # keep the header row visible
+  tab_color = "steelblue",
+  zoom      = 120,
+  gridlines = FALSE)
+path <- write_xlsx(list(Notes = sheet), tempfile(fileext = ".xlsx"))
+```
+
+`auto_colwidth = TRUE` sizes every column to its contents. The xlsx format has
+no true AutoFit, so this is a character-count estimate; columns given an
+explicit width are left alone.
+
+Widths and heights can be given in **pixels** instead of Excel's character
+units and points, which is easier to reason about when sizing a column around
+an image:
+
+```{r}
+xl_col_spec("thumbnail", width_pixels = 100)
+xl_row_spec(1, height_pixels = 40)
+```
+
+Excel stores the character units, so the value is converted on the way in --- a
+column set to 100 pixels reads back as 13.57 units and renders at 100 pixels
+again.
+
+### Grouping and outlines
+
+`level` puts columns or rows into an outline group, which Excel draws with the
++/- controls that collapse it. `xl_outline()` changes how those controls are
+*drawn* --- never which rows are grouped --- and its defaults already match
+Excel's:
+
+```{r}
+xl_sheet(data.frame(q1 = 1:2, q2 = 3:4, total = 4:5),
+         cols    = xl_col_spec(c("q1", "q2"), level = 1),
+         outline = xl_outline(symbols_right = FALSE))
+```
+
+### Protection
+
+```{r}
+xl_sheet(data.frame(id = 1:3),
+         protect = list(password = "secret", sort = TRUE))
+```
+
+`protect = TRUE` locks everything; a list allows named actions through. Cell
+locking set with `xl_protection()` only takes effect once the sheet is
+protected, and `locked = FALSE` is how a cell is left editable on a protected
+sheet.
+
+### Silencing Excel's error indicators
+
+Excel puts a green triangle in cells it thinks are wrong, most often a number
+deliberately stored as text:
+
+```{r}
+xl_sheet(data.frame(zip = c("01234", "02138")),
+         ignore_errors = list(number_stored_as_text = "A2:A3"))
+```
+
+Nine error types can be silenced, each taking a range in any spelling the other
+range arguments accept.
+
+## The tab strip and the opening view
+
+`xl_sheet_view()` collects the rarely-used settings that would otherwise widen
+`xl_sheet()` past reading:
+
+```{r}
+xl_sheet(data.frame(x = 1),
+         view = xl_sheet_view(active = TRUE, selection = "B2",
+                              hide_zero = TRUE))
+```
+
+Which tab is active, which are selected, which are hidden, which is leftmost,
+where the sheet is scrolled to, whether zeros show, right-to-left column order,
+and split panes all live here. `freeze` stays on `xl_sheet()` because keeping
+the header row visible is the one worksheet option almost everyone wants.
+
+Excel's rules about tabs span the whole workbook, so they are checked before
+anything is written: at most one active sheet, no hidden-and-active sheet, and
+at least one sheet visible. The error names the sheet at fault.
+
+## Printing
+
+`xl_page_setup()` collects everything Excel's Page Layout ribbon controls. None
+of it affects the cells:
+
+```{r}
+xl_sheet(data.frame(x = 1:3),
+         page = xl_page_setup(
+           orientation = "landscape", paper = "A4",
+           fit_to = c(1, 0),                 # one page wide, any number tall
+           center_horizontally = TRUE,
+           header = "&LQuarterly report&RPage &P of &N",
+           repeat_rows = 1,                  # the header row, on every page
+           print_area = "A1:C4"))
+```
+
+Headers and footers use Excel's own `&`-codes: `&L`/`&C`/`&R` for the three
+sections, `&P` and `&N` for the page number and count, `&D` for the date, `&G`
+for a picture. Manual page breaks go in with `h_breaks` and `v_breaks`.
+
+## The workbook
+
+`xl_workbook()` binds sheets to `xl_properties()`, which holds the document
+metadata and the formatting defaults that would otherwise be built in:
+
+```{r}
+wb <- xl_workbook(
+  list(Report = data.frame(quarter = c("Q1", "Q2"), sales = c(12000, 15000))),
+  properties = xl_properties(
+    title   = "Quarterly Report",
+    author  = "Finance Team",
+    custom  = list(Project = "Alpha", Reviewed = TRUE),
+    header_format = xl_font(bold = TRUE, color = "white") +
+                    xl_fill(background = "navy")))
+path <- write_xlsx(wb, tempfile(fileext = ".xlsx"))
+```
+
+Because the defaults are ordinary `xl_format` objects you can change any of
+them: the header row's style, the date and datetime formats and their column
+widths, the hyperlink style, and a workbook-wide `default_format` beneath every
+cell. Custom properties may be text, numbers, dates or logicals.
+
+A workbook-wide `default_format` is *emulated* --- it is merged beneath every
+cell --- because libxlsxwriter has no native "Normal style" hook. The effect is
+the same; the file is slightly larger.
+
+## Memory
+
+For a large workbook writexl can stream each row to disk as it is written
+rather than holding the whole sheet in memory. It decides per workbook:
+
+```{r eval = FALSE}
+write_xlsx(big, path, constant_memory = TRUE)
+```
+
+Left at `NA` it turns streaming on only when the workbook is large enough for
+the saving to matter --- estimated from the cell count, with the threshold
+configurable through `constant_memory_threshold`. Some features cannot be
+written while streaming, because they touch cells above the row being written:
+worksheet tables, multi-cell array formulas, merged ranges and embedded images.
+Those turn it off, and asking for it anyway warns rather than producing a
+half-written file.
+
+## Elsewhere
+
+* Styling the cells themselves: [Formatting cells](formatting.html)
+* Charts, chartsheets and pictures: [Charts and images](charts.html)
+* Validation, filters, tables and merges: [Formulas, tables and the
+  rest](more.html)

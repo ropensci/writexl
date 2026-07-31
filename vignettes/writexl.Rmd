@@ -1,0 +1,117 @@
+---
+title: "Getting started with writexl"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting started with writexl}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(writexl)
+```
+
+writexl writes data frames to xlsx. It needs no Java and no Excel, and for the
+common case it needs nothing from you either.
+
+## One data frame
+
+```{r}
+path <- write_xlsx(iris, tempfile(fileext = ".xlsx"))
+```
+
+`write_xlsx()` returns the path it wrote, so it composes with anything that
+takes a file name.
+
+## Several sheets
+
+A named list becomes one sheet per element, and the names become the tabs:
+
+```{r}
+path <- write_xlsx(list(Flowers = iris, Cars = mtcars[1:5, 1:4]),
+                   tempfile(fileext = ".xlsx"))
+```
+
+Sheet names are repaired rather than rejected: Excel forbids `[ ] : * ? / \`,
+limits a name to 31 characters, and refuses duplicates. writexl fixes each of
+those and warns, naming the original and the replacement, because a sheet name
+is often taken from data and losing the whole export over one stray `/` would
+be unkind.
+
+## What is written
+
+Column types map to Excel's own:
+
+| R | Excel |
+|---|---|
+| `character` | text |
+| `numeric`, `integer` | number |
+| `logical` | TRUE/FALSE |
+| `Date`, `POSIXct` | a formatted date or datetime |
+| `factor` | its labels, as text |
+| `difftime` | a number of seconds |
+
+`NA` becomes an empty cell. A column of a type xlsx has no representation for
+--- `complex`, `raw`, a plain list column --- is an error rather than a silent
+approximation.
+
+Excel has no concept of a time zone, so `POSIXct` needs a decision. writexl
+makes it once for the whole workbook: if every value shares one zone the local
+wall-clock reading is written, and if they differ everything is converted to
+UTC and you are warned. Either way nothing is mislabelled.
+
+The header row is written by default and styled bold; `col_names = FALSE` and
+`format_headers = FALSE` turn each off.
+
+## Everything else
+
+The rest of the package is optional. Nothing below is needed to write a
+workbook, and each has a vignette of its own:
+
+* **[Formatting cells](formatting.html)** --- fonts, fills, borders, number
+  formats and alignment, built from group constructors that combine with `+`,
+  plus conditional formatting.
+
+* **[Worksheets and workbooks](sheets.html)** --- column widths and row
+  heights, frozen panes, tab colours, printing and page setup, and the document
+  properties.
+
+* **[Charts and images](charts.html)** --- all 22 chart types Excel offers,
+  their axes, series parts and legends; chartsheets; and pictures placed on or
+  in a sheet.
+
+* **[Formulas, tables and the rest](more.html)** --- formulas and array
+  formulas, hyperlinks, comments, rich strings, data validation, autofilters,
+  worksheet tables and merged cells.
+
+* **[Everything at once](showcase.html)** --- one runnable script that
+  exercises the whole package into a couple of workbooks, for reviewing what it
+  can do without reading five vignettes first.
+
+Two ideas run through all of them and are worth knowing early.
+
+**A format is an object.** `xl_font()`, `xl_fill()` and the rest each return a
+complete `xl_format`, they combine with `+`, and the same object styles a cell,
+a column, a chart series or a conditional rule.
+
+```{r}
+money <- xl_num_format("$#,##0.00") + xl_font(bold = TRUE)
+```
+
+**A range is written one of two ways.** Either as A1 text, or against the data
+frame by column name --- and the second is worth preferring, because it moves
+with the column and accounts for the header row on its own:
+
+```{r}
+xl_sheet(iris, autofilter = "A1:E151")                   # A1 text
+xl_sheet(iris, filter = xl_filter("Species", "==", "setosa"))  # by column
+```
+
+## Reading it back
+
+writexl only writes. To read, use readxl:
+
+```{r eval = requireNamespace("readxl", quietly = TRUE)}
+readxl::read_xlsx(write_xlsx(head(iris, 3), tempfile(fileext = ".xlsx")))
+```
