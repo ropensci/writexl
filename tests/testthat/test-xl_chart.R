@@ -1,5 +1,5 @@
-# Charts.  This file covers the constructors, the chart-type feature matrix and
-# range specs; what reaches the file is tested once apply_charts() lands.
+# Charts: the constructors, the chart-type feature matrix, range specs, and
+# what reaches the chart XML.
 
 # ── Chart types ───────────────────────────────────────────────────────────────
 
@@ -430,10 +430,9 @@ test_that("every relationship a chart adds resolves", {
 })
 
 test_that("a scatter series must have categories", {
-  # not a style preference: libxlsxwriter's _chart_write_cat() reads
-  # series->categories->has_string_cache before its own NULL guard, so a
-  # scatter series without categories segfaults.  Found by bisecting a crash in
-  # this very file, and reduced to a check that says what to do.
+  # not a style preference: a scatter series without categories segfaults in
+  # libxlsxwriter's _chart_write_x_val(), which has no NULL guard on the
+  # formula.
   for (ty in c("scatter", "scatter_straight", "scatter_straight_markers",
                "scatter_smooth", "scatter_smooth_markers"))
     expect_error(xl_chart(ty, xl_chart_series(values = "B1:B5")),
@@ -449,9 +448,8 @@ test_that("a scatter series must have categories", {
 })
 
 test_that("every chart type writes a file without crashing", {
-  # the scatter crash reached the C layer, where a bad assumption is a
-  # segfault rather than a failed expectation, so every type is exercised
-  # end to end
+  # at the C layer a bad assumption is a segfault rather than a failed
+  # expectation, so every type is exercised end to end
   for (ty in names(.LXW_CHART_TYPE)) {
     se <- if (identical(.CHART_FAMILY(ty), "scatter"))
       xl_chart_series(values = list(cols = "qty"),
@@ -460,4 +458,179 @@ test_that("every chart type writes a file without crashing", {
     expect_silent(write_tmp(list(Data = xl_sheet(crange_sales,
                                                  chart = xl_chart(ty, se)))))
   }
+})
+
+# ── The chart title's font ────────────────────────────────────────────────────
+
+test_that("a title format styles the title, and reaches the file", {
+  r <- cfile(chart = xl_chart("column", xl_chart_series(values = list(cols = "qty")),
+                              title = "Sales",
+                              title_format = xl_font(size = 14, bold = TRUE,
+                                                     color = "red")))
+  expect_match(r$chart, "<a:defRPr", fixed = TRUE)
+  # lxw_chart_font.size is in points and written in hundredths
+  expect_match(r$chart, 'sz="1400"', fixed = TRUE)
+  expect_match(r$chart, 'b="1"', fixed = TRUE)
+  expect_match(r$chart, "FF0000", fixed = TRUE)
+})
+
+test_that("a title format needs a title to attach to", {
+  # with no title libxlsxwriter writes no <c:title> element at all, so
+  # chart_title_set_name_font() has nothing to style.  The automatic title of
+  # a single-series chart is Excel's own and never reaches the file.
+  expect_error(xl_chart("column", xl_chart_series(values = "A1:A5"),
+                        title_format = xl_font(italic = TRUE)),
+               "give a `title` too", fixed = TRUE)
+  r <- cfile(chart = xl_chart("column",
+                              xl_chart_series(values = list(cols = "qty")),
+                              title_format = xl_font(italic = TRUE),
+                              title = "Sales"))
+  expect_match(r$chart, "<c:title>", fixed = TRUE)
+  expect_match(r$chart, 'i="1"', fixed = TRUE)
+})
+
+test_that("styling a title that has been removed is refused", {
+  expect_error(xl_chart("column", xl_chart_series(values = "A1:A5"),
+                        title = FALSE, title_format = xl_font(bold = TRUE)),
+               "`title = FALSE` removes it", fixed = TRUE)
+})
+
+test_that("a title format may not set a fill or a border", {
+  expect_error(xl_chart("column", xl_chart_series(values = "A1:A5"),
+                        title = "T", title_format = xl_fill(background = "red")),
+               "takes no fill")
+  expect_error(xl_chart("column", xl_chart_series(values = "A1:A5"),
+                        title = "T", title_format = xl_border(all = "thin")),
+               "takes no line")
+})
+
+test_that("a series format may not set a font", {
+  # refused by the constructor, not at write time
+  expect_error(xl_chart_series(values = list(cols = "qty"),
+                               format = xl_font(bold = TRUE)),
+               "a shape and has no text")
+})
+
+# ── The header cell ───────────────────────────────────────────────────────────
+
+test_that("a name or title may come from a column's header cell", {
+  # the header is where a series name usually lives, and `rows` cannot reach it
+  # -- rows count data rows, so row 1 is the first row *under* the header
+  r <- cfile(chart = xl_chart("column",
+                              xl_chart_series(values = list(cols = "qty"),
+                                              name = list(header = "qty")),
+                              title = list(header = "fruit")))
+  expect_match(r$chart, "<c:f>Data!$B$1</c:f>", fixed = TRUE)
+  expect_match(r$chart, "<c:f>Data!$A$1</c:f>", fixed = TRUE)
+})
+
+test_that("a header cell may name its column by position, and another sheet", {
+  p <- chart_plan(list(
+    Chart = xl_sheet(data.frame(z = 1),
+                     chart = xl_chart("pie",
+                       xl_chart_series(values = list(sheet = "Data",
+                                                     cols = "qty"),
+                                       name = list(sheet = "Data",
+                                                   header = 2)))),
+    Data = crange_sales), sheet = "Chart")
+  nm <- p[[1L]]$series[[1L]]
+  expect_equal(nm$name_sheet, "Data")
+  # 0-based: the header row is 0, and column 2 is index 1
+  expect_equal(nm$name_range, c(0L, 1L, 0L, 1L))
+})
+
+test_that("a header spec stands alone, and needs a header row to exist", {
+  expect_error(xl_chart_series(values = "A1:A5",
+                               name = list(header = "qty", rows = 1)),
+               "stands alone")
+  expect_error(xl_chart_series(values = "A1:A5",
+                               name = list(header = c("a", "b"))),
+               "must name a single column")
+  # written without headers there is no such cell, and saying so beats
+  # silently plotting the first data row as the name
+  expect_error(
+    write_tmp(list(Data = xl_sheet(crange_sales,
+                                   chart = xl_chart("column",
+                                     xl_chart_series(values = list(cols = "qty"),
+                                                     name = list(header = "qty"))))),
+              col_names = FALSE),
+    "written without headers")
+})
+
+# ── The default series name ───────────────────────────────────────────────────
+
+test_that("a series plotting a column is named after that column's header", {
+  # Excel names a series this way when you chart a column with its header, and
+  # the alternative is a legend reading "Series 1"
+  p <- chart_plan(list(Data = xl_sheet(crange_sales, chart = xl_chart("column",
+    xl_chart_series(values = list(cols = "qty"))))))
+  s <- p[[1L]]$series[[1L]]
+  expect_equal(s$name_sheet, "Data")
+  expect_equal(s$name_range, c(0L, 1L, 0L, 1L))   # header row, column qty
+  expect_null(s$name)
+  # and it reaches the file as a reference, not as copied text
+  expect_match(cfile(chart = xl_chart("column",
+    xl_chart_series(values = list(cols = "qty"))))$chart,
+    "<c:f>Data!$B$1</c:f>", fixed = TRUE)
+})
+
+test_that("an explicit name still wins, in any spelling", {
+  nm <- function(...) {
+    p <- chart_plan(list(Data = xl_sheet(crange_sales,
+                                         chart = xl_chart("column",
+                                           xl_chart_series(...)))))
+    p[[1L]]$series[[1L]]
+  }
+  expect_equal(nm(values = list(cols = "qty"), name = "Quantity")$name,
+               "Quantity")
+  # another column's header
+  expect_equal(nm(values = list(cols = "qty"),
+                  name = list(header = "fruit"))$name_range,
+               c(0L, 0L, 0L, 0L))
+  # a data cell
+  expect_equal(nm(values = list(cols = "qty"),
+                  name = list(rows = 1, cols = "fruit"))$name_range,
+               c(1L, 0L, 1L, 0L))
+})
+
+test_that("name = FALSE leaves the series unnamed", {
+  p <- chart_plan(list(Data = xl_sheet(crange_sales, chart = xl_chart("column",
+    xl_chart_series(values = list(cols = "qty"), name = FALSE)))))
+  s <- p[[1L]]$series[[1L]]
+  expect_null(s$name)
+  expect_null(s$name_range)
+})
+
+test_that("the default only applies where a header is known to exist", {
+  no_name <- function(wb, ...) {
+    p <- chart_plan(wb, ...)
+    s <- p[[1L]]$series[[1L]]
+    expect_null(s$name)
+    expect_null(s$name_range)
+  }
+  # an A1 range says nothing about whether the row above it is a header
+  no_name(list(Data = xl_sheet(crange_sales, chart = xl_chart("column",
+    xl_chart_series(values = "Data!B2:B4")))))
+  # neither does a span of several columns
+  no_name(list(Data = xl_sheet(crange_sales, chart = xl_chart("column",
+    xl_chart_series(values = list(cols = c("fruit", "qty")))))))
+  # and a workbook written without headers has no header cell at all
+  s <- .resolve_charts(
+    xl_sheet(crange_sales,
+             chart = xl_chart("column",
+                              xl_chart_series(values = list(cols = "qty")))),
+    writexl:::normalize_df(crange_sales), .new_format_registry(), 0L,
+    xl_properties(), list(Data = writexl:::normalize_df(crange_sales)), "Data")
+  expect_null(s[[1L]]$series[[1L]]$name)
+  expect_null(s[[1L]]$series[[1L]]$name_range)
+})
+
+test_that("the default follows the sheet the values come from", {
+  p <- chart_plan(list(
+    Chart = xl_sheet(data.frame(z = 1),
+                     chart = xl_chart("pie",
+                       xl_chart_series(values = list(sheet = "Data",
+                                                     cols = "qty")))),
+    Data = crange_sales), sheet = "Chart")
+  expect_equal(p[[1L]]$series[[1L]]$name_sheet, "Data")
 })

@@ -143,3 +143,41 @@ test_that("transparency does not disturb a cell format", {
                                              transparency = 40)))))
   expect_equal(plain, with_t)
 })
+
+# ── What each chart part will accept ──────────────────────────────────────────
+
+test_that("a series takes no font, and says where the font belongs", {
+  # libxlsxwriter's series has a line, a fill and a pattern but no font: a
+  # series is a shape, not text.  Dropping the font silently would leave the
+  # caller with an unstyled chart and no reason why.
+  expect_error(.chart_format_payload(xl_font(bold = TRUE), "format",
+                                     accept = c("line", "fill", "pattern"),
+                                     part = "a chart series"),
+               "a shape and has no text")
+  expect_error(.chart_format_payload(xl_font(bold = TRUE), "format",
+                                     accept = c("line", "fill", "pattern"),
+                                     part = "a chart series"),
+               "xl_border() or xl_fill()", fixed = TRUE)
+  # the rest of the same format still translates
+  p <- .chart_format_payload(xl_fill(background = "red"), "format",
+                             accept = c("line", "fill", "pattern"),
+                             part = "a chart series")
+  expect_equal(p$fill$color, xl_color("red"))
+})
+
+test_that("a title takes only a font, and says so for each other group", {
+  ttl <- function(f) .chart_format_payload(f, "title_format", accept = "font",
+                                           part = "a chart title")
+  expect_equal(ttl(xl_font(size = 14))$font$size, 14)
+  expect_error(ttl(xl_border(all = "thin")), "takes no line")
+  expect_error(ttl(xl_fill(background = "red")), "takes no fill")
+  expect_error(ttl(xl_fill(pattern = "gray-125", foreground = "red",
+                           background = "white")), "takes no fill")
+  expect_error(ttl(xl_border(all = "thin")), "Use xl_font()", fixed = TRUE)
+})
+
+test_that("an empty format names the groups the part could use", {
+  expect_error(.chart_format_payload(xl_format(), "title_format",
+                                     accept = "font", part = "a chart title"),
+               "give xl_font()", fixed = TRUE)
+})

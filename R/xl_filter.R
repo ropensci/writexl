@@ -9,12 +9,12 @@
 # data frame and hides the rows that do not match.
 #
 # That makes writexl responsible for reproducing Excel's matching rules
-# exactly.  They were established by writing a workbook with criteria but no
-# hidden rows, opening it in Excel and using Data > Reapply, which makes Excel
-# compute the match itself.
+# exactly.  They are measured rather than inferred: write a workbook with
+# criteria and no hidden rows, open it, and press Data > Reapply so that Excel
+# computes the match itself.
 #
-# What the measurements showed is that the rules are not a property of the
-# criteria alone: they are a property of the XML form libxlsxwriter chooses.
+# The rules are not a property of the criteria alone.  They are a property of
+# the XML form libxlsxwriter chooses.
 # _set_custom_filter() in worksheet.c picks one of two forms, and Excel matches
 # them by entirely different rules:
 #

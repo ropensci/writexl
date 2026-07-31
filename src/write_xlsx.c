@@ -550,6 +550,21 @@ static lxw_chart_pattern chart_pattern_of(SEXP p, int *set){
   return pat;
 }
 
+static lxw_chart_font chart_font_of(SEXP p, int *set){
+  lxw_chart_font f;
+  SEXP e = list_get(p, "font");
+  memset(&f, 0, sizeof(f));
+  *set = 0;
+  if(e == R_NilValue || !Rf_isVectorList(e)) return f;
+  *set = 1;
+  if(payload_has(e, "size"))      f.size = payload_dbl(e, "size");
+  if(payload_has(e, "color"))     f.color = (lxw_color_t) payload_int(e, "color");
+  if(payload_has(e, "bold"))      f.bold = LXW_TRUE;
+  if(payload_has(e, "italic"))    f.italic = LXW_TRUE;
+  if(payload_has(e, "underline")) f.underline = LXW_TRUE;
+  return f;
+}
+
 /* Apply a format payload to one series. */
 static void style_series(lxw_chart_series *s, SEXP fmt){
   int has;
@@ -575,6 +590,490 @@ static int chart_range_of(SEXP p, const char *key, int *out){
   for(i = 0; i < 4; i++) out[i] = INTEGER(q)[i];
   UNPROTECT(1);
   return 1;
+}
+
+/* --- The chart itself ----------------------------------------------------- */
+
+/* chart_line_of() and friends look their struct up under a fixed key; these
+   read one whose fields *are* the list's own, which is how the payloads that
+   carry several lines at once (up-down bars, the two areas) are keyed. */
+static int line_fields(SEXP e, lxw_chart_line *out){
+  memset(out, 0, sizeof(*out));
+  if(e == R_NilValue || !Rf_isVectorList(e)) return 0;
+  if(payload_has(e, "color"))        out->color = (lxw_color_t) payload_int(e, "color");
+  if(payload_has(e, "none"))         out->none = 1;
+  if(payload_has(e, "dash_type"))    out->dash_type = (uint8_t) payload_int(e, "dash_type");
+  if(payload_has(e, "transparency")) out->transparency = (uint8_t) payload_int(e, "transparency");
+  return 1;
+}
+
+static int fill_fields(SEXP e, lxw_chart_fill *out){
+  memset(out, 0, sizeof(*out));
+  if(e == R_NilValue || !Rf_isVectorList(e)) return 0;
+  if(payload_has(e, "color"))        out->color = (lxw_color_t) payload_int(e, "color");
+  if(payload_has(e, "none"))         out->none = 1;
+  if(payload_has(e, "transparency")) out->transparency = (uint8_t) payload_int(e, "transparency");
+  return 1;
+}
+
+static int pattern_fields(SEXP e, lxw_chart_pattern *out){
+  memset(out, 0, sizeof(*out));
+  if(e == R_NilValue || !Rf_isVectorList(e)) return 0;
+  out->fg_color = (lxw_color_t) payload_int(e, "fg_color");
+  out->bg_color = (lxw_color_t) payload_int(e, "bg_color");
+  out->type     = (uint8_t) payload_int(e, "type");
+  return 1;
+}
+
+/* lxw_chart_layout from a payload of 2 or 4 fractions. */
+static int chart_layout_of(SEXP p, const char *key, lxw_chart_layout *out){
+  SEXP e = list_get(p, key);
+  SEXP q;
+  R_xlen_t n;
+  memset(out, 0, sizeof(*out));
+  if(e == R_NilValue) return 0;
+  q = PROTECT(Rf_coerceVector(e, REALSXP));
+  n = Rf_length(q);
+  if(n < 2){ UNPROTECT(1); return 0; }
+  out->x = REAL(q)[0];
+  out->y = REAL(q)[1];
+  if(n >= 4){
+    out->width  = REAL(q)[2];
+    out->height = REAL(q)[3];
+  }
+  UNPROTECT(1);
+  return 1;
+}
+
+static void apply_legend(lxw_chart *chart, SEXP l){
+  int has;
+  lxw_chart_font font;
+  lxw_chart_layout lay;
+  SEXP d;
+  if(l == R_NilValue || !Rf_isVectorList(l)) return;
+
+  if(payload_has(l, "position"))
+    chart_legend_set_position(chart, (uint8_t) payload_int(l, "position"));
+  font = chart_font_of(list_get(l, "font"), &has);
+  if(has) chart_legend_set_font(chart, &font);
+  if(chart_layout_of(l, "layout", &lay))
+    chart_legend_set_layout(chart, &lay);
+
+  /* the array is read until a negative entry, so it gets one extra slot */
+  d = list_get(l, "delete_series");
+  if(d != R_NilValue && Rf_length(d) > 0){
+    SEXP q = PROTECT(Rf_coerceVector(d, INTSXP));
+    R_xlen_t n = Rf_length(q), i;
+    int16_t *idx = calloc((size_t) n + 1, sizeof(*idx));
+    if(!idx){ UNPROTECT(1); Rf_error("could not allocate the legend series"); }
+    for(i = 0; i < n; i++) idx[i] = (int16_t) INTEGER(q)[i];
+    idx[n] = -1;
+    chart_legend_delete_series(chart, idx);
+    free(idx);
+    UNPROTECT(1);
+  }
+}
+
+static void apply_data_table(lxw_chart *chart, SEXP t){
+  int has;
+  lxw_chart_font font;
+  if(t == R_NilValue || !Rf_isVectorList(t)) return;
+  chart_set_table(chart);
+  if(payload_has(t, "grid")){
+    SEXP q = PROTECT(Rf_coerceVector(list_get(t, "grid"), INTSXP));
+    if(Rf_length(q) >= 4)
+      chart_set_table_grid(chart,
+                           INTEGER(q)[0] ? LXW_TRUE : LXW_FALSE,
+                           INTEGER(q)[1] ? LXW_TRUE : LXW_FALSE,
+                           INTEGER(q)[2] ? LXW_TRUE : LXW_FALSE,
+                           INTEGER(q)[3] ? LXW_TRUE : LXW_FALSE);
+    UNPROTECT(1);
+  }
+  font = chart_font_of(list_get(t, "font"), &has);
+  if(has) chart_set_table_font(chart, &font);
+}
+
+/* Drop lines and high-low lines take an optional line; NULL means Excel's own.
+   Up-down bars are either plain or formatted, four structs at once. */
+static void apply_chart_lines(lxw_chart *chart, SEXP c){
+  lxw_chart_line line;
+  SEXP e;
+
+  e = list_get(c, "drop_lines");
+  if(e != R_NilValue && Rf_isVectorList(e))
+    chart_set_drop_lines(chart, line_fields(list_get(e, "line"), &line) ?
+                                &line : NULL);
+
+  e = list_get(c, "high_low_lines");
+  if(e != R_NilValue && Rf_isVectorList(e))
+    chart_set_high_low_lines(chart, line_fields(list_get(e, "line"), &line) ?
+                                    &line : NULL);
+
+  e = list_get(c, "up_down_bars");
+  if(e != R_NilValue && Rf_isVectorList(e)){
+    lxw_chart_line up_line, down_line;
+    lxw_chart_fill up_fill, down_fill;
+    int hu = line_fields(list_get(e, "up_line"), &up_line);
+    int hd = line_fields(list_get(e, "down_line"), &down_line);
+    int fu = fill_fields(list_get(e, "up_fill"), &up_fill);
+    int fd = fill_fields(list_get(e, "down_fill"), &down_fill);
+    if(hu || hd || fu || fd)
+      chart_set_up_down_bars_format(chart, hu ? &up_line : NULL,
+                                    fu ? &up_fill : NULL,
+                                    hd ? &down_line : NULL,
+                                    fd ? &down_fill : NULL);
+    else
+      chart_set_up_down_bars(chart);
+  }
+}
+
+/* The plot area and the chart area take the same three, keyed with a prefix so
+   that one chart payload can carry both. */
+static void apply_area(lxw_chart *chart, SEXP c, const char *which){
+  char key[32];
+  int is_plot = (strcmp(which, "plot_area") == 0);
+  lxw_chart_line line;
+  lxw_chart_fill fill;
+  lxw_chart_pattern pat;
+
+  snprintf(key, sizeof(key), "%s_line", which);
+  if(line_fields(list_get(c, key), &line)){
+    if(is_plot) chart_plotarea_set_line(chart, &line);
+    else        chart_chartarea_set_line(chart, &line);
+  }
+  snprintf(key, sizeof(key), "%s_fill", which);
+  if(fill_fields(list_get(c, key), &fill)){
+    if(is_plot) chart_plotarea_set_fill(chart, &fill);
+    else        chart_chartarea_set_fill(chart, &fill);
+  }
+  snprintf(key, sizeof(key), "%s_pattern", which);
+  if(pattern_fields(list_get(c, key), &pat)){
+    if(is_plot) chart_plotarea_set_pattern(chart, &pat);
+    else        chart_chartarea_set_pattern(chart, &pat);
+  }
+}
+
+static void apply_chart_extras(lxw_chart *chart, SEXP c){
+  lxw_chart_layout lay;
+
+  apply_legend(chart, list_get(c, "legend"));
+  apply_data_table(chart, list_get(c, "data_table"));
+  apply_chart_lines(chart, c);
+  apply_area(chart, c, "plot_area");
+  apply_area(chart, c, "chart_area");
+
+  if(chart_layout_of(c, "plot_area_layout", &lay))
+    chart_plotarea_set_layout(chart, &lay);
+  if(chart_layout_of(c, "title_layout", &lay))
+    chart_title_set_layout(chart, &lay);
+  if(payload_has(c, "title_overlay"))
+    chart_title_set_overlay(chart, payload_int(c, "title_overlay") ? LXW_TRUE
+                                                                  : LXW_FALSE);
+
+  if(payload_has(c, "hole_size"))
+    chart_set_hole_size(chart, (uint8_t) payload_int(c, "hole_size"));
+  if(payload_has(c, "rotation"))
+    chart_set_rotation(chart, (uint16_t) payload_int(c, "rotation"));
+  if(payload_has(c, "series_gap"))
+    chart_set_series_gap(chart, (uint16_t) payload_int(c, "series_gap"));
+  if(payload_has(c, "series_overlap"))
+    chart_set_series_overlap(chart, (int8_t) payload_int(c, "series_overlap"));
+  if(payload_has(c, "show_blanks"))
+    chart_show_blanks_as(chart, (uint8_t) payload_int(c, "show_blanks"));
+  if(payload_has(c, "show_hidden_data"))
+    chart_show_hidden_data(chart);
+}
+
+/* --- The parts of a series ------------------------------------------------ */
+
+/* The structs below are stack- or heap-allocated here and copied by
+   libxlsxwriter, so they only have to outlive the call. */
+static void apply_marker(lxw_chart_series *s, SEXP m){
+  int has;
+  lxw_chart_line line;
+  lxw_chart_fill fill;
+  lxw_chart_pattern pat;
+  if(m == R_NilValue || !Rf_isVectorList(m)) return;
+  if(payload_has(m, "type"))
+    chart_series_set_marker_type(s, (uint8_t) payload_int(m, "type"));
+  if(payload_has(m, "size"))
+    chart_series_set_marker_size(s, (uint8_t) payload_int(m, "size"));
+  line = chart_line_of(m, &has);
+  if(has) chart_series_set_marker_line(s, &line);
+  fill = chart_fill_of(m, &has);
+  if(has) chart_series_set_marker_fill(s, &fill);
+  pat = chart_pattern_of(m, &has);
+  if(has) chart_series_set_marker_pattern(s, &pat);
+}
+
+/* Custom data labels are a NULL-terminated array of structs that point at
+   further structs, so every one of them is allocated up front and freed once
+   libxlsxwriter has taken its copy. */
+static void apply_custom_labels(lxw_chart_series *s, SEXP cs){
+  int has;
+  R_xlen_t n, i;
+  lxw_chart_data_label **arr;
+  lxw_chart_data_label *slot;
+  lxw_chart_font *fonts;
+  lxw_chart_line *lines;
+  lxw_chart_fill *fills;
+  lxw_chart_pattern *pats;
+
+  if(cs == R_NilValue || !Rf_isVectorList(cs)) return;
+  n = Rf_length(cs);
+  if(n < 1) return;
+
+  arr   = calloc((size_t) n + 1, sizeof(*arr));
+  slot  = calloc((size_t) n, sizeof(*slot));
+  fonts = calloc((size_t) n, sizeof(*fonts));
+  lines = calloc((size_t) n, sizeof(*lines));
+  fills = calloc((size_t) n, sizeof(*fills));
+  pats  = calloc((size_t) n, sizeof(*pats));
+  if(!arr || !slot || !fonts || !lines || !fills || !pats){
+    free(arr); free(slot); free(fonts); free(lines); free(fills); free(pats);
+    Rf_error("could not allocate the custom data labels");
+  }
+
+  for(i = 0; i < n; i++){
+    SEXP e = VECTOR_ELT(cs, i);
+    arr[i] = &slot[i];
+    if(e == R_NilValue || !Rf_isVectorList(e)) continue;
+    if(payload_has(e, "value")) slot[i].value = payload_str(e, "value");
+    if(payload_has(e, "hide"))  slot[i].hide = LXW_TRUE;
+    fonts[i] = chart_font_of(e, &has);    if(has) slot[i].font = &fonts[i];
+    lines[i] = chart_line_of(e, &has);    if(has) slot[i].line = &lines[i];
+    fills[i] = chart_fill_of(e, &has);    if(has) slot[i].fill = &fills[i];
+    pats[i]  = chart_pattern_of(e, &has); if(has) slot[i].pattern = &pats[i];
+  }
+  arr[n] = NULL;
+  chart_series_set_labels_custom(s, arr);
+  free(arr); free(slot); free(fonts); free(lines); free(fills); free(pats);
+}
+
+static void apply_labels(lxw_chart_series *s, SEXP l){
+  int has;
+  lxw_chart_line line;
+  lxw_chart_fill fill;
+  lxw_chart_pattern pat;
+  lxw_chart_font font;
+  if(l == R_NilValue || !Rf_isVectorList(l)) return;
+
+  chart_series_set_labels(s);
+  if(payload_has(l, "options")){
+    SEXP q = PROTECT(Rf_coerceVector(list_get(l, "options"), INTSXP));
+    if(Rf_length(q) >= 3)
+      chart_series_set_labels_options(s,
+                                      INTEGER(q)[0] ? LXW_TRUE : LXW_FALSE,
+                                      INTEGER(q)[1] ? LXW_TRUE : LXW_FALSE,
+                                      INTEGER(q)[2] ? LXW_TRUE : LXW_FALSE);
+    UNPROTECT(1);
+  }
+  if(payload_has(l, "percentage"))   chart_series_set_labels_percentage(s);
+  if(payload_has(l, "legend"))       chart_series_set_labels_legend(s);
+  if(payload_has(l, "leader_lines")) chart_series_set_labels_leader_line(s);
+  if(payload_has(l, "position"))
+    chart_series_set_labels_position(s, (uint8_t) payload_int(l, "position"));
+  if(payload_has(l, "separator"))
+    chart_series_set_labels_separator(s, (uint8_t) payload_int(l, "separator"));
+  if(payload_has(l, "num_format"))
+    chart_series_set_labels_num_format(s, payload_str(l, "num_format"));
+
+  font = chart_font_of(l, &has);
+  if(has) chart_series_set_labels_font(s, &font);
+  line = chart_line_of(l, &has);
+  if(has) chart_series_set_labels_line(s, &line);
+  fill = chart_fill_of(l, &has);
+  if(has) chart_series_set_labels_fill(s, &fill);
+  pat = chart_pattern_of(l, &has);
+  if(has) chart_series_set_labels_pattern(s, &pat);
+
+  apply_custom_labels(s, list_get(l, "custom"));
+}
+
+static void apply_trendline(lxw_chart_series *s, SEXP t){
+  int has;
+  lxw_chart_line line;
+  if(t == R_NilValue || !Rf_isVectorList(t)) return;
+  chart_series_set_trendline(s, (uint8_t) payload_int(t, "type"),
+                             (uint8_t) (payload_has(t, "value") ?
+                                        payload_int(t, "value") : 0));
+  if(payload_has(t, "forward") || payload_has(t, "backward"))
+    chart_series_set_trendline_forecast(
+      s, payload_has(t, "forward") ? payload_dbl(t, "forward") : 0,
+      payload_has(t, "backward") ? payload_dbl(t, "backward") : 0);
+  if(payload_has(t, "equation"))  chart_series_set_trendline_equation(s);
+  if(payload_has(t, "r_squared")) chart_series_set_trendline_r_squared(s);
+  if(payload_has(t, "intercept"))
+    chart_series_set_trendline_intercept(s, payload_dbl(t, "intercept"));
+  if(payload_has(t, "name"))
+    chart_series_set_trendline_name(s, payload_str(t, "name"));
+  line = chart_line_of(t, &has);
+  if(has) chart_series_set_trendline_line(s, &line);
+}
+
+static void apply_error_bars(lxw_chart_series *s, SEXP e, uint8_t axis){
+  int has;
+  lxw_chart_line line;
+  lxw_series_error_bars *bars;
+  if(e == R_NilValue || !Rf_isVectorList(e)) return;
+  bars = chart_series_get_error_bars(s, axis);
+  if(!bars) return;
+  chart_series_set_error_bars(bars, (uint8_t) payload_int(e, "type"),
+                              payload_has(e, "value") ?
+                                payload_dbl(e, "value") : 0);
+  if(payload_has(e, "direction"))
+    chart_series_set_error_bars_direction(bars,
+                                          (uint8_t) payload_int(e, "direction"));
+  if(payload_has(e, "endcap"))
+    chart_series_set_error_bars_endcap(
+      bars, payload_int(e, "endcap") ? LXW_CHART_ERROR_BAR_END_CAP
+                                     : LXW_CHART_ERROR_BAR_NO_CAP);
+  line = chart_line_of(e, &has);
+  if(has) chart_series_set_error_bars_line(bars, &line);
+}
+
+static void apply_points(lxw_chart_series *s, SEXP ps){
+  int has;
+  R_xlen_t n, i;
+  lxw_chart_point **arr;
+  lxw_chart_point *slot;
+  lxw_chart_line *lines;
+  lxw_chart_fill *fills;
+  lxw_chart_pattern *pats;
+
+  if(ps == R_NilValue || !Rf_isVectorList(ps)) return;
+  n = Rf_length(ps);
+  if(n < 1) return;
+
+  arr   = calloc((size_t) n + 1, sizeof(*arr));
+  slot  = calloc((size_t) n, sizeof(*slot));
+  lines = calloc((size_t) n, sizeof(*lines));
+  fills = calloc((size_t) n, sizeof(*fills));
+  pats  = calloc((size_t) n, sizeof(*pats));
+  if(!arr || !slot || !lines || !fills || !pats){
+    free(arr); free(slot); free(lines); free(fills); free(pats);
+    Rf_error("could not allocate the chart points");
+  }
+
+  for(i = 0; i < n; i++){
+    SEXP e = VECTOR_ELT(ps, i);
+    arr[i] = &slot[i];
+    if(e == R_NilValue || !Rf_isVectorList(e)) continue;
+    lines[i] = chart_line_of(e, &has);    if(has) slot[i].line = &lines[i];
+    fills[i] = chart_fill_of(e, &has);    if(has) slot[i].fill = &fills[i];
+    pats[i]  = chart_pattern_of(e, &has); if(has) slot[i].pattern = &pats[i];
+  }
+  arr[n] = NULL;
+  chart_series_set_points(s, arr);
+  free(arr); free(slot); free(lines); free(fills); free(pats);
+}
+
+/* Apply one axis payload.  Everything the chart type forbids was refused in R,
+   so anything present here is legal for this axis. */
+static void apply_axis(lxw_chart_axis *axis, SEXP a){
+  int has;
+  lxw_chart_line line;
+  lxw_chart_fill fill;
+  lxw_chart_pattern pat;
+  lxw_chart_font font;
+  int r[4];
+
+  if(a == R_NilValue || !Rf_isVectorList(a)) return;
+
+  if(payload_has(a, "name"))
+    chart_axis_set_name(axis, payload_str(a, "name"));
+  else if(chart_range_of(a, "name_range", r))
+    chart_axis_set_name_range(axis, payload_str(a, "name_sheet"),
+                              (lxw_row_t) r[0], (lxw_col_t) r[1]);
+
+  font = chart_font_of(list_get(a, "name_font"), &has);
+  if(has) chart_axis_set_name_font(axis, &font);
+  font = chart_font_of(list_get(a, "num_font"), &has);
+  if(has) chart_axis_set_num_font(axis, &font);
+  if(payload_has(a, "num_format"))
+    chart_axis_set_num_format(axis, payload_str(a, "num_format"));
+
+  if(payload_has(a, "name_x")){
+    lxw_chart_layout lay;
+    memset(&lay, 0, sizeof(lay));
+    lay.x = payload_dbl(a, "name_x");
+    lay.y = payload_dbl(a, "name_y");
+    chart_axis_set_name_layout(axis, &lay);
+  }
+
+  line = chart_line_of(a, &has);
+  if(has) chart_axis_set_line(axis, &line);
+  fill = chart_fill_of(a, &has);
+  if(has) chart_axis_set_fill(axis, &fill);
+  pat = chart_pattern_of(a, &has);
+  if(has) chart_axis_set_pattern(axis, &pat);
+
+  if(payload_has(a, "off"))     chart_axis_off(axis);
+  if(payload_has(a, "reverse")) chart_axis_set_reverse(axis);
+
+  if(payload_has(a, "min")) chart_axis_set_min(axis, payload_dbl(a, "min"));
+  if(payload_has(a, "max")) chart_axis_set_max(axis, payload_dbl(a, "max"));
+  if(payload_has(a, "log_base"))
+    chart_axis_set_log_base(axis, (uint16_t) payload_int(a, "log_base"));
+  if(payload_has(a, "major_unit"))
+    chart_axis_set_major_unit(axis, payload_dbl(a, "major_unit"));
+  if(payload_has(a, "minor_unit"))
+    chart_axis_set_minor_unit(axis, payload_dbl(a, "minor_unit"));
+  if(payload_has(a, "interval_unit"))
+    chart_axis_set_interval_unit(axis, (uint16_t) payload_int(a, "interval_unit"));
+  if(payload_has(a, "interval_tick"))
+    chart_axis_set_interval_tick(axis, (uint16_t) payload_int(a, "interval_tick"));
+  if(payload_has(a, "display_units"))
+    chart_axis_set_display_units(axis, (uint8_t) payload_int(a, "display_units"));
+  if(payload_has(a, "display_units_visible"))
+    chart_axis_set_display_units_visible(
+      axis, payload_int(a, "display_units_visible") ? LXW_TRUE : LXW_FALSE);
+
+  if(payload_has(a, "position"))
+    chart_axis_set_position(axis, (uint8_t) payload_int(a, "position"));
+  if(payload_has(a, "label_position"))
+    chart_axis_set_label_position(axis, (uint8_t) payload_int(a, "label_position"));
+  if(payload_has(a, "label_align"))
+    chart_axis_set_label_align(axis, (uint8_t) payload_int(a, "label_align"));
+  if(payload_has(a, "major_tick"))
+    chart_axis_set_major_tick_mark(axis, (uint8_t) payload_int(a, "major_tick"));
+  if(payload_has(a, "minor_tick"))
+    chart_axis_set_minor_tick_mark(axis, (uint8_t) payload_int(a, "minor_tick"));
+
+  if(payload_has(a, "crossing_min"))      chart_axis_set_crossing_min(axis);
+  else if(payload_has(a, "crossing_max")) chart_axis_set_crossing_max(axis);
+  else if(payload_has(a, "crossing"))
+    chart_axis_set_crossing(axis, payload_dbl(a, "crossing"));
+
+  if(payload_has(a, "major_gridlines"))
+    chart_axis_major_gridlines_set_visible(
+      axis, payload_int(a, "major_gridlines") ? LXW_TRUE : LXW_FALSE);
+  if(payload_has(a, "minor_gridlines"))
+    chart_axis_minor_gridlines_set_visible(
+      axis, payload_int(a, "minor_gridlines") ? LXW_TRUE : LXW_FALSE);
+  {
+    /* a gridline is a line of its own, keyed separately from the axis line */
+    SEXP g = list_get(a, "major_gridlines_line");
+    if(g != R_NilValue && Rf_isVectorList(g)){
+      lxw_chart_line gl;
+      memset(&gl, 0, sizeof(gl));
+      if(payload_has(g, "color"))        gl.color = (lxw_color_t) payload_int(g, "color");
+      if(payload_has(g, "none"))         gl.none = 1;
+      if(payload_has(g, "dash_type"))    gl.dash_type = (uint8_t) payload_int(g, "dash_type");
+      if(payload_has(g, "transparency")) gl.transparency = (uint8_t) payload_int(g, "transparency");
+      chart_axis_major_gridlines_set_line(axis, &gl);
+    }
+    g = list_get(a, "minor_gridlines_line");
+    if(g != R_NilValue && Rf_isVectorList(g)){
+      lxw_chart_line gl;
+      memset(&gl, 0, sizeof(gl));
+      if(payload_has(g, "color"))        gl.color = (lxw_color_t) payload_int(g, "color");
+      if(payload_has(g, "none"))         gl.none = 1;
+      if(payload_has(g, "dash_type"))    gl.dash_type = (uint8_t) payload_int(g, "dash_type");
+      if(payload_has(g, "transparency")) gl.transparency = (uint8_t) payload_int(g, "transparency");
+      chart_axis_minor_gridlines_set_line(axis, &gl);
+    }
+  }
 }
 
 static void apply_charts(cell_write_ctx *ctx, SEXP opts){
@@ -612,7 +1111,22 @@ static void apply_charts(cell_write_ctx *ctx, SEXP opts){
         if(payload_has(se, "invert_if_negative"))
           chart_series_set_invert_if_negative(series);
         style_series(series, list_get(se, "format"));
+        apply_marker(series, list_get(se, "marker"));
+        apply_labels(series, list_get(se, "labels"));
+        apply_trendline(series, list_get(se, "trendline"));
+        apply_error_bars(series, list_get(se, "x_error_bars"),
+                         LXW_CHART_ERROR_BAR_AXIS_X);
+        apply_error_bars(series, list_get(se, "y_error_bars"),
+                         LXW_CHART_ERROR_BAR_AXIS_Y);
+        apply_points(series, list_get(se, "points"));
       }
+    }
+
+    {
+      /* The title's only styling is its font; xl_chart() refuses the rest. */
+      int has;
+      lxw_chart_font tf = chart_font_of(list_get(c, "title_format"), &has);
+      if(has) chart_title_set_name_font(chart, &tf);
     }
 
     if(payload_has(c, "title_off"))
@@ -625,6 +1139,11 @@ static void apply_charts(cell_write_ctx *ctx, SEXP opts){
 
     if(payload_has(c, "style"))
       chart_set_style(chart, (uint8_t) payload_int(c, "style"));
+
+    apply_chart_extras(chart, c);
+
+    apply_axis(chart->x_axis, list_get(c, "x_axis"));
+    apply_axis(chart->y_axis, list_get(c, "y_axis"));
 
     lxw_chart_options o;
     memset(&o, 0, sizeof(o));
@@ -742,11 +1261,11 @@ static void apply_sheet_scalars(cell_write_ctx *ctx, SEXP opts){
 
 /* --- Sheet overlays ------------------------------------------------------
  *
- * Range-scoped worksheet features (the autofilter today; merged cells, data
- * validation, conditional formats, images, charts and tables later) are all
- * applied here, in one pass after the per-sheet scalars and *before* the row
- * loop: under constant_memory each row is flushed as it is written, so
- * anything spanning rows has to be declared up front.
+ * Range-scoped worksheet features -- the autofilter, merges, data validation,
+ * conditional formats, images, charts and tables -- are all applied here, in
+ * one pass after the per-sheet scalars and *before* the row loop: under
+ * constant_memory each row is flushed as it is written, so anything spanning
+ * rows has to be declared up front.
  *
  * Each payload is a named R list built by .resolve_sheet_plan() carrying a
  * `kind` string.  A new feature adds a kind here rather than another argument

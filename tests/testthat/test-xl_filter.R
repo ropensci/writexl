@@ -1,10 +1,8 @@
 # Autofilter criteria, and the rows they hide.
 #
-# The expected results below are not derived from reading documentation: they
-# were measured in Excel.  A workbook was written with criteria set and no rows
-# hidden, opened, and Data > Reapply pressed so that Excel computed the match
-# itself.  Each expectation records what Excel actually did, so a change in
-# writexl's predicate that drifts away from Excel fails here.
+# The expectations below are measured, not documented: each records what Excel
+# itself computes for those criteria, via Data > Reapply on a workbook written
+# with no rows hidden.  A predicate that drifts away from Excel fails here.
 
 # The sheet rows a filter hides (1-based, as they appear in the XML).
 filter_hidden <- function(df, ...) {

@@ -84,22 +84,79 @@
   name either as an A1 range (`"Data!B2:B10"`) or by column
   (`list(cols = "revenue")`), so a range follows the data when rows are added
   or a header is written; a range may name another sheet, and one that reaches
-  past the data is refused rather than plotted as blanks. Placement uses the
-  same vocabulary as an image (`at`, `scale`, `offset`, `position`,
-  `description`, `decorative`).
+  past the data is refused rather than plotted as blanks. A series name and a
+  chart title are always literal text unless given as a spec, and
+  `list(header = "revenue")` names a header cell. A series that plots a column
+  is named after that column's header unless told otherwise, as it is when you
+  chart a column with its header in Excel; `name = FALSE` leaves it unnamed.
+  Placement uses the same vocabulary as an image (`at`, `scale`, `offset`,
+  `position`, `description`, `decorative`).
 
   Series and titles are styled with the ordinary `xl_format()` groups:
   `xl_border()` becomes the line, `xl_fill()` the fill or pattern, and
-  `xl_font()` the text, so one format object can style both a cell and a chart.
-  `xl_fill()` and `xl_border()` gained `transparency`, which charts honour and
-  cells ignore. Border styles a chart line cannot express, and format groups a
-  chart has no use for, are refused by name instead of being dropped silently.
+  `xl_font()` the title text via `xl_chart(title_format =)`, so one format
+  object can style both a cell and a chart. `xl_fill()` and `xl_border()` gained
+  `transparency`, which charts honour and cells ignore. Anything the chart
+  cannot draw is refused by name rather than dropped silently: border styles a
+  chart line has no width for, format groups no chart shape has, a font on a
+  series (a series is a shape, not text), and a fill or border on a title.
 
-  Features that apply to only some chart types --- the doughnut hole, pie
-  rotation, up-down bars, high-low lines, the series gap and overlap, smoothing
-  --- are checked against the chart's type, because Excel discards them without
-  a word. A scatter series must have `categories`: they are its x axis, and
-  libxlsxwriter crashes without them.
+  **Axes** via `xl_chart(x_axis =, y_axis =)` and `xl_chart_axis()`, covering
+  all 32 of libxlsxwriter's axis functions: the axis title and its font, tick
+  labels and their number format and font, bounds, log scale, major and minor
+  units and tick marks, tick-label position and alignment, category intervals,
+  crossing, reversal, display units, gridlines and their styling, the axis line
+  itself, and hiding the axis.
+
+  Options that apply to one *kind* of axis are refused on the other, since
+  Excel discards them silently. A scatter chart plots numbers against numbers,
+  so both its axes are value axes; every other type has a category x axis and a
+  value y axis, bar charts included --- Excel draws their categories up the
+  side, but the axes keep their names. So `min`, `max`, `log_base`,
+  `major_unit`, `minor_unit` and the display units are value-axis only, and
+  `position`, `label_align`, `interval_unit` and `interval_tick` are
+  category-axis only. Pie and doughnut charts have no axes at all. A test reads
+  the applicability out of the bundled `chart.h` and checks every function is
+  reached, so a function added upstream shows up as a failure rather than as a
+  gap.
+
+  **The parts of a series** --- `xl_chart_marker()` for the symbol at each
+  point, `xl_chart_labels()` and `xl_chart_label()` for the numbers printed
+  beside them, `xl_chart_trendline()` for a fit through the series,
+  `xl_chart_error_bars()` for `x_error_bars` and `y_error_bars`, and an
+  `xl_format()` per point in `points =` to colour one slice of a pie or one
+  bar of a column chart. Custom labels give a single point its own text, its
+  own styling, or `hide = TRUE`. A label holds exactly the parts named, so
+  `show_percentage = TRUE` gives a percentage rather than Excel's
+  "10, 11.8%"; naming none of them leaves Excel's default, the value.
+
+  These carry three more restrictions libxlsxwriter documents and does not
+  enforce: the positions a data label may take depend on the chart type (the
+  whole table is in the header, and is checked), a moving average has no
+  forecast, equation or R-squared, an intercept applies only to exponential,
+  linear and polynomial fits, and an automatic marker cannot also be given a
+  size or a format. A test reads the function list out of the bundled
+  `chart.h`, so all 40 `chart_series_*()` functions are known to be reached.
+
+  **The chart itself** --- `xl_chart_legend()` moves, styles or removes the
+  legend and can leave a series out of the key; `xl_chart_table()` prints the
+  plotted numbers in a grid beneath the chart; `plot_area_format` and
+  `chart_area_format` style the panel and the surround; `title_layout`,
+  `plot_area_layout` and `xl_chart_legend(layout =)` place those parts by hand;
+  `show_blanks` says what an empty cell does to the plot, and
+  `show_hidden_data` plots rows Excel would leave out.
+
+  The six options that belong to one family of chart --- the doughnut hole, pie
+  rotation, drop lines, high-low lines, up-down bars, and the bar gap and
+  overlap --- are now reachable, and the feature matrix that has known about
+  them since the first charts refuses them elsewhere. `drop_lines` and
+  `high_low_lines` take `TRUE` or an `xl_format()` giving their line;
+  `up_down_bars` takes `TRUE` or `list(up =, down =)`.
+
+  Features that apply to only some chart types are checked against the chart's
+  type throughout, because Excel discards them without a word. A scatter series
+  must have `categories`: they are its x axis, and libxlsxwriter crashes
+  without them.
 
 * `xl_filter_keep()` exposes the matching rule on its own: given a data frame
   and one or more `xl_filter()`s, it returns which rows Excel would leave

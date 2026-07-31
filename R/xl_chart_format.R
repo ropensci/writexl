@@ -27,9 +27,8 @@
 #     refused rather than one side being picked.
 # -----------------------------------------------------------------------------
 
-# Cell border style -> chart dash type.  Only exact equivalents are listed; the
-# rest are refused by .chart_dash(), which is the point of keeping this table
-# short rather than approximating.
+# Cell border style -> chart dash type.  Only exact equivalents are listed;
+# .chart_dash() refuses the rest rather than approximating them.
 .CHART_DASH <- c(
   thin       = 0L,   # LXW_CHART_LINE_DASH_SOLID
   dashed     = 3L,   # DASH
@@ -69,9 +68,28 @@
   protection = "a chart shape cannot be locked or hidden"
 )
 
+# Not every chart part takes every piece.  A series is a shape and has no
+# text, so it takes a line, a fill and a pattern but no font; a title is text
+# and takes only a font.  A group the target cannot use has nowhere to go, so
+# it is an error rather than a silent drop.
+.CHART_PART_CANNOT <- c(
+  font    = paste0("a font, but %s is a shape and has no text -- set the font ",
+                   "on the chart title"),
+  line    = "a border, but %s takes no line",
+  fill    = "a fill, but %s takes no fill",
+  pattern = "a pattern fill, but %s takes no fill"
+)
+
+.CHART_PART_GROUP <- c(font = "xl_font()", line = "xl_border()",
+                       fill = "xl_fill()", pattern = "xl_fill()")
+
 # Translate an xl_format into the pieces a chart understands.  Returns a list
-# with any of `line`, `fill`, `pattern` and `font`, each ready for C.
-.chart_format_payload <- function(fmt, arg) {
+# with any of `line`, `fill`, `pattern` and `font`, each ready for C.  `accept`
+# names the pieces this particular chart part can use, and `part` names it for
+# the error message.
+.chart_format_payload <- function(fmt, arg,
+                                  accept = c("line", "fill", "pattern", "font"),
+                                  part = "a chart series") {
   if (is.null(fmt)) return(NULL)
   if (!is_xl_format(fmt))
     stop(sprintf("`%s` must be an xl_format object", arg), call. = FALSE)
@@ -148,8 +166,16 @@
     if (length(ent)) out$line <- ent
   }
 
+  extra <- setdiff(names(out), accept)
+  if (length(extra))
+    stop(sprintf("`%s` sets %s. Use %s instead.", arg,
+                 sprintf(.CHART_PART_CANNOT[[extra[[1L]]]], part),
+                 paste(unique(.CHART_PART_GROUP[accept]), collapse = " or ")),
+         call. = FALSE)
+
   if (!length(out))
-    stop(sprintf(paste0("`%s` is an empty format; give a font, a fill or a ",
-                        "border for the chart to use."), arg), call. = FALSE)
+    stop(sprintf("`%s` is an empty format; give %s for the chart to use.", arg,
+                 paste(unique(.CHART_PART_GROUP[accept]), collapse = " or ")),
+         call. = FALSE)
   out
 }

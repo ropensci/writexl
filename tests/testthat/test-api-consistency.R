@@ -29,7 +29,13 @@ FALSE_FRIENDS <- list(
   c("xl_comment", "xl_row_spec"),
   # `name` in xl_hyperlink() is the deprecated alias for `value`, kept last on
   # purpose; in xl_chart_series() it is the series label shown in the legend.
-  c("xl_hyperlink", "xl_chart_series")
+  c("xl_hyperlink", "xl_chart_series"),
+  c("xl_hyperlink", "xl_chart_axis"),
+  c("xl_hyperlink", "xl_chart_trendline"),
+  # `position` in xl_image() is how the picture behaves when rows and columns
+  # resize; in xl_chart_axis() it is whether the categories sit on the tick
+  # marks or between them.  Different vocabularies, not one argument.
+  c("xl_image", "xl_chart_axis")
 )
 
 is_false_friend <- function(a, b) {

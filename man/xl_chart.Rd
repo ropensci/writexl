@@ -8,6 +8,25 @@ xl_chart(
   type,
   series,
   title = NULL,
+  title_format = NULL,
+  title_layout = NULL,
+  title_overlay = NA,
+  x_axis = NULL,
+  y_axis = NULL,
+  legend = NULL,
+  data_table = NULL,
+  plot_area_format = NULL,
+  plot_area_layout = NULL,
+  chart_area_format = NULL,
+  drop_lines = NA,
+  high_low_lines = NA,
+  up_down_bars = NA,
+  hole_size = NA,
+  rotation = NA,
+  series_gap = NA,
+  series_overlap = NA,
+  show_blanks = NULL,
+  show_hidden_data = NA,
   at = "A1",
   scale = 1,
   offset = NULL,
@@ -22,10 +41,66 @@ xl_chart(
 `"doughnut"`, `"area"`, `"scatter"`, `"radar"`, and the stacked,
 percent-stacked, smoothed and marker variants.}
 
-\item{series}{One [xl_chart_series()], or a list of them.}
+\item{series}{One [xl_chart_series()], or a list of them.  Every series of a
+scatter chart must have `categories`, which are its x axis.}
 
-\item{title}{The chart title: a string, or a range holding one.  `FALSE`
-removes the title Excel would otherwise generate.}
+\item{title}{The chart title.  A string is always taken literally, so to
+take the title from a cell give a range spec ---
+`list(header = "revenue")` for a column's header cell, or
+`list(rows = 1, cols = 1)` for a data cell.  `FALSE` removes the title
+Excel would otherwise generate.}
+
+\item{title_format}{An [xl_format()] styling the title text.  A title is
+text, so only the [xl_font()] group applies.}
+
+\item{title_layout}{Where to put the title by hand, as `c(x, y)` fractions
+of the chart.  Excel places it for you otherwise.}
+
+\item{title_overlay}{Let the title sit over the plot rather than above it.}
+
+\item{x_axis, y_axis}{An [xl_chart_axis()] describing that axis.  Pie and
+doughnut charts have none, and several axis options apply to a value or a
+category axis only --- see [xl_chart_axis()].}
+
+\item{legend}{An [xl_chart_legend()] moving, styling or removing the legend.}
+
+\item{data_table}{An [xl_chart_table()] printing the plotted numbers in a
+grid beneath the chart.}
+
+\item{plot_area_format, chart_area_format}{An [xl_format()] styling the plot
+area --- the panel the data is drawn in --- and the chart area around it:
+[xl_border()] for the line, [xl_fill()] for the fill or pattern.}
+
+\item{plot_area_layout}{Where to put the plot area by hand, as `c(x, y)`
+or `c(x, y, width, height)` fractions of the chart.}
+
+\item{drop_lines}{Drop lines from each point to the category axis: `TRUE`,
+or an [xl_format()] giving the line to draw them with.  Line and area
+charts.}
+
+\item{high_low_lines}{A line joining the highest and lowest series at each
+category, the same way.  Line charts.}
+
+\item{up_down_bars}{Bars between the first and last series at each category:
+`TRUE`, or `list(up = , down = )` with an [xl_format()] for either bar.
+Line charts.}
+
+\item{hole_size}{The size of a doughnut's hole, 10 to 90 percent.}
+
+\item{rotation}{Where a pie or doughnut starts, 0 to 360 degrees clockwise
+from the top.}
+
+\item{series_gap}{The gap between category groups on a bar or column chart,
+0 to 500 percent of a bar's width.}
+
+\item{series_overlap}{How far bars of one category overlap, -100 to 100
+percent.  100 stacks them, -100 pushes them apart.}
+
+\item{show_blanks}{What an empty cell does to the plot: leave a `"gap"`,
+plot it as `"zero"`, or join across it with `"connected"`.}
+
+\item{show_hidden_data}{Plot data from rows and columns that are hidden.
+Excel leaves them out otherwise.}
 
 \item{at}{The cell the chart's top-left corner is anchored to.}
 
@@ -71,7 +146,14 @@ xl_chart("pie", xl_chart_series(values = "Data!B2:B5"), title = "Share")
 [xl_chart_series], [xl_sheet]
 
 Other images and charts:
+\code{\link[=xl_chart_axis]{xl_chart_axis()}},
+\code{\link[=xl_chart_error_bars]{xl_chart_error_bars()}},
+\code{\link[=xl_chart_labels]{xl_chart_labels()}},
+\code{\link[=xl_chart_legend]{xl_chart_legend()}},
+\code{\link[=xl_chart_marker]{xl_chart_marker()}},
 \code{\link[=xl_chart_series]{xl_chart_series()}},
+\code{\link[=xl_chart_table]{xl_chart_table()}},
+\code{\link[=xl_chart_trendline]{xl_chart_trendline()}},
 \code{\link[=xl_image]{xl_image()}}
 }
 \concept{images and charts}

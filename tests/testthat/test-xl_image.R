@@ -1,5 +1,4 @@
-# Images.  This file covers the constructor and its validation; what reaches
-# the file is tested once apply_images() lands.
+# Images: the constructor, its validation, and what reaches the file.
 
 # A minimal valid 1x1 PNG.  Hardcoded rather than shipped as a fixture or drawn
 # with png(), which needs a working graphics device that CRAN machines may not

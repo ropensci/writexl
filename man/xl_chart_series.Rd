@@ -9,6 +9,12 @@ xl_chart_series(
   categories = NULL,
   name = NULL,
   format = NULL,
+  marker = NULL,
+  labels = NULL,
+  trendline = NULL,
+  x_error_bars = NULL,
+  y_error_bars = NULL,
+  points = NULL,
   smooth = NA,
   invert_if_negative = NA
 )
@@ -19,13 +25,28 @@ xl_chart_series(
 \item{categories}{The range holding the labels to plot them against.  Omit
 for a chart that numbers its points.}
 
-\item{name}{The series name, shown in the legend.  A string is always taken
-literally --- a series may legitimately be called `"Q1!"` --- so to take
-the name from a cell, give a range spec:
-`name = list(sheet = "Data", rows = 1, cols = 1)`.}
+\item{name}{The series name, shown in the legend.  Left unset, a series that
+plots a column takes its name from that column's header cell, which is
+what Excel does when you chart a column along with its header; `FALSE`
+leaves it unnamed.  A string is always taken literally --- a series may
+legitimately be called `"Q1!"` --- so to take the name from another cell,
+give a range spec: `name = list(header = "cost")` for a different column's
+header, or `name = list(rows = 1, cols = 1)` for a data cell.}
 
 \item{format}{An [xl_format] styling the series --- its line and fill.  See
 [xl_chart()] for which format properties a chart can express.}
+
+\item{marker}{An [xl_chart_marker()] drawn at each point.}
+
+\item{labels}{An [xl_chart_labels()] printing the numbers beside the points.}
+
+\item{trendline}{An [xl_chart_trendline()] fitted through the series.}
+
+\item{x_error_bars, y_error_bars}{An [xl_chart_error_bars()] on each point.}
+
+\item{points}{An [xl_format()] per point, as a list, styling individual
+points --- one slice of a pie, one bar of a column chart.  `NULL` in the
+list leaves that point as it is.}
 
 \item{smooth}{Draw the line smoothed.  Line and scatter charts only.}
 
@@ -36,14 +57,17 @@ An `xl_chart_series` object.
 }
 \description{
 `xl_chart_series()` names the values a chart plots, and optionally the
-categories to plot them against and a name for the legend.
+categories to plot them against and a name for the legend.  A series that
+plots a column is named after that column's header unless told otherwise.
 
 Each range may live on a different sheet from the chart, so it takes an
 optional `sheet`:
 
 * `"Data!B2:B10"` --- an A1 range, sheet-qualified;
 * `list(cols = "revenue")` --- resolved against the chart's own sheet;
-* `list(sheet = "Data", cols = "revenue")` --- against another sheet.
+* `list(sheet = "Data", cols = "revenue")` --- against another sheet;
+* `list(header = "revenue")` --- that column's header cell, which is where
+  a series name usually lives.
 
 A range that selects no data is an error rather than an empty chart.
 }
@@ -57,6 +81,13 @@ xl_chart_series(values = "Data!B2:B10", categories = "Data!A2:A10",
 
 Other images and charts:
 \code{\link[=xl_chart]{xl_chart()}},
+\code{\link[=xl_chart_axis]{xl_chart_axis()}},
+\code{\link[=xl_chart_error_bars]{xl_chart_error_bars()}},
+\code{\link[=xl_chart_labels]{xl_chart_labels()}},
+\code{\link[=xl_chart_legend]{xl_chart_legend()}},
+\code{\link[=xl_chart_marker]{xl_chart_marker()}},
+\code{\link[=xl_chart_table]{xl_chart_table()}},
+\code{\link[=xl_chart_trendline]{xl_chart_trendline()}},
 \code{\link[=xl_image]{xl_image()}}
 }
 \concept{images and charts}
