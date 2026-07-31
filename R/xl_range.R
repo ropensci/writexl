@@ -4,10 +4,10 @@
 #
 # `.xl_resolve_range()` is the single place where a user-supplied range is
 # turned into the 0-based `c(first_row, first_col, last_row, last_col)` quad
-# that C consumes.  Everything range-scoped goes through it -- the autofilter
-# today, and merged cells / data validation / conditional formats / images /
-# charts / tables as they arrive -- so there is exactly one set of accepted
-# spellings and one set of error messages.
+# that C consumes.  Every range-scoped feature goes through it -- the
+# autofilter, merges, data validation, conditional formats, images, charts and
+# tables -- so there is one set of accepted spellings and one set of error
+# messages.
 #
 # Two spellings are accepted:
 #
@@ -102,10 +102,10 @@
 # Reject an inverted or off-grid quad.  A zero-span range (a single cell) is
 # legitimate and passes.
 .check_range_span <- function(v, arg) {
-  # Unreachable from today's callers -- every path into here has already been
-  # through .check_row_number() / .check_col_index(), which reject anything
-  # below the top-left cell.  Kept as a guard for the kinds still to come, so a
-  # new producer of a quad cannot leak a negative index into C.
+  # No current caller can reach this: every path in has already been through
+  # .check_row_number() / .check_col_index(), which reject anything below the
+  # top-left cell.  It stands so that a new producer of a quad cannot leak a
+  # negative index into C.
   # nocov start
   if (v[1L] < 0L || v[2L] < 0L)
     stop(sprintf("`%s` range starts before the top-left cell", arg),

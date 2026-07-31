@@ -172,10 +172,9 @@ test_that("workbooks write the same content with constant memory on and off", {
                    stringsAsFactors = FALSE)
   on_path <- write_tmp(list(D = xl_sheet(df, autofilter = TRUE, freeze = "A2")),
                        constant_memory = TRUE)
-  # No feature writexl writes today turns the mode off, so drive the off path by
-  # mocking the resolver.  It must stay exercised: the C side and libxlsxwriter
-  # behave differently with row streaming disabled, and a phase that needs the
-  # mode off (worksheet tables, multi-cell array formulas) will rely on it.
+  # The off path is driven by mocking the resolver so that this test covers the
+  # C side alone, whatever the blacklist happens to contain.  It has to stay
+  # exercised: libxlsxwriter behaves differently with row streaming disabled.
   off_path <- local({
     local_mocked_bindings(
       .resolve_constant_memory = function(elems, props, ...)

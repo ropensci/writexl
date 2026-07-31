@@ -1,5 +1,5 @@
-# Worksheet tables.  This file covers the constructors and their validation;
-# what reaches the file is tested once the C side lands.
+# Worksheet tables: the constructors, their validation, and what reaches the
+# file.
 
 # ── Style parsing ─────────────────────────────────────────────────────────────
 

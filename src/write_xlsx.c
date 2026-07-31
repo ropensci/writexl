@@ -1261,11 +1261,11 @@ static void apply_sheet_scalars(cell_write_ctx *ctx, SEXP opts){
 
 /* --- Sheet overlays ------------------------------------------------------
  *
- * Range-scoped worksheet features (the autofilter today; merged cells, data
- * validation, conditional formats, images, charts and tables later) are all
- * applied here, in one pass after the per-sheet scalars and *before* the row
- * loop: under constant_memory each row is flushed as it is written, so
- * anything spanning rows has to be declared up front.
+ * Range-scoped worksheet features -- the autofilter, merges, data validation,
+ * conditional formats, images, charts and tables -- are all applied here, in
+ * one pass after the per-sheet scalars and *before* the row loop: under
+ * constant_memory each row is flushed as it is written, so anything spanning
+ * rows has to be declared up front.
  *
  * Each payload is a named R list built by .resolve_sheet_plan() carrying a
  * `kind` string.  A new feature adds a kind here rather than another argument
