@@ -22,66 +22,125 @@ install.packages("writexl")
 
 ## Getting started
 
-Currently the package only has `write_xlsx()` to export a data frame to xlsx.
-
 ```r
 library(writexl)
 library(readxl)
-tmp <- writexl::write_xlsx(iris)
-readxl::read_xlsx(tmp)
+tmp <- write_xlsx(iris)
+read_xlsx(tmp)
 ```
 ```
-# A tibble: 150 x 5
+# A tibble: 150 × 5
    Sepal.Length Sepal.Width Petal.Length Petal.Width Species
-          <dbl>       <dbl>        <dbl>       <dbl>   <chr>
- 1          5.1         3.5          1.4         0.2  setosa
- 2          4.9         3.0          1.4         0.2  setosa
- 3          4.7         3.2          1.3         0.2  setosa
- 4          4.6         3.1          1.5         0.2  setosa
- 5          5.0         3.6          1.4         0.2  setosa
- 6          5.4         3.9          1.7         0.4  setosa
- 7          4.6         3.4          1.4         0.3  setosa
- 8          5.0         3.4          1.5         0.2  setosa
- 9          4.4         2.9          1.4         0.2  setosa
-10          4.9         3.1          1.5         0.1  setosa
-# ... with 140 more rows
+          <dbl>       <dbl>        <dbl>       <dbl> <chr>
+ 1          5.1         3.5          1.4         0.2 setosa
+ 2          4.9         3            1.4         0.2 setosa
+ 3          4.7         3.2          1.3         0.2 setosa
+ 4          4.6         3.1          1.5         0.2 setosa
+ 5          5           3.6          1.4         0.2 setosa
+# ℹ 145 more rows
 ```
 
-Most data types should roundtrip with `readxl`:
+A named list writes one sheet per element:
+
+```r
+write_xlsx(list(Flowers = iris, Cars = mtcars))
+```
+
+That is the whole of the common case. Everything below is optional.
+
+## What else it can do
+
+Each of these has a vignette; none is needed to write a workbook.
+
+| | |
+|---|---|
+| **[Formatting cells](https://docs.ropensci.org/writexl/articles/b-formatting.html)** | Fonts, fills, borders, number formats and alignment, built from group constructors that combine with `+`. The same format object styles a cell, a column, a chart series or a conditional rule. Conditional formatting, colour scales, data bars and icon sets. |
+| **[Worksheets and workbooks](https://docs.ropensci.org/writexl/articles/c-worksheets-workbooks.html)** | Column widths and row heights in characters or pixels, frozen and split panes, tab colours and visibility, outlines, protection, page setup and printing, document properties, and the row-streaming mode for large workbooks. |
+| **[Charts and images](https://docs.ropensci.org/writexl/articles/d-charts-images.html)** | All 22 chart types Excel offers, with axes, markers, data labels, trendlines, error bars, legends and data tables; chartsheets; and pictures placed on a sheet, inside a cell, in a header or tiled behind the grid. |
+| **[Formulas, tables and the rest](https://docs.ropensci.org/writexl/articles/e-formulas-and-more.html)** | Formulas including array and dynamic array formulas, hyperlinks, comments, rich strings, mixed-type columns, data validation, autofilters that actually hide the rows, worksheet tables and merged cells. |
+| **[Everything at once](https://docs.ropensci.org/writexl/articles/f-everything-at-once.html)** | One runnable script that exercises the whole package into two workbooks — the quickest way to see what it does without reading the other four. |
+
+A taste of how they fit together:
+
+```r
+sheet <- xl_sheet(
+  sales,
+  cols   = xl_col_spec("revenue", format = xl_num_format("$#,##0")),
+  freeze = "A2",
+  chart  = xl_chart("column", xl_chart_series(values = list(cols = "revenue")))
+)
+write_xlsx(list(Sales = sheet), "report.xlsx")
+```
+
+## Round-tripping
+
+Every column type survives a trip through `readxl` unchanged, with one
+exception that is deliberate:
 
 ```r
 library(nycflights13)
 out <- readxl::read_xlsx(writexl::write_xlsx(flights))
-all.equal(out, flights)
+keep <- setdiff(names(flights), "time_hour")
+all.equal(out[keep], flights[keep])
 ## TRUE
 ```
 
-File writing time is faster than the `openxlsx2` implementation:
+`time_hour` is a `POSIXct` in `America/New_York`, and **Excel has no concept of
+a time zone**. Rather than silently converting everything to UTC, writexl
+decides once per workbook: when every datetime shares a zone it writes the
+local wall-clock reading and drops the " UTC" suffix from the default datetime
+format, so nothing is mislabelled; when the zones differ it converts to UTC and
+warns. Either way the zone itself is not in the file for `readxl` to hand back.
+
+## Performance
+
+Writing `nycflights13::flights` — 336,776 rows by 19 columns — is faster than
+the `openxlsx2` implementation, for files of the same size:
 
 ```r
-library(microbenchmark)
 library(nycflights13)
-microbenchmark(
-  writexl = writexl::write_xlsx(flights, tempfile()),
-  openxlsx2 = openxlsx2::write_xlsx(flights, tempfile()),
-  times = 5
-)
-# Unit: seconds
-#      expr       min       lq     mean   median       uq      max neval
-#   writexl  8.297612 11.38129 12.19547 13.13240 13.92596 14.24009     5
-# openxlsx2 31.840446 33.25751 50.86460 52.04899 64.36513 72.81091     5
+bench <- function(f) median(replicate(2, {
+  p <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(p))
+  system.time(f(p))[["elapsed"]]
+}))
+
+bench(function(p) writexl::write_xlsx(flights, p))
+## 12.3
+bench(function(p) openxlsx2::write_xlsx(flights, p))
+## 19.6
 ```
 
-The output xlsx files are similarly sized:
-
-```r
-writexl::write_xlsx(flights, tmp1 <- tempfile())
-file.info(tmp1)$size
-# 29139353
-```
+The output files are within a rounding error of each other:
 
 ```r
-openxlsx2::write_xlsx(flights, tmp2 <- tempfile())
-file.info(tmp2)$size
-# 29296990
+file.size(writexl::write_xlsx(flights, tempfile(fileext = ".xlsx")))
+## 29132216   (27.8 MB)
+
+p <- tempfile(fileext = ".xlsx"); openxlsx2::write_xlsx(flights, p); file.size(p)
+## 29297097   (27.9 MB)
 ```
+
+Measured on R 4.6.1, writexl 1.5.4.9000, openxlsx2 1.28.
+
+### Memory
+
+`constant_memory = TRUE` streams each row to disk instead of holding the whole
+sheet, which is the difference between a workbook that fits in memory and one
+that does not. Peak resident memory of the whole R process, writing the same
+336,776 rows:
+
+| | peak memory | file | time |
+|---|---|---|---|
+| `constant_memory = FALSE` | 894 MB | 26.8 MB | 7.4 s |
+| `constant_memory = TRUE` | **208 MB** | 27.8 MB | 7.7 s |
+
+A quarter of the memory, for a file 3.5% larger and about the same time.
+Streaming produces slightly bigger files because a shared-string table cannot
+be built for rows already flushed to disk.
+
+Left at its default, writexl chooses per workbook: streaming is switched on
+only when the estimated saving is worth it, and switched off automatically for
+the features that cannot be written while streaming — worksheet tables,
+multi-cell array formulas, merged ranges and embedded images. See
+[Worksheets and workbooks](https://docs.ropensci.org/writexl/articles/c-worksheets-workbooks.html).

@@ -72,7 +72,7 @@ test_that("both axes of a scatter take the value-axis options", {
 test_that("pie and doughnut charts have no axes to describe", {
   for (ty in c("pie", "doughnut"))
     expect_error(xl_chart(ty, xl_chart_series(values = "A1:A5"),
-                          y_axis = xl_chart_axis(name = "n")),
+                          y_axis = xl_chart_axis(title = "n")),
                  "does not apply to a", label = ty)
 })
 
@@ -106,9 +106,9 @@ test_that("axis arguments are validated", {
   expect_error(xl_chart_axis(crossing = c(1, 2)),
                "must be a number, \"min\" or \"max\"")
   expect_error(xl_chart_axis(num_format = 42), "must be an Excel format string")
-  expect_error(xl_chart_axis(name_layout = c(0, 0.5)),
+  expect_error(xl_chart_axis(title_layout = c(0, 0.5)),
                "each above 0 and at most 1")
-  expect_error(xl_chart_axis(name_layout = 0.5), "must be c\\(x, y\\)")
+  expect_error(xl_chart_axis(title_layout = 0.5), "must be c\\(x, y\\)")
   expect_error(xl_chart("column", xl_chart_series(values = "A1"),
                         x_axis = "bottom"),
                "must be an xl_chart_axis")
@@ -124,7 +124,7 @@ test_that("a number format may be given either way", {
 })
 
 test_that("each part of an axis takes only the format groups it can use", {
-  expect_error(xl_chart_axis(name = "n", name_format = xl_fill(background = "red")),
+  expect_error(xl_chart_axis(title = "n", title_format = xl_fill(background = "red")),
                "takes no fill")
   expect_error(xl_chart_axis(label_format = xl_border(all = "thin")),
                "takes no line")
@@ -135,10 +135,10 @@ test_that("each part of an axis takes only the format groups it can use", {
                "a shape and has no text")
 })
 
-test_that("a name format needs a name to style", {
-  expect_error(xl_chart_axis(name_format = xl_font(bold = TRUE)),
-               "give a `name` too", fixed = TRUE)
-  expect_s3_class(xl_chart_axis(name = "n", name_format = xl_font(bold = TRUE)),
+test_that("a title format needs a title to style", {
+  expect_error(xl_chart_axis(title_format = xl_font(bold = TRUE)),
+               "give a `title` too", fixed = TRUE)
+  expect_s3_class(xl_chart_axis(title = "n", title_format = xl_font(bold = TRUE)),
                   "xl_chart_axis")
 })
 
@@ -159,15 +159,15 @@ test_that("styling a gridline turns it on", {
 
 test_that("every axis option reaches the chart XML", {
   x <- axis_xml(
-    x_axis = xl_chart_axis(name = "Quarter", position = "on_tick",
+    x_axis = xl_chart_axis(title = "Quarter", position = "on_tick",
                            label_align = "left", interval_unit = 2,
                            interval_tick = 3, major_tick = "inside",
                            minor_tick = "crossing", label_position = "low",
-                           name_format = xl_font(size = 12, bold = TRUE),
+                           title_format = xl_font(size = 12, bold = TRUE),
                            label_format = xl_font(italic = TRUE),
                            line_format = xl_border(all = "dashed",
                                                    color = "red")),
-    y_axis = xl_chart_axis(name = list(header = "revenue"), min = 5, max = 45,
+    y_axis = xl_chart_axis(title = list(header = "revenue"), min = 5, max = 45,
                            major_unit = 10, minor_unit = 2.5,
                            num_format = "$#,##0.0", reverse = TRUE,
                            crossing = "max", display_units = "thousands",
@@ -175,7 +175,7 @@ test_that("every axis option reaches the chart XML", {
                            major_gridlines = TRUE, minor_gridlines = TRUE,
                            minor_gridlines_format = xl_border(all = "dotted",
                                                               color = "blue"),
-                           name_layout = c(0.02, 0.4)))
+                           title_layout = c(0.02, 0.4)))
   want <- c(
     "Quarter",                              # name
     "<c:f>Data!$B$1</c:f>",                 # name from a header cell
@@ -196,7 +196,7 @@ test_that("every axis option reaches the chart XML", {
     "<c:majorGridlines/>", "<c:minorGridlines>",
     '<a:prstDash val="dot"/>',              # the minor gridline's own line
     "0000FF",                               # and its colour
-    "<c:manualLayout>",                     # name_layout
+    "<c:manualLayout>",                     # title_layout
     'sz="1200"', 'i="1"'                    # the two fonts
   )
   for (w in want) expect_true(grepl(w, x, fixed = TRUE), info = w)
@@ -235,7 +235,7 @@ test_that("an axis name may come from another sheet", {
                      chart = xl_chart("column",
                        xl_chart_series(values = list(sheet = "Data",
                                                      cols = "revenue")),
-                       y_axis = xl_chart_axis(name = list(sheet = "Data",
+                       y_axis = xl_chart_axis(title = list(sheet = "Data",
                                                           header = "revenue")))),
     Data = axis_sales), t)
   d <- tempfile(); dir.create(d); utils::unzip(t, exdir = d)

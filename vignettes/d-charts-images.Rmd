@@ -1,0 +1,222 @@
+---
+title: "Charts and images"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Charts and images}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(writexl)
+sales <- data.frame(quarter = c("Q1", "Q2", "Q3", "Q4"),
+                    revenue = c(120, 145, 133, 180),
+                    cost    = c(90, 110, 105, 130))
+```
+
+## A chart
+
+`xl_chart()` puts a chart on a sheet; `xl_chart_series()` says what it plots.
+
+```{r}
+sheet <- xl_sheet(sales,
+                  chart = xl_chart("column",
+                                   xl_chart_series(values = list(cols = "revenue")),
+                                   title = "Revenue by quarter", at = "E2"))
+path <- write_xlsx(list(Sales = sheet), tempfile(fileext = ".xlsx"))
+```
+
+All 22 types Excel offers are available: `"column"`, `"bar"`, `"line"`,
+`"pie"`, `"doughnut"`, `"area"`, `"scatter"`, `"radar"`, and the stacked,
+percent-stacked, smoothed and marker variants.
+
+### Naming a range
+
+A series range is written either **by column**, `list(cols = "revenue")`, or as
+**A1 text**, `"Data!B2:B5"`. Prefer the column form: it is checked against the
+data frame, moves with the column rather than with a letter, and accounts for
+the header row itself. `rows` narrows it, and `sheet` points at another sheet:
+
+```{r}
+xl_chart_series(values = list(sheet = "Sales", cols = "revenue", rows = 1:2))
+```
+
+A range reaching past the data is an error rather than a chart with blanks on
+the end --- a chart of the wrong numbers looks plausible, which is the worst
+way to be wrong.
+
+A series that plots a column is **named after that column's header**, which is
+what Excel does when you chart a column along with its header. The header is
+referenced, not copied, so renaming it in Excel renames the series.
+`name = FALSE` leaves it unnamed, and a string is always taken literally --- a
+series may legitimately be called `"Q1!"` --- so to take a name from a cell,
+give a spec: `list(header = "cost")`, or `list(rows = 1, cols = 1)`.
+
+### Styling
+
+Charts reuse the format objects from [Formatting cells](b-formatting.html).
+`xl_border()` becomes the line, `xl_fill()` the fill or pattern, `xl_font()`
+the text:
+
+```{r}
+xl_chart("line",
+         xl_chart_series(values = list(cols = "revenue"),
+                         format = xl_border(all = "dashed", color = "#4472C4")),
+         title = "Revenue", title_format = xl_font(size = 14, bold = TRUE))
+```
+
+Each part takes the groups it can use and **refuses the rest by name**. A
+series is a shape, so it takes a line and a fill but no font; a title is text,
+so it takes a font and nothing else. `xl_fill()` and `xl_border()` also take
+`transparency`, which charts honour and cells ignore, and chart lines have
+fewer dash styles than cell borders because a chart line has no width. None of
+this is dropped quietly.
+
+`style` picks one of Excel's 48 built-in chart styles.
+
+## Axes
+
+`xl_chart_axis()` covers everything an axis has --- the title and its font,
+tick labels with their number format, bounds, a log scale, tick marks and their
+spacing, gridlines, and the axis line itself:
+
+```{r}
+xl_chart("column", xl_chart_series(values = list(cols = "revenue")),
+         x_axis = xl_chart_axis(title = "Quarter", major_tick = "none"),
+         y_axis = xl_chart_axis(title = "Revenue", min = 0,
+                                num_format = "$#,##0",
+                                major_gridlines_format =
+                                  xl_border(all = "dotted", color = "gray")))
+```
+
+There are two kinds of axis and several options belong to one of them. A
+**scatter** chart plots numbers against numbers, so both its axes are value
+axes; every other type has a **category** x axis and a value y axis --- bar
+charts included, since Excel draws their categories up the side but does not
+rename the axes.
+
+| value axes | category axes |
+|---|---|
+| `min`, `max`, `log_base`, `major_unit`, `minor_unit`, `display_units`, `display_units_visible` | `position`, `label_align`, `interval_unit`, `interval_tick` |
+
+Setting a minimum on a category axis is accepted by Excel and then ignored, so
+writexl refuses it and names the axis that would work. Pie and doughnut charts
+have no axes at all.
+
+## The parts of a series
+
+A series can carry a marker at each point, labels beside them, a trendline
+through them and error bars on them, and individual points can be styled:
+
+```{r}
+xl_chart_series(
+  values       = list(cols = "revenue"),
+  marker       = xl_chart_marker(type = "circle", size = 7),
+  labels       = xl_chart_labels(num_format = "$#,##0", position = "above"),
+  trendline    = xl_chart_trendline("linear", equation = TRUE),
+  y_error_bars = xl_chart_error_bars("percentage", 5))
+```
+
+`xl_chart_labels()` with no arguments prints each point's value, which is
+Excel's default. Naming any part means the label holds **exactly** those, so
+`show_percentage = TRUE` alone gives a percentage with no value beside it.
+`custom =` takes a list of `xl_chart_label()`s, one per point, so a single
+label can be renamed or removed with `hide = TRUE`. `points =` takes a list of
+formats the same way --- one red slice, the rest untouched:
+
+```{r}
+xl_chart("pie", xl_chart_series(values = list(cols = "revenue"),
+                                points = list(xl_fill(background = "red"),
+                                              NULL, NULL, NULL)))
+```
+
+Four more of Excel's silent rules are checked here: which **label positions**
+each chart type allows, that a **moving average** has no forecast, equation or
+R-squared, that an **intercept** applies only to exponential, linear and
+polynomial fits, and that an **automatic marker** takes neither a size nor a
+format.
+
+## The chart as a whole
+
+```{r}
+xl_chart("column", xl_chart_series(values = list(cols = "revenue")),
+         legend     = xl_chart_legend(position = "bottom"),
+         data_table = xl_chart_table(show_keys = TRUE),
+         plot_area_format  = xl_fill(background = "#F8F8F8"),
+         chart_area_format = xl_border(all = "thin", color = "gray"))
+```
+
+`xl_chart_legend(position = "none")` removes the legend, and `delete_series`
+leaves one series out of the key while still plotting it. Anything placed by
+hand takes a `layout` rather than an `at` --- `title_layout`,
+`plot_area_layout`, `xl_chart_axis(title_layout =)` and
+`xl_chart_legend(layout =)` are fractions of the chart, where `at` means a cell
+everywhere else. `show_blanks` decides what an empty cell does, and
+`show_hidden_data` plots rows Excel would leave out.
+
+Six options belong to one family of chart: the doughnut `hole_size`, pie
+`rotation`, `drop_lines`, `high_low_lines`, `up_down_bars`, and the bar
+`series_gap` and `series_overlap`. Each takes `TRUE` for Excel's own drawing or
+a format to style it, and each is refused on a type that has no such feature.
+
+A scatter series must have `categories` --- they are its x axis, and
+libxlsxwriter crashes without them.
+
+## A chart on a sheet of its own
+
+`xl_chartsheet()` is a tab holding one chart and no cells:
+
+```{r}
+chart <- xl_chart("column",
+                  xl_chart_series(values = list(sheet = "Data",
+                                                cols = "revenue"),
+                                  categories = list(sheet = "Data",
+                                                    cols = "quarter")),
+                  title = "Revenue")
+path <- write_xlsx(list(Data = sales, Overview = xl_chartsheet(chart)),
+                   tempfile(fileext = ".xlsx"))
+```
+
+Every range must name its sheet, since a chartsheet has no cells for
+`list(cols = )` to resolve against. It supports a fraction of what a worksheet
+does --- of `xl_page_setup()` the orientation, paper, margins, header and
+footer; of `xl_sheet_view()` the four tab-state options --- plus `tab_color`,
+`zoom` and `protect`. The rest is refused rather than dropped.
+
+## Images
+
+`xl_image()` places a picture, anchored to a cell:
+
+```{r eval = isTRUE(capabilities("png"))}
+card <- as.raster(matrix(c("red", "blue", "green", "gold"), nrow = 2))
+xl_sheet(sales, image = xl_image(card, at = "G2", scale = 20))
+```
+
+The image may be a **file path**, a **raw vector** of encoded bytes, or an
+**in-memory picture** --- a `raster`, a colour matrix, an RGB array or a
+`nativeRaster`. Anything `rasterImage()` can draw can be written, so a plot
+never has to touch the disk; that path uses R's PNG device, which is why
+`grDevices` is a suggested package.
+
+PNG, JPEG, GIF and BMP are supported, and the format is read from the file's
+own bytes rather than its extension, so a mislabelled `.png` is caught rather
+than misfiled. `scale`, `offset` and `position` control size and placement,
+`description` and `decorative` set the alt text, and `url` makes the image a
+hyperlink.
+
+An image can also go in the printed header or footer, matched to a `&G`
+placeholder, or be tiled behind the cells as a screen watermark:
+
+```{r eval = FALSE}
+xl_page_setup(header = "&L&G", header_image = list(left = logo))
+xl_sheet(sales, background = logo)
+```
+
+`embed = TRUE` puts the image *inside* a cell, the Excel 365 "place in cell"
+feature; older Excel shows `#VALUE!` in its place.
+
+Two combinations are refused, because libxlsxwriter miscounts them and Excel
+repairs the file: an embedded image alongside any other image, and a
+header/footer or background image on a sheet *before* one with a floating image
+or a chart. Both errors name the sheets and the arrangement that works.

@@ -1,0 +1,70 @@
+url: https://docs.ropensci.org/writexl
+
+template:
+  bootstrap: 5
+
+# The vignettes are ordered, not alphabetical: the file names carry that order
+# for CRAN's index, and this carries it for the site.
+articles:
+- title: Guides
+  navbar: ~
+  contents:
+  - a-getting-started
+  - b-formatting
+  - c-worksheets-workbooks
+  - d-charts-images
+  - e-formulas-and-more
+  - f-everything-at-once
+
+reference:
+- title: Writing a workbook
+  contents:
+  - write_xlsx
+  - xl_workbook
+  - xl_properties
+- title: Cell content
+  contents:
+  - xl_cell_general
+  - xl_formula
+  - xl_comment
+  - xl_rich_string
+  - xl_rich_run
+  - is_xl_comment
+- title: Formatting
+  contents:
+  - xl_format
+  - xl_format_groups
+  - xl_color
+  - is_xl_format
+- title: Worksheet layout
+  contents:
+  - xl_sheet
+  - xl_colrow_spec
+  - xl_sheet_view
+  - xl_page_setup
+  - xl_outline
+- title: Worksheet features
+  contents:
+  - xl_conditional
+  - xl_validation
+  - xl_filter
+  - xl_filter_keep
+  - xl_table
+  - xl_table_column
+  - xl_merge
+- title: The bundled library
+  contents:
+  - lxw_version
+- title: Charts and images
+  contents:
+  - xl_chart
+  - xl_chart_series
+  - xl_chart_axis
+  - xl_chart_marker
+  - xl_chart_labels
+  - xl_chart_trendline
+  - xl_chart_error_bars
+  - xl_chart_legend
+  - xl_chart_table
+  - xl_chartsheet
+  - xl_image

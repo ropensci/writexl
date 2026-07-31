@@ -1,0 +1,241 @@
+---
+title: "Everything at once"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Everything at once}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(writexl)
+```
+
+This vignette is one runnable script. It exercises every part of the package
+into **two** workbooks, so that reviewing what writexl can do means opening two
+files rather than reading five vignettes.
+
+Two files rather than one because of a single constraint: an embedded image
+cannot share a workbook with any other image, so it gets its own. Everything
+else fits together.
+
+Each section says which vignette explains it.
+
+```{r}
+sales <- data.frame(
+  quarter = c("Q1", "Q2", "Q3", "Q4"),
+  revenue = c(120000, 145000, 133000, 180000),
+  cost    = c(90000, 110000, 105000, 130000),
+  region  = c("North", "South", "North", "South"),
+  stringsAsFactors = FALSE)
+```
+
+## Formatting --- [vignette](b-formatting.html)
+
+```{r}
+money <- xl_num_format("$#,##0") + xl_font(color = "darkgreen")
+
+styled <- xl_sheet(
+  sales,
+  cols = list(xl_col_spec("quarter", width = 10),
+              xl_col_spec(c("revenue", "cost"), width = 14, format = money)),
+  rows = xl_row_spec(1, height = 18),
+  conditional = list(
+    xl_cond_cell(list(cols = "revenue"), "cell", ">=", 1.4e5,
+                 format = xl_fill(background = "lightgreen")),
+    xl_cond_bar(list(cols = "cost"), color = "steelblue")),
+  freeze = "A2", tab_color = "steelblue")
+```
+
+## Cell content --- [vignette](e-formulas-and-more.html)
+
+```{r}
+cells <- data.frame(item = c("Widget", "Gadget", "Gizmo"),
+                    stringsAsFactors = FALSE)
+cells$price   <- xl_cell_general(value = c(1234.5, 67.25, 890), format = money)
+cells$margin  <- xl_formula(sprintf("=B%d*0.3", 2:4))
+cells$link    <- xl_hyperlink(rep("https://ropensci.org", 3), "rOpenSci")
+cells$note    <- xl_cell_general(
+  value   = c("ok", NA, "check"),
+  comment = list(xl_comment("Reviewed", author = "QA"), NULL, NULL),
+  format  = list(NULL, xl_fill(background = "#EEEEEE"), NULL))
+# a rich string is one cell's worth of text, so it goes in a list alongside
+# the other rows' values
+cells$rich    <- xl_cell_general(value = list(
+  xl_rich_string("Plain ", xl_rich_run("bold", xl_font(bold = TRUE)),
+                 " and ", xl_rich_run("red", xl_font(color = "red"))),
+  "plain text", NA))
+
+content <- xl_sheet(
+  cells,
+  merge = xl_merge("A5:C5", "A merged heading",
+                   format = xl_align(horizontal = "center") +
+                            xl_font(bold = TRUE)),
+  validation = xl_validation(list(cols = "item"), type = "list",
+                             list = c("Widget", "Gadget", "Gizmo"),
+                             input_title = "Pick one"),
+  ignore_errors = list(number_stored_as_text = "A2:A4"))
+```
+
+## Worksheet features --- [vignette](e-formulas-and-more.html)
+
+```{r}
+filtered <- xl_sheet(sales, filter = xl_filter("region", "==", "North"))
+
+tabled <- xl_sheet(sales[, c("quarter", "revenue")],
+                   table = xl_table(name = "Revenue", style = "medium 9",
+                                    total_row = TRUE,
+                                    columns = xl_table_column("revenue",
+                                                              total = "sum")))
+```
+
+## Printing and the sheet view --- [vignette](c-worksheets-workbooks.html)
+
+```{r}
+printed <- xl_sheet(
+  sales,
+  page = xl_page_setup(orientation = "landscape", paper = "A4",
+                       fit_to = c(1, 0), center_horizontally = TRUE,
+                       header = "&LwritexlShowcase&RPage &P of &N",
+                       repeat_rows = 1),
+  view = xl_sheet_view(hide_zero = TRUE),
+  outline = xl_outline(symbols_below = FALSE),
+  protect = list(password = "secret", sort = TRUE))
+```
+
+## Charts --- [vignette](d-charts-images.html)
+
+```{r}
+charted <- xl_sheet(
+  sales,
+  chart = list(
+    xl_chart("column",
+             list(xl_chart_series(values = list(cols = "revenue"),
+                                  categories = list(cols = "quarter"),
+                                  labels = xl_chart_labels(num_format = "$#,##0",
+                                                           position = "outside_end")),
+                  xl_chart_series(values = list(cols = "cost"),
+                                  categories = list(cols = "quarter"))),
+             title = "Revenue and cost",
+             title_format = xl_font(size = 13, bold = TRUE),
+             x_axis = xl_chart_axis(title = "Quarter"),
+             y_axis = xl_chart_axis(title = "Dollars", min = 0,
+                                    num_format = "$#,##0"),
+             legend = xl_chart_legend(position = "bottom"),
+             series_gap = 60, at = "G2"),
+    xl_chart("pie",
+             xl_chart_series(values = list(cols = "revenue"),
+                             categories = list(cols = "quarter"),
+                             labels = xl_chart_labels(show_percentage = TRUE),
+                             points = list(xl_fill(background = "#C00000"),
+                                           NULL, NULL, NULL)),
+             title = "Share of revenue", at = "G20"),
+    xl_chart("scatter_straight_markers",
+             xl_chart_series(values = list(cols = "revenue"),
+                             categories = list(cols = "cost"),
+                             marker = xl_chart_marker("circle", size = 7),
+                             trendline = xl_chart_trendline("linear",
+                                                            equation = TRUE),
+                             y_error_bars = xl_chart_error_bars("percentage", 5)),
+             title = "Revenue against cost", at = "P2")))
+
+overview <- xl_chartsheet(
+  xl_chart("line",
+           xl_chart_series(values = list(sheet = "Charts", cols = "revenue"),
+                           categories = list(sheet = "Charts",
+                                             cols = "quarter")),
+           title = "Revenue, full page",
+           y_axis = xl_chart_axis(title = "Revenue", min = 0)),
+  tab_color = "red")
+```
+
+## An image --- [vignette](d-charts-images.html)
+
+```{r}
+have_png <- isTRUE(capabilities("png")) &&
+  requireNamespace("grDevices", quietly = TRUE)
+```
+
+```{r eval = have_png}
+card <- as.raster(matrix(c("#4472C4", "#ED7D31", "#A5A5A5", "#FFC000"),
+                         nrow = 2))
+pictured <- xl_sheet(sales[, 1:2], image = xl_image(card, at = "D2",
+                                                    scale = 30,
+                                                    description = "A test card"))
+```
+
+```{r eval = !have_png, echo = FALSE}
+pictured <- xl_sheet(sales[, 1:2])
+```
+
+## The workbook --- [vignette](c-worksheets-workbooks.html)
+
+```{r}
+wb <- xl_workbook(
+  list(Formatted = styled,
+       Content   = content,
+       Filtered  = filtered,
+       Table     = tabled,
+       Printed   = printed,
+       Charts    = charted,
+       Picture   = pictured,
+       Overview  = overview),
+  properties = xl_properties(
+    title    = "writexl showcase",
+    author   = "writexl",
+    subject  = "Every feature in one workbook",
+    custom   = list(Generated = Sys.Date(), Reviewed = FALSE),
+    header_format = xl_font(bold = TRUE, color = "white") +
+                    xl_fill(background = "#1F3864")))
+
+showcase <- write_xlsx(wb, tempfile(fileext = ".xlsx"))
+```
+
+The sheet order matters: any sheet with a header, footer or background image
+must come *after* every sheet carrying a floating image or a chart, because
+libxlsxwriter numbers the drawing relationships from a counter that skips the
+first kind. writexl checks the order and refuses rather than writing a file
+Excel repairs.
+
+## The second workbook: an embedded image
+
+An embedded image sits *inside* a cell and sizes with it. libxlsxwriter
+numbers its metadata from a counter shared with every other image, so mixing
+the two writes a cell reference past the end of the metadata and Excel repairs
+the sheet. writexl refuses that combination, which is why this is a second
+file:
+
+```{r eval = have_png}
+embedded <- write_xlsx(
+  list(Embedded = xl_sheet(sales[, 1:2],
+                           image = xl_image(card, at = "D2", embed = TRUE))),
+  tempfile(fileext = ".xlsx"))
+```
+
+## What was written
+
+```{r}
+sheets <- c("Formatted", "Content", "Filtered", "Table", "Printed",
+            "Charts", "Picture", "Overview")
+data.frame(sheet = sheets,
+           shows = c("formats, conditional rules, frozen pane",
+                     "formulas, links, comments, rich text, merge, validation",
+                     "an autofilter with its rows hidden",
+                     "a worksheet table with a total row",
+                     "page setup, outline symbols, protection",
+                     "a column, a pie and a scatter chart",
+                     "a picture anchored to a cell",
+                     "a chartsheet: one chart, no cells"))
+```
+
+```{r}
+file.size(showcase)
+```
+
+Open it and every feature above is visible in one place. For why any of it
+behaves as it does, follow the links back to
+[formatting](b-formatting.html),
+[worksheets and workbooks](c-worksheets-workbooks.html),
+[charts and images](d-charts-images.html), or
+[formulas, tables and the rest](e-formulas-and-more.html).

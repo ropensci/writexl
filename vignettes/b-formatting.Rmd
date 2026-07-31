@@ -1,0 +1,146 @@
+---
+title: "Formatting cells"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Formatting cells}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(writexl)
+```
+
+One kind of object describes appearance everywhere in writexl: an `xl_format`.
+The same object styles a cell, a whole column, a chart series or a conditional
+rule, so there is one vocabulary to learn rather than five.
+
+## Building a format
+
+Six group constructors, each covering one family of Excel properties. Every
+argument defaults to unset, so you name only what you want to change:
+
+```{r}
+xl_font(bold = TRUE, color = "navy", size = 12)
+xl_fill(background = "#FFF2CC")
+xl_border(all = "thin", color = "gray")
+xl_align(horizontal = "center", vertical = "top", wrap = TRUE)
+xl_num_format("#,##0.00")
+xl_protection(locked = FALSE)
+```
+
+Colours accept R colour names, hex strings or integers, via `xl_color()`.
+
+Each constructor already returns a complete format, so one can be used alone.
+Combine them with `+`, which merges **property by property** --- later values
+win, but nothing you did not touch is lost:
+
+```{r}
+money <- xl_num_format("$#,##0.00") + xl_font(color = "darkgreen")
+money + xl_font(bold = TRUE)     # still green, now bold
+```
+
+## Applying it to cells
+
+`xl_cell_general()` attaches a format to values. One format covers the column;
+a list gives a format per cell:
+
+```{r}
+df <- data.frame(item = c("Widget", "Gadget", "Gizmo"))
+df$price <- xl_cell_general(value = c(1234.5, 67.25, 890), format = money)
+df$flag  <- xl_cell_general(
+  value  = c(10, -5, 3),
+  format = list(xl_fill(background = "lightgreen"),
+                xl_fill(background = "salmon"),
+                xl_fill(background = "lightgreen")))
+path <- write_xlsx(df, tempfile(fileext = ".xlsx"))
+```
+
+A cell with a format and no value is a formatted blank --- useful for ruling a
+sheet out to a fixed size:
+
+```{r}
+xl_cell_general(value = NA, format = xl_fill(background = "#EEEEEE"))
+```
+
+Dates and times take the workbook's date format automatically when their own
+format sets no number format.
+
+## Applying it to columns and rows
+
+More often you want a whole column. `xl_col_spec()` and `xl_row_spec()` *are*
+`xl_format` objects that additionally carry a target and some geometry, so they
+combine with `+` like any other format:
+
+```{r}
+sheet <- xl_sheet(
+  data.frame(date = as.Date("2024-01-01") + 0:2,
+             revenue = c(1000.5, 2000.25, 1500.75)),
+  cols = list(xl_col_spec("date", width = 12),
+              xl_col_spec("revenue", width = 14, format = money)),
+  rows = xl_row_spec(1, height = 20))
+path <- write_xlsx(list(Sales = sheet), tempfile(fileext = ".xlsx"))
+```
+
+Columns are named or indexed; rows are counted from 1 as *data* rows, ignoring
+the header.
+
+## Where a format comes from
+
+Formats cascade. What Excel finally applies to a cell is the workbook's
+`default_format`, merged with the column or row format, merged with the cell's
+own. Identical results are written once, so styling thousands of cells stays
+compact. See [Worksheets and workbooks](c-worksheets-workbooks.html) for the workbook end of
+that.
+
+## Conditional formatting
+
+A conditional format is a rule plus a format, applied to a range and evaluated
+by Excel rather than by you:
+
+```{r}
+scores <- data.frame(name = c("a", "b", "c", "d"), score = c(35, 78, 55, 92))
+sheet <- xl_sheet(scores, conditional = list(
+  xl_cond_cell(list(cols = "score"), "cell", ">=", 80,
+               format = xl_fill(background = "lightgreen")),
+  xl_cond_cell(list(cols = "score"), "cell", "<", 50,
+               format = xl_fill(background = "salmon"))))
+path <- write_xlsx(list(Scores = sheet), tempfile(fileext = ".xlsx"))
+```
+
+Rules are tried in order, and `stop_if_true` stops at the first match.
+
+The format on a rule is a **differential** format: it says what to change, not
+what the cell looks like. A rule setting only a fill leaves the font alone,
+which is why these are stored apart from ordinary cell styles.
+
+`type` picks what is being tested --- a cell's value, whether it is in the top
+or bottom *n*, above or below average, a duplicate, blank, an error, text
+containing something, a date in a relative window, or a formula of your own.
+
+### Scales, bars and icons
+
+Three constructors cover Excel's graphical rules, none of which needs a format:
+
+```{r}
+xl_cond_scale(list(cols = "score"), colors = c("salmon", "lightgreen"))
+xl_cond_bar(list(cols = "score"), color = "steelblue")
+xl_cond_icons(list(cols = "score"), style = "3_traffic_lights")
+```
+
+A two-colour scale takes two colours, a three-colour scale three. Data bars
+draw behind the value in the cell. Icon sets take one of Excel's built-in
+`style`s, optionally reversed or shown without their values.
+
+Every one of these takes its range the same way as anything else in writexl:
+`list(cols = )` against the data frame, or A1 text.
+
+## What is elsewhere
+
+* The same format objects style **charts**, translated to what a chart can
+  draw: [Charts and images](d-charts-images.html).
+* **Number formats** are ordinary Excel format strings --- anything the Custom
+  box in Excel accepts.
+* `xl_protection()` only takes effect once the sheet itself is protected: see
+  [Worksheets and workbooks](c-worksheets-workbooks.html).

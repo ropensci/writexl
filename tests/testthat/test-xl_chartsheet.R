@@ -48,7 +48,7 @@ test_that("the chart on a chartsheet carries everything a chart can", {
                                          marker = xl_chart_marker("circle", 7)),
                          title = "T",
                          legend = xl_chart_legend("bottom"),
-                         y_axis = xl_chart_axis(name = "Revenue", min = 0)))
+                         y_axis = xl_chart_axis(title = "Revenue", min = 0)))
   # the chart itself is covered by the chart tests; what matters here is that
   # a fully-featured chart still reaches a chartsheet
   expect_true(any(grepl("^xl/charts/chart1.xml$", r$files)))
