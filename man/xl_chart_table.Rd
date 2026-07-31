@@ -47,6 +47,7 @@ Other images and charts:
 \code{\link[=xl_chart_marker]{xl_chart_marker()}},
 \code{\link[=xl_chart_series]{xl_chart_series()}},
 \code{\link[=xl_chart_trendline]{xl_chart_trendline()}},
+\code{\link[=xl_chartsheet]{xl_chartsheet()}},
 \code{\link[=xl_image]{xl_image()}}
 }
 \concept{images and charts}

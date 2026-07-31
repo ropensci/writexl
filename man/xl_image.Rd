@@ -105,6 +105,7 @@ Other images and charts:
 \code{\link[=xl_chart_marker]{xl_chart_marker()}},
 \code{\link[=xl_chart_series]{xl_chart_series()}},
 \code{\link[=xl_chart_table]{xl_chart_table()}},
-\code{\link[=xl_chart_trendline]{xl_chart_trendline()}}
+\code{\link[=xl_chart_trendline]{xl_chart_trendline()}},
+\code{\link[=xl_chartsheet]{xl_chartsheet()}}
 }
 \concept{images and charts}

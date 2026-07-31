@@ -21,7 +21,8 @@
 
 # One sheet's visibility settings, with absent ones as NA.
 .sheet_view_flags <- function(el) {
-  vw <- .sheet_view_of(el)
+  vw <- if (inherits(el, "xl_chartsheet")) unclass(el)$view
+        else .sheet_view_of(el)
   if (is.null(vw))
     return(list(active = NA, selected = NA, visible = NA, first_tab = NA))
   list(active    = vw$active,

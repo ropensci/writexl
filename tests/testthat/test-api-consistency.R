@@ -21,26 +21,35 @@ api_arg_positions <- function() {
   out
 }
 
-# Same name, unrelated concept.  These are allowed to disagree on order because
-# they are not really the same argument: a comment *box's* pixel width and a
-# worksheet *column's* character width have nothing to do with each other.
+# Same name, unrelated concept: two functions and the one argument they are
+# allowed to disagree about.  Naming the argument rather than exempting the
+# whole pair keeps every other argument the two share under the check.
 FALSE_FRIENDS <- list(
-  c("xl_comment", "xl_col_spec"),
-  c("xl_comment", "xl_row_spec"),
+  # a comment *box's* pixel width and height, against a worksheet *column's*
+  # character width and a *row's* height
+  list(c("xl_comment", "xl_col_spec"), "width"),
+  list(c("xl_comment", "xl_row_spec"), "height"),
   # `name` in xl_hyperlink() is the deprecated alias for `value`, kept last on
-  # purpose; in xl_chart_series() it is the series label shown in the legend.
-  c("xl_hyperlink", "xl_chart_series"),
-  c("xl_hyperlink", "xl_chart_axis"),
-  c("xl_hyperlink", "xl_chart_trendline"),
+  # purpose; elsewhere it is a label
+  list(c("xl_hyperlink", "xl_chart_series"), "name"),
+  list(c("xl_hyperlink", "xl_chart_axis"), "name"),
+  list(c("xl_hyperlink", "xl_chart_trendline"), "name"),
   # `position` in xl_image() is how the picture behaves when rows and columns
   # resize; in xl_chart_axis() it is whether the categories sit on the tick
-  # marks or between them.  Different vocabularies, not one argument.
-  c("xl_image", "xl_chart_axis")
+  # marks or between them
+  list(c("xl_image", "xl_chart_axis"), "position"),
+  # `chart` on a worksheet is one or more charts floating over the cells, and
+  # optional; on a chartsheet it is the sheet's whole content, exactly one of
+  # them, and the only required argument -- so it comes first there and last
+  # among the overlays here
+  list(c("xl_sheet", "xl_chartsheet"), "chart")
 )
 
-is_false_friend <- function(a, b) {
-  any(vapply(FALSE_FRIENDS,
-             function(p) setequal(p, c(a, b)), logical(1)))
+# The argument two functions may disagree about, or NULL.
+false_friend_arg <- function(a, b) {
+  for (p in FALSE_FRIENDS)
+    if (setequal(p[[1L]], c(a, b))) return(p[[2L]])
+  NULL
 }
 
 test_that("shared arguments keep the same relative order across functions", {
@@ -50,8 +59,8 @@ test_that("shared arguments keep the same relative order across functions", {
   for (i in seq_along(fns)) for (j in seq_along(fns)) {
     if (j <= i) next
     fa <- fns[i]; fb <- fns[j]
-    if (is_false_friend(fa, fb)) next
-    common <- intersect(api[[fa]], api[[fb]])
+    common <- setdiff(intersect(api[[fa]], api[[fb]]),
+                      false_friend_arg(fa, fb))
     if (length(common) < 2L) next
     oa <- order(match(common, api[[fa]]))
     ob <- order(match(common, api[[fb]]))

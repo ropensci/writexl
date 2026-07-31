@@ -963,6 +963,35 @@ where `at` means a cell everywhere else in writexl.
 `"zero"`, or run `"connected"` across it — and `show_hidden_data` plots rows and
 columns Excel would otherwise leave out.
 
+### A chart on a sheet of its own
+
+`xl_chartsheet()` is a tab holding one chart and no cells, which is Excel's
+"Move chart to a new sheet". Give one to `write_xlsx()` where a data frame
+would go:
+
+```{r}
+sales <- data.frame(quarter = c("Q1", "Q2", "Q3", "Q4"),
+                    revenue = c(10, 25, 18, 32))
+chart <- xl_chart("column",
+                  xl_chart_series(values = list(sheet = "Data",
+                                                cols = "revenue"),
+                                  categories = list(sheet = "Data",
+                                                    cols = "quarter")),
+                  title = "Revenue")
+path <- write_xlsx(list(Data = sales, Overview = xl_chartsheet(chart)),
+                   tempfile(fileext = ".xlsx"))
+```
+
+Every range must name its sheet — a chartsheet has no cells for
+`list(cols = "revenue")` to resolve against, and saying so is better than
+plotting nothing.
+
+A chartsheet supports a fraction of what a worksheet does, and the rest is
+refused rather than dropped: of `xl_page_setup()` it takes the orientation,
+paper size, margins, header and footer; of `xl_sheet_view()` it takes `active`,
+`selected`, `visible` and `first_tab`. It also takes `tab_color`, `zoom` and
+`protect`.
+
 ### Features that belong to some types only
 
 Excel discards a setting the chart type does not have without saying so, so

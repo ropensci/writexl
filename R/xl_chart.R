@@ -497,8 +497,16 @@ print.xl_chart <- function(x, ...) {
 # Resolve a sheet's charts to the C payloads.  Called once the whole workbook is
 # known, since a series may point at another sheet.
 .resolve_charts <- function(el, df, reg, header_offset, props, sheets, own) {
-  if (!inherits(el, "xl_sheet")) return(list())
-  cs <- .chart_list(el$chart)
+  if (inherits(el, "xl_chartsheet")) {
+    # a chartsheet has no cells, so `own` names a sheet with no columns and a
+    # range that does not name its sheet has nothing to resolve against
+    .check_chartsheet_ranges(unclass(el)$chart, own)
+    cs <- list(unclass(el)$chart)
+  } else if (!inherits(el, "xl_sheet")) {
+    return(list())
+  } else {
+    cs <- .chart_list(el$chart)
+  }
   lapply(seq_along(cs), function(i) {
     p <- unclass(cs[[i]])
     at <- .xl_resolve_range(p[["at"]], arg = sprintf("chart[[%d]] at", i),

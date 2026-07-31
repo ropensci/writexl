@@ -64,7 +64,13 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
   }
   props <- wb$properties
   elems <- wb$sheets
-  dfs <- lapply(elems, function(el) if(inherits(el, "xl_sheet")) el$data else el)
+  # a chartsheet has no cells, so it stands in the data-frame list as a data
+  # frame with no columns; C branches on the plan before the row loop
+  is_cs <- vapply(elems, inherits, logical(1), "xl_chartsheet")
+  dfs <- lapply(seq_along(elems), function(i)
+    if (is_cs[[i]]) .chartsheet_placeholder()
+    else if (inherits(elems[[i]], "xl_sheet")) elems[[i]]$data else elems[[i]])
+  names(dfs) <- names(elems)
   dfs <- lapply(dfs, normalize_df)
   names(dfs) <- .resolve_sheet_names(names(elems), length(dfs))
   # tab visibility is the one worksheet setting whose rules span the whole
@@ -95,7 +101,11 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
     .resolve_charts(el, dfs[[nm]], reg, header_offset, props, dfs, nm),
     elems, names(dfs))
   sheets <- Map(function(el, df, tn, ch)
-                  .resolve_sheet_plan(el, df, reg, header_offset, props, tn, ch),
+                  if (inherits(el, "xl_chartsheet"))
+                    .resolve_chartsheet_plan(el, ch)
+                  else
+                    .resolve_sheet_plan(el, df, reg, header_offset, props, tn,
+                                        ch),
                 elems, dfs, table_names, chart_plans)
   # Ordering matters to libxlsxwriter's drawing numbering, so this spans the
   # whole workbook rather than any one sheet
