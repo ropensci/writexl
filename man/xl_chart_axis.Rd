@@ -5,9 +5,9 @@
 \title{An axis of a chart}
 \usage{
 xl_chart_axis(
-  name = NULL,
-  name_format = NULL,
-  name_layout = NULL,
+  title = NULL,
+  title_format = NULL,
+  title_layout = NULL,
   label_format = NULL,
   num_format = NULL,
   line_format = NULL,
@@ -35,14 +35,14 @@ xl_chart_axis(
 )
 }
 \arguments{
-\item{name}{The axis title: a string, or a range spec holding one --- see
+\item{title}{The axis title: a string, or a range spec holding one --- see
 [xl_chart_series()] for the spellings, including
 `list(header = "revenue")`.}
 
-\item{name_format}{An [xl_format()] styling the axis title.  A title is
+\item{title_format}{An [xl_format()] styling the axis title.  A title is
 text, so only the [xl_font()] group applies.}
 
-\item{name_layout}{Where to put the axis title by hand, as `c(x, y)`
+\item{title_layout}{Where to put the axis title by hand, as `c(x, y)`
 fractions of the chart, each above 0 and at most 1.  Excel places it for
 you otherwise.}
 
@@ -127,8 +127,8 @@ doughnut charts have no axes at all.
 `"hundred_millions"`, `"billions"` or `"trillions"`.
 }
 \examples{
-xl_chart_axis(name = "Quarter")
-xl_chart_axis(name = "Revenue", min = 0, num_format = "$#,##0",
+xl_chart_axis(title = "Quarter")
+xl_chart_axis(title = "Revenue", min = 0, num_format = "$#,##0",
               major_gridlines = FALSE)
 }
 \seealso{

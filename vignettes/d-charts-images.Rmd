@@ -83,8 +83,8 @@ spacing, gridlines, and the axis line itself:
 
 ```{r}
 xl_chart("column", xl_chart_series(values = list(cols = "revenue")),
-         x_axis = xl_chart_axis(name = "Quarter", major_tick = "none"),
-         y_axis = xl_chart_axis(name = "Revenue", min = 0,
+         x_axis = xl_chart_axis(title = "Quarter", major_tick = "none"),
+         y_axis = xl_chart_axis(title = "Revenue", min = 0,
                                 num_format = "$#,##0",
                                 major_gridlines_format =
                                   xl_border(all = "dotted", color = "gray")))
@@ -150,7 +150,7 @@ xl_chart("column", xl_chart_series(values = list(cols = "revenue")),
 `xl_chart_legend(position = "none")` removes the legend, and `delete_series`
 leaves one series out of the key while still plotting it. Anything placed by
 hand takes a `layout` rather than an `at` --- `title_layout`,
-`plot_area_layout`, `xl_chart_axis(name_layout =)` and
+`plot_area_layout`, `xl_chart_axis(title_layout =)` and
 `xl_chart_legend(layout =)` are fractions of the chart, where `at` means a cell
 everywhere else. `show_blanks` decides what an empty cell does, and
 `show_hidden_data` plots rows Excel would leave out.

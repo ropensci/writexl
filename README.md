@@ -123,7 +123,24 @@ p <- tempfile(fileext = ".xlsx"); openxlsx2::write_xlsx(flights, p); file.size(p
 
 Measured on R 4.6.1, writexl 1.5.4.9000, openxlsx2 1.28.
 
-For a workbook large enough to matter, `constant_memory = TRUE` streams each
-row to disk instead of holding the sheet in memory; left at its default writexl
-decides from the estimated cost. See
+### Memory
+
+`constant_memory = TRUE` streams each row to disk instead of holding the whole
+sheet, which is the difference between a workbook that fits in memory and one
+that does not. Peak resident memory of the whole R process, writing the same
+336,776 rows:
+
+| | peak memory | file | time |
+|---|---|---|---|
+| `constant_memory = FALSE` | 894 MB | 26.8 MB | 7.4 s |
+| `constant_memory = TRUE` | **208 MB** | 27.8 MB | 7.7 s |
+
+A quarter of the memory, for a file 3.5% larger and about the same time.
+Streaming produces slightly bigger files because a shared-string table cannot
+be built for rows already flushed to disk.
+
+Left at its default, writexl chooses per workbook: streaming is switched on
+only when the estimated saving is worth it, and switched off automatically for
+the features that cannot be written while streaming — worksheet tables,
+multi-cell array formulas, merged ranges and embedded images. See
 [Worksheets and workbooks](https://docs.ropensci.org/writexl/articles/c-worksheets-workbooks.html).

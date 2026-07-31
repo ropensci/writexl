@@ -98,12 +98,12 @@
 #' * category axes only --- `position`, `label_align`, `interval_unit`,
 #'   `interval_tick`.
 #'
-#' @param name The axis title: a string, or a range spec holding one --- see
+#' @param title The axis title: a string, or a range spec holding one --- see
 #'   [xl_chart_series()] for the spellings, including
 #'   `list(header = "revenue")`.
-#' @param name_format An [xl_format()] styling the axis title.  A title is
+#' @param title_format An [xl_format()] styling the axis title.  A title is
 #'   text, so only the [xl_font()] group applies.
-#' @param name_layout Where to put the axis title by hand, as `c(x, y)`
+#' @param title_layout Where to put the axis title by hand, as `c(x, y)`
 #'   fractions of the chart, each above 0 and at most 1.  Excel places it for
 #'   you otherwise.
 #' @param label_format An [xl_format()] styling the tick labels --- the
@@ -152,10 +152,10 @@
 #' @seealso [xl_chart], [xl_chart_series]
 #' @export
 #' @examples
-#' xl_chart_axis(name = "Quarter")
-#' xl_chart_axis(name = "Revenue", min = 0, num_format = "$#,##0",
+#' xl_chart_axis(title = "Quarter")
+#' xl_chart_axis(title = "Revenue", min = 0, num_format = "$#,##0",
 #'               major_gridlines = FALSE)
-xl_chart_axis <- function(name = NULL, name_format = NULL, name_layout = NULL,
+xl_chart_axis <- function(title = NULL, title_format = NULL, title_layout = NULL,
                           label_format = NULL, num_format = NULL,
                           line_format = NULL, visible = NA, reverse = NA,
                           min = NA, max = NA, log_base = NA,
@@ -169,12 +169,12 @@ xl_chart_axis <- function(name = NULL, name_format = NULL, name_layout = NULL,
                           major_gridlines = NA, minor_gridlines = NA,
                           major_gridlines_format = NULL,
                           minor_gridlines_format = NULL) {
-  nm <- if (is.null(name)) NULL
-        else if (is.character(name) && length(name) == 1L && !is.na(name))
-          list(text = name)
-        else .chart_range(name, "name")
-  if (!is.null(name_format) && is.null(nm))
-    stop(paste0("`name_format` styles the axis title, so give a `name` too. ",
+  nm <- if (is.null(title)) NULL
+        else if (is.character(title) && length(title) == 1L && !is.na(title))
+          list(text = title)
+        else .chart_range(title, "title")
+  if (!is.null(title_format) && is.null(nm))
+    stop(paste0("`title_format` styles the axis title, so give a `title` too. ",
                 "An axis with no title has nothing to style."), call. = FALSE)
 
   # chart_axis_set_num_format() takes the format string itself rather than an
@@ -200,11 +200,11 @@ xl_chart_axis <- function(name = NULL, name_format = NULL, name_layout = NULL,
       stop("`crossing` must be a number, \"min\" or \"max\"", call. = FALSE)
   }
 
-  at <- name_layout
+  at <- title_layout
   if (!is.null(at)) {
     if (!is.numeric(at) || length(at) != 2L || anyNA(at) ||
         any(at <= 0) || any(at > 1))
-      stop(paste0("`name_layout` must be c(x, y), each above 0 and at most 1 ",
+      stop(paste0("`title_layout` must be c(x, y), each above 0 and at most 1 ",
                   "-- they are fractions of the chart's width and height"),
            call. = FALSE)
     at <- as.numeric(at)
@@ -213,11 +213,11 @@ xl_chart_axis <- function(name = NULL, name_format = NULL, name_layout = NULL,
   lb <- .val_int(log_base, "log_base", min = 2, max = 1000)
 
   structure(.drop_null(list(
-    name = nm,
-    name_format = .chart_format_payload(name_format, "name_format",
+    title = nm,
+    title_format = .chart_format_payload(title_format, "title_format",
                                         accept = "font",
                                         part = "an axis title"),
-    name_layout = at,
+    title_layout = at,
     label_format = .chart_format_payload(label_format, "label_format",
                                          accept = "font",
                                          part = "an axis tick label"),
@@ -293,11 +293,11 @@ print.xl_chart_axis <- function(x, ...) {
   p <- unclass(ax)
 
   ent <- list()
-  nm <- p[["name"]]
+  nm <- p[["title"]]
   if (!is.null(nm)) {
     if (!is.null(nm[["text"]])) ent$name <- nm[["text"]]
     else {
-      r <- .resolve_chart_range(nm, sprintf("%s name", arg), sheets, own,
+      r <- .resolve_chart_range(nm, sprintf("%s title", arg), sheets, own,
                                 header_offset)
       ent$name_sheet <- r$sheet
       ent$name_range <- r$range
@@ -305,12 +305,12 @@ print.xl_chart_axis <- function(x, ...) {
   }
   # the payload itself, not its $font: chart_font_of() looks the font up by
   # key, the same way it reads a series format
-  ent$name_font  <- p[["name_format"]]
+  ent$name_font  <- p[["title_format"]]
   ent$num_font   <- p[["label_format"]]
   ent$num_format <- p[["num_format"]]
-  if (!is.null(p[["name_layout"]])) {
-    ent$name_x <- p[["name_layout"]][[1L]]
-    ent$name_y <- p[["name_layout"]][[2L]]
+  if (!is.null(p[["title_layout"]])) {
+    ent$name_x <- p[["title_layout"]][[1L]]
+    ent$name_y <- p[["title_layout"]][[2L]]
   }
   ent$line    <- p[["line_format"]][["line"]]
   ent$fill    <- p[["line_format"]][["fill"]]

@@ -119,8 +119,8 @@ charted <- xl_sheet(
                                   categories = list(cols = "quarter"))),
              title = "Revenue and cost",
              title_format = xl_font(size = 13, bold = TRUE),
-             x_axis = xl_chart_axis(name = "Quarter"),
-             y_axis = xl_chart_axis(name = "Dollars", min = 0,
+             x_axis = xl_chart_axis(title = "Quarter"),
+             y_axis = xl_chart_axis(title = "Dollars", min = 0,
                                     num_format = "$#,##0"),
              legend = xl_chart_legend(position = "bottom"),
              series_gap = 60, at = "G2"),
@@ -146,7 +146,7 @@ overview <- xl_chartsheet(
                            categories = list(sheet = "Charts",
                                              cols = "quarter")),
            title = "Revenue, full page",
-           y_axis = xl_chart_axis(name = "Revenue", min = 0)),
+           y_axis = xl_chart_axis(title = "Revenue", min = 0)),
   tab_color = "red")
 ```
 
