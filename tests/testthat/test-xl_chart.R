@@ -430,9 +430,9 @@ test_that("every relationship a chart adds resolves", {
 })
 
 test_that("a scatter series must have categories", {
-  # not a style preference: libxlsxwriter's _chart_write_cat() reads
-  # series->categories->has_string_cache before its own NULL guard, so a
-  # scatter series without categories segfaults.
+  # not a style preference: a scatter series without categories segfaults in
+  # libxlsxwriter's _chart_write_x_val(), which has no NULL guard on the
+  # formula.
   for (ty in c("scatter", "scatter_straight", "scatter_straight_markers",
                "scatter_smooth", "scatter_smooth_markers"))
     expect_error(xl_chart(ty, xl_chart_series(values = "B1:B5")),

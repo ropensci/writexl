@@ -346,9 +346,11 @@ xl_chart <- function(type, series, title = NULL, title_format = NULL,
     if (isTRUE(p[["smooth"]]))
       .check_chart_feature(ty, "smooth", sprintf("series[[%d]]$smooth", i))
     # A scatter plots x against y, so a series with no categories has no x
-    # values.  libxlsxwriter requires them too: _chart_write_cat() reads
-    # series->categories->has_string_cache before its own NULL guard on
-    # ->formula, so omitting them segfaults.
+    # values.  libxlsxwriter requires them too, but only checks when the range
+    # is passed to chart_add_series() as a string; set through
+    # chart_series_set_values() it reaches _chart_write_x_val(), which unlike
+    # _chart_write_cat() has no NULL guard, and strpbrk() is handed the NULL
+    # formula.
     if (identical(.CHART_FAMILY(ty), "scatter") && is.null(p[["categories"]]))
       stop(sprintf(paste0("`series[[%d]]` has no `categories`, which a \"%s\" ",
                           "chart needs: a scatter plots values against ",
