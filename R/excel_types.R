@@ -9,6 +9,33 @@
   x
 }
 
+# The one string an object will show in the workbook.  Anything classed is put
+# through as.character(), so a cell built for a sheet -- xl_cell_general(value
+# = "Total") -- can be reused wherever only its displayed value is wanted.  A
+# rich string is refused rather than flattened: these callers write a single
+# run, so its per-run fonts would disappear without a word.
+.as_display_string <- function(x, arg, null_ok = TRUE) {
+  if (is.null(x)) {
+    if (null_ok) return(NULL)
+    stop(sprintf("`%s` must be a single non-NA string", arg), call. = FALSE)
+  }
+  if (is_xl_rich_string(x) || .cell_holds_rich_string(x))
+    stop(sprintf(paste0("`%s` cannot be a rich string: only one font is ",
+                        "written here, so the per-run fonts would be lost"),
+                 arg), call. = FALSE)
+  if (!is.character(x) && !is.null(attr(x, "class"))) x <- as.character(x)
+  if (!is.character(x) || length(x) != 1L || is.na(x))
+    stop(sprintf(paste0("`%s` must be a single non-NA string, or an object ",
+                        "with an as.character() method such as an ",
+                        "xl_cell_general()"), arg), call. = FALSE)
+  x
+}
+
+.cell_holds_rich_string <- function(x) {
+  inherits(x, "xl_cell_general") &&
+    any(vapply(x, function(el) is_xl_rich_string(el[["value"]]), logical(1)))
+}
+
 #' Excel Types
 #'
 #' Create special column types to write to a spreadsheet.

@@ -202,8 +202,16 @@
 
 * Bundled libxlsxwriter updated to 1.2.4.
 
-* See the "Formatting and workbook properties" and "Writing Special Cell Types"
-  vignettes.
+* Argument names are consistent across the new functions. Whatever a cell,
+  label or box will show is `value`, whatever its type; a size in pixels says
+  so (`width_pixels`); and a caption is `title`, with `title_format` and
+  `title_layout` beside it. `as.character()` methods on `xl_cell_general()` and
+  `xl_rich_string()` mean a cell built for a sheet can be reused anywhere a
+  plain string is wanted.
+
+* See the "Getting started with writexl" vignette, and the five that follow it
+  for formatting, worksheets and workbooks, charts and images, formulas and
+  tables, and one runnable example of everything.
 
 ## Bug fixes
 
@@ -218,7 +226,7 @@
   in the workbook shares one time zone, the zone is dropped and local
   wall-clock time is written; when they differ, all are converted to UTC with a
   warning. Code that relied on always getting the UTC instant will see shifted
-  values. See the formatting vignette.
+  values. See the "Getting started with writexl" vignette.
 
 * `Date` values before 1900-03-01 were written one day too late, because the
   `Date` writer did not compensate for Excel's phantom 1900-02-29. `Date` and

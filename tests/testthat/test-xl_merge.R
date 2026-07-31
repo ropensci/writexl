@@ -13,8 +13,8 @@ merged <- function(..., df = data.frame(a = 1:3, b = 4:6)) {
 
 test_that("xl_merge validates its arguments", {
   expect_error(xl_merge(), "must name the cells")
-  expect_error(xl_merge("A1:B1", text = 1), "single non-NA string")
-  expect_error(xl_merge("A1:B1", text = c("a", "b")), "single non-NA string")
+  expect_error(xl_merge("A1:B1", value = 1), "single non-NA string")
+  expect_error(xl_merge("A1:B1", value = c("a", "b")), "single non-NA string")
   expect_error(xl_merge("A1:B1", format = "bold"), "must be an xl_format")
   expect_s3_class(xl_merge("A1:B1"), "xl_merge")
   expect_s3_class(xl_merge("A1:B1", "T", xl_font(bold = TRUE)), "xl_merge")
@@ -131,4 +131,21 @@ test_that("a merge turns row streaming off, and says why", {
   expect_true(is.null(xlsx_part(write_tmp(list(D = xl_sheet(df)),
                                           constant_memory = TRUE),
                                 "xl/sharedStrings.xml")))
+})
+
+# ── Coercing the merged value ─────────────────────────────────────────────────
+
+test_that("a merge takes its value from anything that can render itself", {
+  # a cell built for a sheet, reused where only its displayed value matters
+  expect_equal(xl_merge("A1:B1", xl_cell_general(value = "Total"))$value,
+               "Total")
+  expect_equal(xl_merge("A1:B1", factor("Total"))$value, "Total")
+  # a rich string is refused rather than silently flattened: worksheet_merge_
+  # range() writes one run, so the per-run fonts would be dropped
+  rs <- xl_rich_string("a", xl_rich_run("b", xl_font(bold = TRUE)))
+  expect_error(xl_merge("A1:B1", rs), "cannot be a rich string")
+  expect_error(xl_merge("A1:B1", xl_cell_general(value = rs)),
+               "cannot be a rich string")
+  expect_error(xl_merge("A1:B1", xl_cell_general(value = c("a", "b"))),
+               "single non-NA string")
 })

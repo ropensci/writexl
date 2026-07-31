@@ -19,7 +19,7 @@
 #' `xl_rich_run()` is one fragment of an [xl_rich_string()]: a piece of text
 #' plus the font it is drawn in.
 #'
-#' @param text A single non-`NA`, non-empty string.
+#' @param value A single non-`NA`, non-empty string: the run's text.
 #' @param format An optional [xl_format].  Only its **font** properties apply
 #'   (see [xl_font()]); a run has no fill, border, alignment or number format,
 #'   and supplying one warns.  `NULL` draws the run in the cell's own font.
@@ -30,18 +30,17 @@
 #' @examples
 #' xl_rich_run("bold", xl_font(bold = TRUE))
 #' xl_rich_run("plain")
-xl_rich_run <- function(text, format = NULL) {
-  if (!is.character(text) || length(text) != 1L || is.na(text))
-    stop("`text` must be a single non-NA string", call. = FALSE)
-  if (!nzchar(text))
-    stop("`text` must not be empty: Excel has no representation for an empty ",
+xl_rich_run <- function(value, format = NULL) {
+  value <- .as_display_string(value, "value", null_ok = FALSE)
+  if (!nzchar(value))
+    stop("`value` must not be empty: Excel has no representation for an empty ",
          "run of a rich string", call. = FALSE)
   if (!is.null(format)) {
     if (!is_xl_format(format))
       stop("`format` must be an xl_format object", call. = FALSE)
     .check_rich_string_format(format)
   }
-  structure(list(text = text, format = format), class = "xl_rich_run")
+  structure(list(value = value, format = format), class = "xl_rich_run")
 }
 
 #' A cell whose text has several formats
@@ -123,7 +122,7 @@ is_xl_rich_string <- function(x) inherits(x, "xl_rich_string")
 
 #' @export
 print.xl_rich_run <- function(x, ...) {
-  cat(sprintf("<xl_rich_run: %s%s>\n", encodeString(x$text, quote = '"'),
+  cat(sprintf("<xl_rich_run: %s%s>\n", encodeString(x$value, quote = '"'),
               if (is.null(x$format)) "" else " (formatted)"))
   invisible(x)
 }
@@ -133,15 +132,21 @@ print.xl_rich_string <- function(x, ...) {
   runs <- unclass(x)
   cat(sprintf("<xl_rich_string: %d runs>\n", length(runs)))
   for (r in runs)
-    cat(sprintf("  %s%s\n", encodeString(r$text, quote = '"'),
+    cat(sprintf("  %s%s\n", encodeString(r$value, quote = '"'),
                 if (is.null(r$format)) "" else "  <formatted>"))
   invisible(x)
 }
 
 #' @export
 format.xl_rich_string <- function(x, ...) {
-  paste(vapply(unclass(x), function(r) r$text, character(1)), collapse = "")
+  paste(vapply(unclass(x), function(r) r$value, character(1)), collapse = "")
 }
+
+#' @description
+#' `as.character()` returns the cell's text with the per-run fonts dropped.
+#' @rdname xl_rich_string
+#' @export
+as.character.xl_rich_string <- function(x, ...) format(x)
 
 # Flatten a rich string to the parallel text / format-id vectors C consumes,
 # registering each run's format in the workbook registry.  Run formats cascade
@@ -149,7 +154,7 @@ format.xl_rich_string <- function(x, ...) {
 .rich_string_c_payload <- function(rs, reg, props) {
   runs <- unclass(rs)
   list(
-    rich_text = vapply(runs, function(r) r$text, character(1)),
+    rich_text = vapply(runs, function(r) r$value, character(1)),
     rich_format_id = vapply(runs, function(r)
       .register_format(reg, merge_xl_format(props$default_format, r$format)),
       integer(1))

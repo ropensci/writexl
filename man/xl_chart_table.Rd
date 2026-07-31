@@ -6,16 +6,17 @@
 \usage{
 xl_chart_table(
   show_keys = NA,
-  horizontal = NA,
-  vertical = NA,
-  outline = NA,
+  horizontal_border = NA,
+  vertical_border = NA,
+  outline_border = NA,
   format = NULL
 )
 }
 \arguments{
 \item{show_keys}{Print each series' legend swatch in the table.}
 
-\item{horizontal, vertical, outline}{Which borders the grid draws.}
+\item{horizontal_border, vertical_border, outline_border}{Which of the grid's
+borders to draw.}
 
 \item{format}{An [xl_format()] styling the table's text --- the [xl_font()]
 group only.}
@@ -33,7 +34,7 @@ outline borders drawn, and no legend keys.
 }
 \examples{
 xl_chart_table()
-xl_chart_table(show_keys = TRUE, vertical = FALSE)
+xl_chart_table(show_keys = TRUE, vertical_border = FALSE)
 }
 \seealso{
 [xl_chart]

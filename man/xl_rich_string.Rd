@@ -3,11 +3,14 @@
 \name{xl_rich_string}
 \alias{xl_rich_string}
 \alias{is_xl_rich_string}
+\alias{as.character.xl_rich_string}
 \title{A cell whose text has several formats}
 \usage{
 xl_rich_string(...)
 
 is_xl_rich_string(x)
+
+\method{as.character}{xl_rich_string}(x, ...)
 }
 \arguments{
 \item{...}{Runs, in order.  A bare string is taken as an unformatted run; an
@@ -26,6 +29,8 @@ as the `value` of [xl_cell_general()].
 
 Excel requires at least two runs: a string with one format is an ordinary
 character value, so pass it as one.
+
+`as.character()` returns the cell's text with the per-run fonts dropped.
 }
 \examples{
 xl_rich_string("This is ", xl_rich_run("bold", xl_font(bold = TRUE)), " text")

@@ -314,7 +314,7 @@ test_that("an embedded image writes a cell, not a drawing", {
 # ── Background ────────────────────────────────────────────────────────────────
 
 test_that("a background image is stored and referenced", {
-  r <- img_parts(background = png_file())
+  r <- img_parts(background_image = png_file())
   expect_true("xl/media/image1.png" %in% r$files)
   expect_match(r$sheet, "<picture r:id=", fixed = TRUE)
   # a background is a backdrop, not a drawing
@@ -322,16 +322,16 @@ test_that("a background image is stored and referenced", {
 })
 
 test_that("a background may be a raw vector or an in-memory image", {
-  expect_true("xl/media/image1.png" %in% img_parts(background = PNG_1x1)$files)
+  expect_true("xl/media/image1.png" %in% img_parts(background_image = PNG_1x1)$files)
   skip_if_not(isTRUE(capabilities("png")))
   expect_true("xl/media/image1.png" %in%
-                img_parts(background = as.raster(matrix("red", 2, 2)))$files)
+                img_parts(background_image = as.raster(matrix("red", 2, 2)))$files)
 })
 
 test_that("a bad background is refused like any other image", {
   bad <- tempfile(fileext = ".png")
   writeLines("not an image", bad)
-  expect_error(write_tmp(list(S = xl_sheet(data.frame(a = 1), background = bad))),
+  expect_error(write_tmp(list(S = xl_sheet(data.frame(a = 1), background_image = bad))),
                "is not a PNG, JPEG, GIF or BMP")
 })
 
@@ -361,14 +361,14 @@ test_that("a drawing-less image sheet may not precede a floating image", {
   expect_error(write_tmp(list(A = hdr,
                               B = xl_sheet(df, image = xl_image(logo, "C2")))),
                "earlier in the workbook has a header or footer image")
-  expect_error(write_tmp(list(A = xl_sheet(df, background = logo),
+  expect_error(write_tmp(list(A = xl_sheet(df, background_image = logo),
                               B = xl_sheet(df, image = xl_image(logo, "C2")))),
                "earlier in the workbook has a background image")
   # the other order is fine, and is what the message recommends
   expect_silent(write_tmp(list(A = xl_sheet(df, image = xl_image(logo, "C2")),
                                B = hdr)))
   expect_silent(write_tmp(list(A = xl_sheet(df, image = xl_image(logo, "C2")),
-                               B = xl_sheet(df, background = logo))))
+                               B = xl_sheet(df, background_image = logo))))
 })
 
 test_that("only an embedded image costs row streaming", {

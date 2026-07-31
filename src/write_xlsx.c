@@ -465,7 +465,7 @@ static void apply_merges(cell_write_ctx *ctx, SEXP opts){
     if(rng == R_NilValue || Rf_length(rng) < 4) continue;
     SEXP q = PROTECT(Rf_coerceVector(rng, INTSXP));
     int *a = INTEGER(q);
-    const char *txt = payload_str(m, "text");
+    const char *txt = payload_str(m, "value");
     int fid = payload_int(m, "format_id");
     note_protection(ctx, fid);
     /* a NULL string would be rejected, so an empty merge writes "" */
@@ -1868,7 +1868,7 @@ static void write_cell_general(cell_write_ctx *ctx,
   /* --- comment overlay (independent of value/formula/hyperlink) ----------- */
   SEXP comment = list_get(cell, "comment");
   if(comment != R_NilValue && Rf_isVectorList(comment)){
-    const char *ctext = payload_str(comment, "text");
+    const char *ctext = payload_str(comment, "value");
     if(ctext){
       lxw_comment_options copts;
       memset(&copts, 0, sizeof(copts));

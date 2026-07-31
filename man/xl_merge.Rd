@@ -4,14 +4,16 @@
 \alias{xl_merge}
 \title{Merge a range of cells}
 \usage{
-xl_merge(range, text = NULL, format = NULL)
+xl_merge(range, value = NULL, format = NULL)
 }
 \arguments{
 \item{range}{The cells to merge: an Excel range string such as `"A1:C1"`, or
 a `list(rows = , cols = )` spec.  It must cover more than one cell ---
 Excel has no single-cell merge.}
 
-\item{text}{The text shown in the merged cell.  `NULL` leaves it empty.}
+\item{value}{The value shown in the merged cell: a string, or anything with
+an [as.character()] method such as an [xl_rich_string()].  `NULL` leaves
+the cell empty.}
 
 \item{format}{An optional [xl_format] applied to the whole merged range.
 Merged cells usually want `xl_align(horizontal = "center")`.}
@@ -23,9 +25,9 @@ An `xl_merge` object.
 `xl_merge()` merges a rectangle of cells into one, as Excel's "Merge and
 Centre" does.  Pass one or a list of them as `xl_sheet(merge = )`.
 
-A merged range holds a single value, so `xl_merge()` carries its own `text`
+A merged range holds a single value, so `xl_merge()` carries its own `value`
 rather than taking it from the data frame.  Merging over cells the data frame
-filled keeps only the merged text, exactly as merging in Excel discards
+filled keeps only the merged value, exactly as merging in Excel discards
 everything but the top-left value.
 }
 \examples{

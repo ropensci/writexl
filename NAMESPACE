@@ -2,6 +2,8 @@
 
 S3method("+",xl_format)
 S3method("[",xl_cell_general)
+S3method(as.character,xl_cell_general)
+S3method(as.character,xl_rich_string)
 S3method(as.data.frame,xl_cell_general)
 S3method(c,xl_cell_general)
 S3method(format,xl_rich_string)

@@ -179,3 +179,29 @@ test_that("a rich string is accepted by the cell value type check", {
   df$r <- cells
   expect_true(file.exists(write_tmp(df)))
 })
+
+# ── as.character() ────────────────────────────────────────────────────────────
+
+test_that("as.character() drops the runs' fonts and keeps the text", {
+  rs <- xl_rich_string("This is ", xl_rich_run("bold", xl_font(bold = TRUE)),
+                       " text")
+  expect_equal(as.character(rs), "This is bold text")
+  # which is what a data frame column of them shows
+  expect_equal(as.character(xl_cell_general(value = rs)), "This is bold text")
+})
+
+test_that("as.character() of a cell is what the cell displays", {
+  expect_equal(as.character(xl_cell_general(value = c(1.5, 2))), c("1.5", "2"))
+  expect_equal(as.character(xl_cell_general(value = "a")), "a")
+  # a formula's displayed value comes from Excel, so writexl has none to give
+  expect_equal(as.character(xl_cell_general(formula = "=SUM(A1:A2)")),
+               NA_character_)
+  expect_equal(as.character(xl_cell_general(value = NA)), NA_character_)
+})
+
+test_that("a run takes its value from anything that can render itself", {
+  expect_equal(xl_rich_run(xl_cell_general(value = "a"))$value, "a")
+  expect_equal(xl_rich_run(factor("a"))$value, "a")
+  # a run is one font by definition, so a rich string cannot be one
+  expect_error(xl_rich_run(xl_rich_string("a", "b")), "cannot be a rich string")
+})

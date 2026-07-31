@@ -320,12 +320,12 @@ print.xl_image <- function(x, ...) {
   })
 }
 
-# Resolve xl_sheet(background =) to the C payload.  A background takes the same
+# Resolve xl_sheet(background_image =) to the C payload.  It takes the same
 # shapes as an image but no options: Excel tiles it to fill the sheet, and it
 # is a display-only backdrop that never prints.
-.resolve_background <- function(el, arg = "background") {
-  if (!inherits(el, "xl_sheet") || is.null(el$background)) return(NULL)
-  x <- el$background
+.resolve_background <- function(el, arg = "background_image") {
+  if (!inherits(el, "xl_sheet") || is.null(el$background_image)) return(NULL)
+  x <- el$background_image
   if (.is_raster_like(x)) x <- .raster_to_png(x, arg)
   .check_image(x, arg)
   if (is.raw(x)) list(buffer = x) else list(filename = x)

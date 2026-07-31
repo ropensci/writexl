@@ -4,10 +4,10 @@
 \alias{xl_rich_run}
 \title{One run of a rich (multi-format) string}
 \usage{
-xl_rich_run(text, format = NULL)
+xl_rich_run(value, format = NULL)
 }
 \arguments{
-\item{text}{A single non-`NA`, non-empty string.}
+\item{value}{A single non-`NA`, non-empty string: the run's text.}
 
 \item{format}{An optional [xl_format].  Only its **font** properties apply
 (see [xl_font()]); a run has no fill, border, alignment or number format,

@@ -210,7 +210,7 @@ placeholder, or be tiled behind the cells as a screen watermark:
 
 ```{r eval = FALSE}
 xl_page_setup(header = "&L&G", header_image = list(left = logo))
-xl_sheet(sales, background = logo)
+xl_sheet(sales, background_image = logo)
 ```
 
 `embed = TRUE` puts the image *inside* a cell, the Excel 365 "place in cell"
