@@ -74,7 +74,8 @@ xl_chart_legend <- function(position = NULL, format = NULL,
 #' outline borders drawn, and no legend keys.
 #'
 #' @param show_keys Print each series' legend swatch in the table.
-#' @param horizontal,vertical,outline Which borders the grid draws.
+#' @param horizontal_border,vertical_border,outline_border Which of the grid's
+#'   borders to draw.
 #' @param format An [xl_format()] styling the table's text --- the [xl_font()]
 #'   group only.
 #' @return An `xl_chart_table` object.
@@ -83,14 +84,15 @@ xl_chart_legend <- function(position = NULL, format = NULL,
 #' @export
 #' @examples
 #' xl_chart_table()
-#' xl_chart_table(show_keys = TRUE, vertical = FALSE)
-xl_chart_table <- function(show_keys = NA, horizontal = NA, vertical = NA,
-                           outline = NA, format = NULL) {
+#' xl_chart_table(show_keys = TRUE, vertical_border = FALSE)
+xl_chart_table <- function(show_keys = NA, horizontal_border = NA,
+                           vertical_border = NA, outline_border = NA,
+                           format = NULL) {
   structure(.drop_null(list(
     show_keys = .val_flag(show_keys, "show_keys"),
-    horizontal = .val_flag(horizontal, "horizontal"),
-    vertical = .val_flag(vertical, "vertical"),
-    outline = .val_flag(outline, "outline"),
+    horizontal = .val_flag(horizontal_border, "horizontal_border"),
+    vertical = .val_flag(vertical_border, "vertical_border"),
+    outline = .val_flag(outline_border, "outline_border"),
     format = .chart_format_payload(format, "format", accept = "font",
                                    part = "a chart data table")
   )), class = "xl_chart_table")

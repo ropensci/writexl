@@ -4,7 +4,7 @@
 #
 # worksheet_merge_range() does more than record a merge: it writes the top-left
 # cell's text itself and blanks the rest of the range with the same format.  A
-# merge therefore carries its own content, which is why xl_merge() takes `text`
+# merge therefore carries its own content, which is why xl_merge() takes `value`
 # rather than reusing whatever the data frame put there.
 #
 # That also settles when merges are applied.  They run *after* the sheet's rows
@@ -24,15 +24,17 @@
 #' `xl_merge()` merges a rectangle of cells into one, as Excel's "Merge and
 #' Centre" does.  Pass one or a list of them as `xl_sheet(merge = )`.
 #'
-#' A merged range holds a single value, so `xl_merge()` carries its own `text`
+#' A merged range holds a single value, so `xl_merge()` carries its own `value`
 #' rather than taking it from the data frame.  Merging over cells the data frame
-#' filled keeps only the merged text, exactly as merging in Excel discards
+#' filled keeps only the merged value, exactly as merging in Excel discards
 #' everything but the top-left value.
 #'
 #' @param range The cells to merge: an Excel range string such as `"A1:C1"`, or
 #'   a `list(rows = , cols = )` spec.  It must cover more than one cell ---
 #'   Excel has no single-cell merge.
-#' @param text The text shown in the merged cell.  `NULL` leaves it empty.
+#' @param value The value shown in the merged cell: a string, or anything with
+#'   an [as.character()] method such as an [xl_rich_string()].  `NULL` leaves
+#'   the cell empty.
 #' @param format An optional [xl_format] applied to the whole merged range.
 #'   Merged cells usually want `xl_align(horizontal = "center")`.
 #' @return An `xl_merge` object.
@@ -47,15 +49,13 @@
 #' sheet <- xl_sheet(df, merge = xl_merge("A5:B5", "Total",
 #'                                        format = xl_font(bold = TRUE)))
 #' tmp <- write_xlsx(list(Data = sheet))
-xl_merge <- function(range, text = NULL, format = NULL) {
+xl_merge <- function(range, value = NULL, format = NULL) {
   if (missing(range) || is.null(range))
     stop("`range` must name the cells to merge", call. = FALSE)
-  if (!is.null(text) &&
-      (!is.character(text) || length(text) != 1L || is.na(text)))
-    stop("`text` must be a single non-NA string, or NULL", call. = FALSE)
+  value <- .as_display_string(value, "value")
   if (!is.null(format) && !is_xl_format(format))
     stop("`format` must be an xl_format object", call. = FALSE)
-  structure(list(range = range, text = text, format = format),
+  structure(list(range = range, value = value, format = format),
             class = "xl_merge")
 }
 
@@ -63,8 +63,8 @@ xl_merge <- function(range, text = NULL, format = NULL) {
 print.xl_merge <- function(x, ...) {
   cat(sprintf("<xl_merge: %s%s>\n",
               if (is.character(x$range)) x$range else "<spec>",
-              if (is.null(x$text)) "" else sprintf(" %s",
-                                                   encodeString(x$text, quote = '"'))))
+              if (is.null(x$value)) ""
+              else sprintf(" %s", encodeString(x$value, quote = '"'))))
   invisible(x)
 }
 
@@ -98,7 +98,7 @@ print.xl_merge <- function(x, ...) {
       stop(sprintf("`%s` covers a single cell; a merge needs more than one",
                    arg), call. = FALSE)
     list(kind = "merge", range = as.integer(q),
-         text = if (is.null(m$text)) NA_character_ else m$text,
+         value = if (is.null(m$value)) NA_character_ else m$value,
          format_id = .register_format(reg,
                                       merge_xl_format(props$default_format,
                                                       m$format)))

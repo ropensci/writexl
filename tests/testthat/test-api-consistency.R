@@ -25,10 +25,6 @@ api_arg_positions <- function() {
 # allowed to disagree about.  Naming the argument rather than exempting the
 # whole pair keeps every other argument the two share under the check.
 FALSE_FRIENDS <- list(
-  # a comment *box's* pixel width and height, against a worksheet *column's*
-  # character width and a *row's* height
-  list(c("xl_comment", "xl_col_spec"), "width"),
-  list(c("xl_comment", "xl_row_spec"), "height"),
   # `name` in xl_hyperlink() is the deprecated alias for `value`, kept last on
   # purpose; elsewhere it is a label
   list(c("xl_hyperlink", "xl_chart_series"), "name"),
@@ -85,6 +81,14 @@ test_that("`format` follows the content arguments, everywhere it appears", {
     if (is.na(p)) NA_integer_ else as.integer(p)
   }, integer(1))
   expect_equal(got, expected)
+})
+
+test_that("what a cell shows is always called `value`", {
+  # xl_comment(), xl_merge() and xl_rich_run() each called it `text` at one
+  # point, which made three functions read differently for one idea.  `value`
+  # is the word everywhere something is shown, whatever its type.
+  api <- api_arg_positions()
+  expect_equal(names(Filter(function(a) "text" %in% a, api)), character(0))
 })
 
 test_that("data comes first in the functions that take data", {

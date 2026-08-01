@@ -73,7 +73,7 @@ test_that("legend arguments are validated", {
 test_that("a data table reaches the file with its grid options", {
   expect_match(ex_xml(data_table = xl_chart_table()), "<c:dTable>",
                fixed = TRUE)
-  x <- ex_xml(data_table = xl_chart_table(show_keys = TRUE, vertical = FALSE))
+  x <- ex_xml(data_table = xl_chart_table(show_keys = TRUE, vertical_border = FALSE))
   expect_match(x, '<c:showKeys val="1"/>', fixed = TRUE)
   expect_match(x, '<c:showHorzBorder val="1"/>', fixed = TRUE)
   # a border switched off is written as an absence, not as val="0"

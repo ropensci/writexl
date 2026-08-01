@@ -33,7 +33,9 @@ is_xl_comment <- function(x) inherits(x, "xl_comment")
 #' borders, number formats, ...) is not supported by comments and triggers a
 #' warning.
 #'
-#' @param text A single string: the comment text.
+#' @param value A single string: the comment's text.  Anything with an
+#'   [as.character()] method is accepted, so a cell built for a sheet can be
+#'   reused here.
 #' @param format An optional [xl_format]; only its fill background color and
 #'   font name/size/family are used (see [xl_fill()], [xl_font()]).  Other
 #'   properties are unsupported and warned about.
@@ -43,7 +45,8 @@ is_xl_comment <- function(x) inherits(x, "xl_comment")
 #' @param visible Initial visibility: `NA` follows the sheet default (comments
 #'   are hidden unless `show_comments` is set), `TRUE` shows this comment,
 #'   `FALSE` hides it.
-#' @param width,height Comment box size in pixels (defaults 128 x 74).
+#' @param width_pixels,height_pixels Comment box size in pixels (defaults
+#'   128 x 74).
 #' @param x_scale,y_scale Box scale factors.
 #' @param start_row,start_col Zero-based anchor cell of the box (by default a
 #'   comment sits one row up and one column right of its cell).
@@ -60,12 +63,11 @@ is_xl_comment <- function(x) inherits(x, "xl_comment")
 #' xl_comment("Estimate", author = "Finance",
 #'            format = xl_font(name = "Arial", size = 10) +
 #'                     xl_fill(background = "lightyellow"))
-xl_comment <- function(text, format = NULL, author = NA, visible = NA,
-                       width = NA, height = NA, x_scale = NA, y_scale = NA,
-                       start_row = NA, start_col = NA, x_offset = NA,
-                       y_offset = NA) {
-  if (!is.character(text) || length(text) != 1L || is.na(text))
-    stop("`text` must be a single non-NA string", call. = FALSE)
+xl_comment <- function(value, format = NULL, author = NA, visible = NA,
+                       width_pixels = NA, height_pixels = NA, x_scale = NA,
+                       y_scale = NA, start_row = NA, start_col = NA,
+                       x_offset = NA, y_offset = NA) {
+  value <- .as_display_string(value, "value", null_ok = FALSE)
 
   # styling: validate now, but keep the xl_format object itself so it stays
   # easy to inspect and modify (e.g. cm$format <- cm$format + xl_font(size = 9)).
@@ -81,12 +83,12 @@ xl_comment <- function(text, format = NULL, author = NA, visible = NA,
   visible_code <- if (is.null(vis)) NULL else if (isTRUE(vis)) 2L else 1L
 
   payload <- .drop_null(list(
-    text        = text,
+    value       = value,
     format      = format,
     author      = .val_str(author, "author"),
     visible     = visible_code,
-    width       = .val_int(width, "width", min = 0),
-    height      = .val_int(height, "height", min = 0),
+    width       = .val_int(width_pixels, "width_pixels", min = 0),
+    height      = .val_int(height_pixels, "height_pixels", min = 0),
     x_scale     = .val_num(x_scale, "x_scale", min = 0),
     y_scale     = .val_num(y_scale, "y_scale", min = 0),
     start_row   = .val_int(start_row, "start_row", min = 0),
@@ -118,8 +120,8 @@ xl_comment <- function(text, format = NULL, author = NA, visible = NA,
 print.xl_comment <- function(x, ...) {
   p <- unclass(x)
   cat("<xl_comment>\n")
-  cat("  text:", p$text, "\n")
-  for (o in setdiff(names(p), c("text", "format")))
+  cat("  value:", p$value, "\n")
+  for (o in setdiff(names(p), c("value", "format")))
     cat(sprintf("  %s: %s\n", o, paste(format(p[[o]]), collapse = ",")))
   if (!is.null(p$format)) print(p$format)
   invisible(x)

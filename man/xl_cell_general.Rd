@@ -2,6 +2,7 @@
 % Please edit documentation in R/xl_cell_general.R
 \name{xl_cell_general}
 \alias{xl_cell_general}
+\alias{as.character.xl_cell_general}
 \title{General cell objects for Excel writing}
 \usage{
 xl_cell_general(
@@ -14,6 +15,8 @@ xl_cell_general(
   dynamic = FALSE,
   array_range = NULL
 )
+
+\method{as.character}{xl_cell_general}(x, ...)
 }
 \arguments{
 \item{value}{An atomic vector or a list of scalars, one per cell. Use `NA`
@@ -76,6 +79,10 @@ and value cells.}
   is the right spelling for a `SUMPRODUCT`-style aggregate. Supplying it
   forces the workbook out of the memory-efficient row-streaming mode, since
   libxlsxwriter cannot pad an array range while streaming.}
+
+\item{x}{An `xl_cell_general`.}
+
+\item{...}{Ignored.}
 }
 \value{
 An object of class `c("xl_cell_general", "xl_cell")`, which is a
@@ -94,6 +101,11 @@ result, or a URL with separate display text and tooltip).
 An `xl_cell_general` behaves like a vector: it has a `length()`, supports
 `[`, `c()`, and `rep()`, and recycles automatically when assigned to a
 data frame column of a different length (just like [xl_formula()]).
+
+`as.character()` returns what each cell displays, so a cell built for a sheet
+can be reused wherever a plain string is wanted --- [xl_merge()]'s or
+[xl_comment()]'s `value`, for instance.  A cell that carries only a formula
+shows `NA`: its displayed value comes from Excel, not from writexl.
 }
 \examples{
 # Value-only cell

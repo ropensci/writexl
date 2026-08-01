@@ -5,12 +5,12 @@
 \title{Create a cell comment}
 \usage{
 xl_comment(
-  text,
+  value,
   format = NULL,
   author = NA,
   visible = NA,
-  width = NA,
-  height = NA,
+  width_pixels = NA,
+  height_pixels = NA,
   x_scale = NA,
   y_scale = NA,
   start_row = NA,
@@ -20,7 +20,9 @@ xl_comment(
 )
 }
 \arguments{
-\item{text}{A single string: the comment text.}
+\item{value}{A single string: the comment's text.  Anything with an
+[as.character()] method is accepted, so a cell built for a sheet can be
+reused here.}
 
 \item{format}{An optional [xl_format]; only its fill background color and
 font name/size/family are used (see [xl_fill()], [xl_font()]).  Other
@@ -34,7 +36,8 @@ sheet/workbook `comment_author` when unset (see [xl_sheet()],
 are hidden unless `show_comments` is set), `TRUE` shows this comment,
 `FALSE` hides it.}
 
-\item{width, height}{Comment box size in pixels (defaults 128 x 74).}
+\item{width_pixels, height_pixels}{Comment box size in pixels (defaults
+128 x 74).}
 
 \item{x_scale, y_scale}{Box scale factors.}
 

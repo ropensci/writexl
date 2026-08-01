@@ -206,7 +206,7 @@ xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
 #' @param chart One [xl_chart()], or a list of them, placed on the sheet and
 #'   anchored to a cell.  A chart's series may plot data from any sheet in the
 #'   workbook, not only this one.
-#' @param background An image tiled behind the sheet's cells, in any shape
+#' @param background_image An image tiled behind the sheet's cells, in any shape
 #'   [xl_image()] accepts.  It is a screen backdrop only --- Excel never prints
 #'   it.
 #' @param ignore_errors A named list turning off the green error triangle Excel
@@ -236,7 +236,7 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
                      page = NULL, view = NULL, merge = NULL,
                      validation = NULL, conditional = NULL,
                      filter = NULL, outline = NULL, ignore_errors = NULL,
-                     table = NULL, image = NULL, background = NULL,
+                     table = NULL, image = NULL, background_image = NULL,
                      chart = NULL) {
   if (!is.data.frame(data))
     stop("`data` must be a data frame", call. = FALSE)
@@ -274,7 +274,7 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
       ignore_errors  = ignore_errors,
       table          = table,
       image          = image,
-      background     = background,
+      background_image = background_image,
       chart          = chart
     ),
     class = "xl_sheet"

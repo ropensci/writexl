@@ -15,12 +15,12 @@ vml_xml <- function(x) {
 # --- the xl_comment object ---------------------------------------------------
 
 test_that("xl_comment builds a payload from text and options", {
-  cm <- xl_comment("hello", author = "QA", width = 200, height = 90,
+  cm <- xl_comment("hello", author = "QA", width_pixels = 200, height_pixels = 90,
                    x_scale = 1.5, y_scale = 2, start_row = 3, start_col = 4,
                    x_offset = 5, y_offset = 6)
   p <- unclass(cm)
   expect_true(is_xl_comment(cm))
-  expect_equal(p$text, "hello")
+  expect_equal(p$value, "hello")
   expect_equal(p$author, "QA")
   expect_equal(p$width, 200L)
   expect_equal(p$height, 90L)
@@ -43,7 +43,7 @@ test_that("xl_comment validates its inputs", {
   expect_error(xl_comment(NA), "single non-NA string")
   expect_error(xl_comment(1), "single non-NA string")
   expect_error(xl_comment("x", format = "nope"), "must be an xl_format")
-  expect_error(xl_comment("x", width = -1), "between 0")
+  expect_error(xl_comment("x", width_pixels = -1), "between 0")
   expect_error(xl_comment("x", visible = "yes"), "logical")
 })
 
@@ -71,7 +71,7 @@ test_that(".comment_c_payload flattens the format to the supported C fields", {
                             xl_fill(background = "lightyellow"))
   p <- .comment_c_payload(unclass(cm))
   expect_null(p$format)                     # replaced by flat fields
-  expect_equal(p$text, "note")
+  expect_equal(p$value, "note")
   expect_equal(p$color, xl_color("lightyellow"))
   expect_equal(p$font_name, "Arial")
   expect_equal(p$font_size, 10)
@@ -106,8 +106,8 @@ test_that("supported-only format does not warn", {
 })
 
 test_that(".comment_payload normalizes strings, xl_comment, and NA", {
-  expect_equal(.comment_payload("hi")$text, "hi")
-  expect_equal(.comment_payload(xl_comment("hey"))$text, "hey")
+  expect_equal(.comment_payload("hi")$value, "hi")
+  expect_equal(.comment_payload(xl_comment("hey"))$value, "hey")
   expect_null(.comment_payload(NA))
   expect_null(.comment_payload(NA_character_))
   expect_null(.comment_payload(NULL))
@@ -137,7 +137,7 @@ test_that("a single xl_comment recycles to every cell", {
 test_that("comment styling reaches comments1.xml and the VML", {
   df <- data.frame(x = 1L)
   df$x <- xl_cell_general(value = 1,
-    comment = xl_comment("styled", author = "Rev", visible = TRUE, width = 200,
+    comment = xl_comment("styled", author = "Rev", visible = TRUE, width_pixels = 200,
                          format = xl_font(name = "Arial", size = 12) +
                                   xl_fill(background = "red")))
   cm <- comments_xml(df)
@@ -214,4 +214,13 @@ test_that("comments work on a sheet with no comment defaults set", {
 test_that("show_comments is validated", {
   expect_error(xl_sheet(data.frame(a = 1), show_comments = "x"), "TRUE or FALSE")
   expect_error(xl_sheet(data.frame(a = 1), show_comments = NA), "TRUE or FALSE")
+})
+
+test_that("a comment takes its value from anything that can render itself", {
+  expect_equal(unclass(xl_comment(xl_cell_general(value = "note")))$value,
+               "note")
+  expect_equal(unclass(xl_comment(factor("note")))$value, "note")
+  # Excel comment boxes draw one font, so a rich string cannot be one
+  expect_error(xl_comment(xl_rich_string("a", "b")), "cannot be a rich string")
+  expect_error(xl_comment(NULL), "single non-NA string")
 })

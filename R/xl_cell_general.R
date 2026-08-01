@@ -266,6 +266,24 @@ xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
   structure(cells, class = c("xl_cell_general", "xl_cell"))
 }
 
+#' @description
+#' `as.character()` returns what each cell displays, so a cell built for a sheet
+#' can be reused wherever a plain string is wanted --- [xl_merge()]'s or
+#' [xl_comment()]'s `value`, for instance.  A cell that carries only a formula
+#' shows `NA`: its displayed value comes from Excel, not from writexl.
+#' @param x An `xl_cell_general`.
+#' @param ... Ignored.
+#' @rdname xl_cell_general
+#' @export
+as.character.xl_cell_general <- function(x, ...) {
+  vapply(x, function(el) {
+    v <- el[["value"]]
+    if (is_xl_rich_string(v)) as.character(v)
+    else if (is.null(v) || length(v) != 1L) NA_character_
+    else as.character(v)
+  }, character(1))
+}
+
 # A rich string is the cell's text, so it cannot share the cell with a formula
 # (whose result Excel supplies) or a hyperlink (whose display text is a plain
 # string).  Both would silently discard the runs, so refuse the combination.
