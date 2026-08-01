@@ -42,6 +42,10 @@
 #'   as 100 pixels is 13.57 character units.
 #' @param hidden Logical; hide the column/row.
 #' @param level Integer outline (grouping) level, 0--7.
+#' @param collapsed Logical; draw this column/row as the collapsed summary of
+#'   the group beside it.  Excel does not derive this --- the rows or columns
+#'   of the group itself need `hidden = TRUE` as well, exactly as clicking the
+#'   grouping symbol would leave them.
 #' @param format An optional [xl_format] applied to the column/row as its
 #'   default cell format.  Combine groups with `+` (e.g.
 #'   `xl_font(bold = TRUE) + xl_fill(background = "yellow")`).
@@ -83,7 +87,7 @@ NULL
 #' @rdname xl_colrow_spec
 #' @export
 xl_col_spec <- function(cols, width = NA, hidden = NA, level = NA,
-                        format = NULL, width_pixels = NA) {
+                        format = NULL, width_pixels = NA, collapsed = NA) {
   if (missing(cols) || length(cols) < 1L)
     stop("`cols` must name or index at least one column", call. = FALSE)
   if (!is.character(cols) && !is.numeric(cols))
@@ -93,7 +97,8 @@ xl_col_spec <- function(cols, width = NA, hidden = NA, level = NA,
     width  = .one_of_units(width, width_pixels, "width", "width_pixels",
                            .pixels_to_width),
     hidden = .val_flag(hidden, "hidden"),
-    level  = .val_int(level, "level", min = 0, max = 7)
+    level  = .val_int(level, "level", min = 0, max = 7),
+    collapsed = .val_flag(collapsed, "collapsed")
   ))
   .new_colrow_spec("col", list(kind = "col", index = cols), geometry, format)
 }
@@ -101,7 +106,7 @@ xl_col_spec <- function(cols, width = NA, hidden = NA, level = NA,
 #' @rdname xl_colrow_spec
 #' @export
 xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
-                        format = NULL, height_pixels = NA) {
+                        format = NULL, height_pixels = NA, collapsed = NA) {
   if (missing(rows) || length(rows) < 1L)
     stop("`rows` must index at least one row", call. = FALSE)
   if (!is.numeric(rows))
@@ -113,7 +118,8 @@ xl_row_spec <- function(rows, height = NA, hidden = NA, level = NA,
     height = .one_of_units(height, height_pixels, "height", "height_pixels",
                            .pixels_to_height),
     hidden = .val_flag(hidden, "hidden"),
-    level  = .val_int(level, "level", min = 0, max = 7)
+    level  = .val_int(level, "level", min = 0, max = 7),
+    collapsed = .val_flag(collapsed, "collapsed")
   ))
   .new_colrow_spec("row", list(kind = "row", index = rows), geometry, format)
 }
@@ -281,15 +287,22 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
   )
 }
 
-# The subset of lxw_protection options exposed (chartsheet-only fields omitted).
+# lxw_protection, split by the sheet kind each field applies to.  The last two
+# are what Excel offers on a chartsheet, where there are no cells to lock.
 .LXW_PROTECT_OPTS <- c(
   "no_select_locked_cells", "no_select_unlocked_cells", "format_cells",
   "format_columns", "format_rows", "insert_columns", "insert_rows",
   "insert_hyperlinks", "delete_columns", "delete_rows", "sort", "autofilter",
   "pivot_tables", "scenarios", "objects"
 )
+.LXW_CHARTSHEET_PROTECT_OPTS <- c("no_content", "no_objects")
 
-.validate_protect <- function(protect) {
+.protect_opts <- function(kind) {
+  if (identical(kind, "chartsheet")) .LXW_CHARTSHEET_PROTECT_OPTS
+  else .LXW_PROTECT_OPTS
+}
+
+.validate_protect <- function(protect, kind = "sheet") {
   if (is.null(protect)) return(invisible())
   if (is.logical(protect) && length(protect) == 1L) return(invisible())
   if (is.character(protect) && length(protect) == 1L) return(invisible())
@@ -297,10 +310,21 @@ xl_sheet <- function(data, cols = NULL, rows = NULL, freeze = NULL,
     nms <- names(protect)
     if (is.null(nms) || any(nms == ""))
       stop("`protect` list must be fully named", call. = FALSE)
-    bad <- setdiff(nms, c("password", .LXW_PROTECT_OPTS))
-    if (length(bad))
-      stop("unknown `protect` option(s): ", paste(bad, collapse = ", "),
-           call. = FALSE)
+    ok <- .protect_opts(kind)
+    bad <- setdiff(nms, c("password", ok))
+    if (length(bad)) {
+      other <- setdiff(c(.LXW_PROTECT_OPTS, .LXW_CHARTSHEET_PROTECT_OPTS), ok)
+      why <- if (all(bad %in% other))
+        sprintf(" -- %s, so %s.", paste(sprintf("`%s`", bad), collapse = ", "),
+                if (identical(kind, "chartsheet"))
+                  "belong to a worksheet, and a chartsheet has no cells"
+                else "belong to a chartsheet")
+      else "."
+      stop("unknown `protect` option(s) for a ", kind, ": ",
+           paste(bad, collapse = ", "), why, "
+  It accepts: ",
+           paste(ok, collapse = ", "), call. = FALSE)
+    }
     return(invisible())
   }
   stop("`protect` must be TRUE/FALSE, a password string, or a named list",
@@ -319,7 +343,7 @@ print.xl_sheet <- function(x, ...) {
 # --- resolution: turn a sheet into the plan C consumes --------------------
 
 # Build the (flag, password, options) triple C uses for worksheet protection.
-.resolve_protect <- function(protect) {
+.resolve_protect <- function(protect, kind = "sheet") {
   out <- list(flag = 0L, password = NA_character_, options = NULL)
   if (isTRUE(protect)) {
     out$flag <- 1L
@@ -331,9 +355,9 @@ print.xl_sheet <- function(x, ...) {
     optnames <- setdiff(names(protect), "password")
     if (length(optnames)) {
       # a named list (not a bare vector) so the C side can look up by name
+      ok <- .protect_opts(kind)
       out$options <- stats::setNames(
-        lapply(.LXW_PROTECT_OPTS, function(nm) as.integer(isTRUE(protect[[nm]]))),
-        .LXW_PROTECT_OPTS)
+        lapply(ok, function(nm) as.integer(isTRUE(protect[[nm]]))), ok)
     }
   }
   out
@@ -440,6 +464,7 @@ print.xl_sheet <- function(x, ...) {
   col_width  <- rep(NA_real_, ncols)
   col_hidden <- rep(NA_integer_, ncols)
   col_level  <- rep(NA_integer_, ncols)
+  col_collapsed <- rep(NA_integer_, ncols)
   explicit_width <- rep(FALSE, ncols)   # columns whose width the user set
   for (i in seq_len(ncols)) {
     base <- props$default_format
@@ -455,6 +480,7 @@ print.xl_sheet <- function(x, ...) {
 
   row_row <- integer(0); row_height <- numeric(0)
   row_fmt_id <- integer(0); row_hidden <- integer(0); row_level <- integer(0)
+  row_collapsed <- integer(0)
   freeze <- c(-1L, -1L)
   gridlines <- -1L; tab_color <- -1L; zoom <- 0L; default_row_height <- NA_real_
   overlay <- list()
@@ -476,6 +502,8 @@ print.xl_sheet <- function(x, ...) {
         if (!is.null(geo$width)) { col_width[i] <- geo$width; explicit_width[i] <- TRUE }
         if (!is.null(geo$hidden)) col_hidden[i] <- as.integer(isTRUE(geo$hidden))
         if (!is.null(geo$level))  col_level[i]  <- as.integer(geo$level)
+        if (!is.null(geo$collapsed))
+          col_collapsed[i] <- as.integer(isTRUE(geo$collapsed))
       }
     }
     # row specs
@@ -488,6 +516,8 @@ print.xl_sheet <- function(x, ...) {
         row_fmt_id <- c(row_fmt_id, fid)
         row_hidden <- c(row_hidden, if (!is.null(geo$hidden)) as.integer(isTRUE(geo$hidden)) else NA_integer_)
         row_level  <- c(row_level, if (!is.null(geo$level)) as.integer(geo$level) else NA_integer_)
+        row_collapsed <- c(row_collapsed,
+          if (!is.null(geo$collapsed)) as.integer(isTRUE(geo$collapsed)) else NA_integer_)
       }
     }
     # A table column's format reaches the data cells only through the column
@@ -572,6 +602,7 @@ print.xl_sheet <- function(x, ...) {
         row_fmt_id <- c(row_fmt_id, 0L)
         row_hidden <- c(row_hidden, 1L)
         row_level  <- c(row_level, NA_integer_)
+        row_collapsed <- c(row_collapsed, NA_integer_)
       }
     }
   }
@@ -589,8 +620,10 @@ print.xl_sheet <- function(x, ...) {
   list(
     col_width = col_width, col_format_id = col_format_id,
     col_hidden = col_hidden, col_level = col_level,
+    col_collapsed = col_collapsed,
     row_row = row_row, row_height = row_height, row_format_id = row_fmt_id,
     row_hidden = row_hidden, row_level = row_level,
+    row_collapsed = row_collapsed,
     freeze_row = freeze[1L], freeze_col = freeze[2L],
     gridlines = gridlines, tab_color = tab_color, zoom = zoom,
     default_row_height = default_row_height,

@@ -15,6 +15,7 @@ xl_properties(
   comments = NA,
   status = NA,
   hyperlink_base = NA,
+  created = NA,
   custom = NULL,
   read_only = FALSE,
   window_size = NULL,
@@ -31,6 +32,11 @@ xl_properties(
 }
 \arguments{
 \item{title, subject, author, manager, company, category, keywords, comments, status, hyperlink_base}{Document metadata strings (Excel's "Properties" dialog).}
+
+\item{created}{The workbook's creation timestamp, a `Date` or `POSIXct`.
+Left `NA` libxlsxwriter stamps the moment the file is written, which is
+what makes two runs over the same data differ; pinning it makes them
+byte-identical.}
 
 \item{custom}{A named list of custom document properties.  Values may be
 character, integer, numeric, logical, `Date` or `POSIXct`.  A `Date` or

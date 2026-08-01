@@ -72,11 +72,45 @@
        call. = FALSE)
 }
 
-# The groups a chart shape cannot express at all.
+# Cell fill pattern -> chart pattern.  A cell's patterns are ECMA-376's
+# ST_PatternValue and a chart's are ST_PresetPatternVal: two vocabularies, so
+# only the names that mean the same thing in both are listed, and
+# .chart_pattern() refuses the rest rather than approximating them.  The grey
+# screens map by the percentage their names state; 12.5% and 6.25% have no
+# chart member, and the chart's grid and trellis sets have no dark/light pair.
+.CHART_PATTERN <- c(
+  "light-gray"       = 4L,   # LXW_CHART_PATTERN_PERCENT_25
+  "medium-gray"      = 7L,   # PERCENT_50
+  "dark-gray"        = 10L,  # PERCENT_75
+  "light-down"       = 13L,  # LIGHT_DOWNWARD_DIAGONAL
+  "light-up"         = 14L,  # LIGHT_UPWARD_DIAGONAL
+  "dark-down"        = 15L,  # DARK_DOWNWARD_DIAGONAL
+  "dark-up"          = 16L,  # DARK_UPWARD_DIAGONAL
+  "light-vertical"   = 19L,  # LIGHT_VERTICAL
+  "light-horizontal" = 20L,  # LIGHT_HORIZONTAL
+  "dark-vertical"    = 23L,  # DARK_VERTICAL
+  "dark-horizontal"  = 24L   # DARK_HORIZONTAL
+)
+
+.chart_pattern <- function(pattern, arg) {
+  if (pattern %in% names(.CHART_PATTERN))
+    return(unname(.CHART_PATTERN[[pattern]]))
+  stop(sprintf(paste0("`%s`: fill pattern \"%s\" cannot be drawn on a chart -- ",
+                      "Excel's chart patterns are a different set from its ",
+                      "cell patterns, and none of them means the same thing.",
+                      "\n  Chart patterns accept: %s."),
+               arg, pattern,
+               paste(sprintf("\"%s\"", names(.CHART_PATTERN)), collapse = ", ")),
+       call. = FALSE)
+}
+
+# The groups a chart shape cannot express at all.  Alignment is the partial
+# case: a chart shape has no horizontal or vertical placement for its text, but
+# lxw_chart_font does carry a rotation, so xl_align(rotation =) turns a header
+# cell and an axis label by the same angle.
 .CHART_FORMAT_REFUSED <- c(
   num_format = paste0("a chart shape has no number format; set it on the axis ",
                       "or the data labels instead"),
-  align      = "a chart shape has no text alignment",
   protection = "a chart shape cannot be locked or hidden"
 )
 
@@ -111,14 +145,30 @@
     if (!is.null(f[[g]]))
       stop(sprintf("`%s` sets %s, which a chart cannot use: %s.", arg,
                    switch(g, num_format = "a number format",
-                          align = "alignment", protection = "protection"),
+                          protection = "protection"),
                    .CHART_FORMAT_REFUSED[[g]]), call. = FALSE)
+
+  rotation <- NULL
+  if (!is.null(f$align)) {
+    placement <- setdiff(names(f$align), "rotation")
+    if (length(placement))
+      stop(sprintf(paste0("`%s` sets %s, which a chart cannot use: a chart ",
+                          "shape places its own text. Of the alignment group ",
+                          "it takes only `rotation`."),
+                   arg, paste(sprintf("`%s`", placement), collapse = ", ")),
+           call. = FALSE)
+    # 0 has to travel as 360: lxw_chart_font treats a rotation of 0 as unset,
+    # which is why libxlsxwriter spells "explicitly upright" 360
+    rotation <- if (identical(as.integer(f$align$rotation), 0L)) 360L
+                else as.integer(f$align$rotation)
+  }
 
   out <- list()
 
-  if (!is.null(f$font)) {
+  if (!is.null(f$font) || !is.null(rotation)) {
     fo <- f$font
     ent <- list()
+    if (!is.null(fo$name))  ent$name <- fo$name
     if (!is.null(fo$size))  ent$size <- as.numeric(fo$size)
     if (!is.null(fo$color)) ent$color <- .chart_color(fo$color)
     if (isTRUE(fo$bold))    ent$bold <- 1L
@@ -127,10 +177,7 @@
     # underline at all becomes underlined; "none" means not underlined
     if (!is.null(fo$underline) && !identical(fo$underline, "none"))
       ent$underline <- 1L
-    if (!is.null(fo$name))
-      stop(sprintf(paste0("`%s` sets a font name; libxlsxwriter's chart font ",
-                          "carries no typeface, only size, weight, style, ",
-                          "underline and colour."), arg), call. = FALSE)
+    if (!is.null(rotation)) ent$rotation <- rotation
     if (length(ent)) out$font <- ent
   }
 
@@ -146,7 +193,7 @@
                      arg), call. = FALSE)
       out$pattern <- list(fg_color = .chart_color(fi$foreground),
                           bg_color = .chart_color(fi$background),
-                          type = unname(.LXW$pattern[[fi$pattern]]))
+                          type = .chart_pattern(fi$pattern, arg))
     } else {
       ent <- list()
       if (!is.null(fi$background)) ent$color <- .chart_color(fi$background)

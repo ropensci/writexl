@@ -86,6 +86,10 @@
 #'   `"std_dev"` or `"var"`.  Needs `total_row = TRUE` on the table.
 #' @param total_label A string for the total-row cell instead of a function ---
 #'   typically `"Total"` under the first column.
+#' @param total_value The number the total-row cell already holds. Excel
+#'   recalculates `total` on open and ignores this, but a reader that does not
+#'   evaluate formulas --- [readxl::read_xlsx()] among them --- shows what is
+#'   cached, which without this is nothing.
 #' @param format An [xl_format] applied to the column's data cells.
 #' @param header_format An [xl_format] applied to the column's header cell.
 #' @return An `xl_table_column` object.
@@ -97,8 +101,8 @@
 #' xl_table_column("fruit", total_label = "Total")
 #' xl_table_column("margin", formula = "=Sales[@revenue] * 0.3")
 xl_table_column <- function(col, header = NULL, formula = NULL, total = NULL,
-                            total_label = NULL, format = NULL,
-                            header_format = NULL) {
+                            total_label = NULL, total_value = NULL,
+                            format = NULL, header_format = NULL) {
   if (missing(col) || is.null(col))
     stop("`col` must name or index the table column", call. = FALSE)
   str1 <- function(x, arg) {
@@ -119,9 +123,19 @@ xl_table_column <- function(col, header = NULL, formula = NULL, total = NULL,
   tot <- .val_enum(total, names(.LXW_TABLE_FUNCTION), "total")
   if (!is.null(tot) && !is.null(total_label))
     stop("give either `total` or `total_label`, not both", call. = FALSE)
+  if (!is.null(total_value)) {
+    if (!is.numeric(total_value) || length(total_value) != 1L ||
+        is.na(total_value))
+      stop("`total_value` must be a single non-NA number", call. = FALSE)
+    if (is.null(tot))
+      stop("`total_value` caches the result of `total`, so give `total` too",
+           call. = FALSE)
+    total_value <- as.numeric(total_value)
+  }
   structure(.drop_null(list(
     col = col, header = str1(header, "header"), formula = formula,
     total = tot, total_label = str1(total_label, "total_label"),
+    total_value = total_value,
     format = fmt(format, "format"),
     header_format = fmt(header_format, "header_format")
   )), class = "xl_table_column")
@@ -561,6 +575,7 @@ print.xl_table <- function(x, ...) {
     if (!is.null(q[["total"]]))
       ent$total_function <- unname(.LXW_TABLE_FUNCTION[[q[["total"]]]])
     if (!is.null(q[["total_label"]])) ent$total_string <- q[["total_label"]]
+    if (!is.null(q[["total_value"]])) ent$total_value <- q[["total_value"]]
     if (!is.null(q[["format"]]))
       ent$format_id <- .register_format(reg,
         merge_xl_format(props$default_format, q[["format"]]))

@@ -437,3 +437,22 @@ test_that("print area and breaks together leave the cells alone", {
     print_area = "A1:A11", repeat_rows = 1, h_breaks = 6))))
   expect_equal(as.data.frame(readxl::read_xlsx(p)), df)
 })
+
+test_that("a header or footer image position may be given only once", {
+  logo <- png_file()
+  expect_error(xl_page_setup(header = "&L&G",
+                             header_image = list(left = logo, left = logo)),
+               "each position may be given only once")
+  expect_error(xl_page_setup(header = "&L&G",
+                             header_image = list(middle = logo)),
+               "unknown position")
+})
+
+test_that("a header image may be an in-memory picture", {
+  skip_if_not(isTRUE(capabilities("png")))
+  p <- write_tmp(list(D = xl_sheet(data.frame(a = 1:3), page = xl_page_setup(
+    header = "&L&G",
+    header_image = list(left = as.raster(matrix("red", 2, 2)))))))
+  d <- tempfile(); dir.create(d); utils::unzip(p, exdir = d)
+  expect_true(any(grepl("^xl/media/", list.files(d, recursive = TRUE))))
+})

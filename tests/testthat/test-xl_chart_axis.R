@@ -289,3 +289,21 @@ test_that("the display-units caption is on unless it is turned off", {
   expect_match(off, '<c:builtInUnit val="thousands"/>', fixed = TRUE)
   expect_false(grepl("<c:dispUnitsLbl>", off, fixed = TRUE))
 })
+
+test_that("only the options in the kind table are checked against the axis", {
+  # .check_axis() intersects with .AXIS_OPTION_KIND before checking, so an
+  # option outside the table -- `title`, `visible`, the gridlines -- reaches
+  # every axis of every chart type untouched
+  untyped <- setdiff(names(formals(xl_chart_axis)), names(.AXIS_OPTION_KIND))
+  expect_true(length(untyped) > 0L)
+  for (ty in c("column", "scatter", "line"))
+    expect_s3_class(xl_chart(ty, xl_chart_series(values = "A1:A5",
+                                                 categories = "B1:B5"),
+                             x_axis = xl_chart_axis(title = "t",
+                                                    visible = FALSE),
+                             y_axis = xl_chart_axis(title = "t",
+                                                    visible = FALSE)),
+                    "xl_chart")
+  # and every option that IS in the table belongs to exactly one kind
+  expect_true(all(.AXIS_OPTION_KIND %in% c("category", "value")))
+})

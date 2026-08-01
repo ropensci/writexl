@@ -63,9 +63,10 @@
   else if (identical(which, "x")) "category" else "value"
 }
 
+# `opt` is one of .AXIS_OPTION_KIND's names: .check_axis() intersects with them
+# before calling, and a character vector's [[ ]] errors on anything else.
 .check_axis_option <- function(opt, type, which) {
   kind <- .AXIS_OPTION_KIND[[opt]]
-  if (is.null(kind) || is.na(kind)) return(invisible(NULL))
   have <- .axis_kind(type, which)
   if (identical(kind, have)) return(invisible(NULL))
   other <- if (identical(which, "x")) "y_axis" else "x_axis"

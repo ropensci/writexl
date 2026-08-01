@@ -34,12 +34,34 @@ test_that("a plain fill maps to the chart fill, with transparency", {
 })
 
 test_that("a real pattern maps to the chart pattern, not the fill", {
-  p <- cf(xl_fill(pattern = "gray-125", foreground = "red",
+  p <- cf(xl_fill(pattern = "dark-horizontal", foreground = "red",
                   background = "white"))
   expect_null(p$fill)
   expect_equal(p$pattern$fg_color, xl_color("red"))
   expect_equal(p$pattern$bg_color, xl_color("white"))
-  expect_true(is.numeric(p$pattern$type))
+  # the number is LXW_CHART_PATTERN_DARK_HORIZONTAL, not the cell enum's
+  # LXW_PATTERN_DARK_HORIZONTAL -- two different vocabularies at the same names
+  expect_equal(p$pattern$type, 24L)
+  expect_false(identical(p$pattern$type, unname(.LXW$pattern[["dark-horizontal"]])))
+})
+
+test_that("every chart pattern name maps to its own place in the chart enum", {
+  # the cell and chart pattern enums overlap only in these names, and a
+  # wrong index here draws a silently different pattern
+  expect_equal(vapply(names(.CHART_PATTERN), function(nm)
+    cf(xl_fill(pattern = nm, foreground = "red", background = "white"))$pattern$type,
+    integer(1), USE.NAMES = FALSE), unname(.CHART_PATTERN))
+  expect_false(any(duplicated(.CHART_PATTERN)))
+})
+
+test_that("a cell pattern with no chart counterpart is refused, not guessed", {
+  for (nm in setdiff(names(.LXW$pattern), c(names(.CHART_PATTERN), "none", "solid")))
+    expect_error(cf(xl_fill(pattern = nm, foreground = "red",
+                            background = "white")),
+                 "cannot be drawn on a chart")
+  expect_error(cf(xl_fill(pattern = "gray-125", foreground = "red",
+                          background = "white")),
+               "Chart patterns accept")
 })
 
 test_that("a border maps to the chart line, with transparency", {
@@ -89,10 +111,22 @@ test_that("every border style a chart cannot draw is refused, with a reason", {
 
 test_that("the format groups a chart shape has no concept of are refused", {
   expect_error(cf(xl_num_format("0.0")), "set it on the axis or the data labels")
-  expect_error(cf(xl_align(horizontal = "center")), "no text alignment")
+  expect_error(cf(xl_align(horizontal = "center")),
+               "a chart shape places its own text")
+  expect_error(cf(xl_align(vertical = "top", rotation = 45)),
+               "takes only `rotation`", fixed = TRUE)
   expect_error(cf(xl_protection(locked = FALSE)), "cannot be locked or hidden")
-  # a typeface: lxw_chart_font has no font name field at all
-  expect_error(cf(xl_font(name = "Arial")), "carries no typeface")
+})
+
+test_that("a font name and a rotation reach the chart font", {
+  expect_equal(cf(xl_font(name = "Arial"))$font$name, "Arial")
+  expect_equal(cf(xl_align(rotation = -45))$font$rotation, -45L)
+  expect_equal(cf(xl_align(rotation = 270))$font$rotation, 270L)
+  # lxw_chart_font reads a rotation of 0 as unset, so an explicit upright
+  # travels as libxlsxwriter's 360
+  expect_equal(cf(xl_align(rotation = 0))$font$rotation, 360L)
+  # and a rotation alone is a font, even with no xl_font() beside it
+  expect_equal(names(cf(xl_align(rotation = 30))), "font")
 })
 
 test_that("a chart has one line, so differing sides are refused", {
@@ -171,7 +205,7 @@ test_that("a title takes only a font, and says so for each other group", {
   expect_equal(ttl(xl_font(size = 14))$font$size, 14)
   expect_error(ttl(xl_border(all = "thin")), "takes no line")
   expect_error(ttl(xl_fill(background = "red")), "takes no fill")
-  expect_error(ttl(xl_fill(pattern = "gray-125", foreground = "red",
+  expect_error(ttl(xl_fill(pattern = "dark-up", foreground = "red",
                            background = "white")), "takes no fill")
   expect_error(ttl(xl_border(all = "thin")), "Use xl_font()", fixed = TRUE)
 })
@@ -196,7 +230,7 @@ test_that("black reaches a chart, rather than reading as no colour at all", {
     expect_true(any(vapply(cf(f), function(e) identical(e$color, 0x1000000L),
                            logical(1))))
   # a pattern's two colours go the same way
-  p <- cf(xl_fill(pattern = "gray-125", foreground = "black",
+  p <- cf(xl_fill(pattern = "dark-up", foreground = "black",
                   background = "white"))$pattern
   expect_equal(p$fg_color, 0x1000000L)
 })
@@ -213,4 +247,32 @@ test_that("a black chart line is written as a black line", {
              collapse = "")
   plot_area <- substr(x, regexpr("<c:plotArea>", x), regexpr("</c:plotArea>", x))
   expect_match(plot_area, '<a:srgbClr val="000000"/>', fixed = TRUE)
+})
+
+test_that("the pattern and font that reach the chart XML are the ones asked for", {
+  # the payload tests above check the number; this checks the number means what
+  # it should once libxlsxwriter has written it
+  chart_xml <- function(fmt, ...) {
+    df <- data.frame(a = c("x", "y"), b = c(1, 2), stringsAsFactors = FALSE)
+    t <- tempfile(fileext = ".xlsx")
+    write_xlsx(list(Data = xl_sheet(df, chart = xl_chart("column",
+      xl_chart_series(values = list(cols = "b"), format = fmt), ...))), t)
+    xlsx_part(t, "xl/charts/chart1.xml", raw = TRUE)
+  }
+  x <- chart_xml(xl_fill(pattern = "dark-horizontal", foreground = "red",
+                         background = "white"))
+  expect_match(x, '<a:pattFill prst="dkHorz">', fixed = TRUE)
+  expect_false(grepl('prst="pct30"', x, fixed = TRUE))
+
+  x <- chart_xml(NULL, title = "Revenue",
+                 title_format = xl_font(name = "Courier New", size = 14) +
+                                xl_align(rotation = -45))
+  expect_match(x, 'typeface="Courier New"', fixed = TRUE)
+  # 60,000ths of a degree, as _chart_convert_font_args() converts it
+  expect_match(x, 'rot="-2700000"', fixed = TRUE)
+})
+
+test_that("an absent or explicitly absent border is no chart dash", {
+  expect_null(.chart_dash(NULL, "format"))
+  expect_null(.chart_dash("none", "format"))
 })

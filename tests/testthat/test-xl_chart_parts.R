@@ -329,3 +329,17 @@ test_that("every chart_series_*() function libxlsxwriter offers is called", {
   for (f in fns)
     expect_true(grepl(paste0(f, "("), called, fixed = TRUE), info = f)
 })
+
+test_that("the part constructors name what was wrong", {
+  expect_error(xl_chart_labels(custom = "not a label"),
+               "must be a list of xl_chart_label")
+  expect_error(xl_chart_trendline(type = NA), "must name the fit")
+  expect_error(xl_chart_error_bars(type = NA, value = 1),
+               "must say how the bars are sized")
+  expect_error(.points_payload("not a format", "points"),
+               "must be a list of xl_format objects")
+  # an empty list of points is nothing to apply, not an error
+  expect_null(.points_payload(list(), "points"))
+  # a single format is taken as one point's worth
+  expect_length(.points_payload(xl_fill(background = "red"), "points"), 1L)
+})

@@ -108,8 +108,7 @@
 # untouched; the length and the image placeholders are our business.
 .check_header_footer <- function(x, arg) {
   if (.is_unset(x)) return(NULL)
-  s <- .val_str(x, arg)
-  if (is.null(s)) return(NULL)
+  s <- .val_str(x, arg)   # non-NULL: .is_unset() covered the NULL case above
   # libxlsxwriter measures this in UTF-8 characters, as nchar(type = "chars")
   # does, and errors above the limit
   if (nchar(s, type = "chars") > .HEADER_FOOTER_MAX)

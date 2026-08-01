@@ -141,11 +141,12 @@ test_that("the page options a chartsheet has no setter for are refused", {
 test_that("the view options a chartsheet has no setter for are refused", {
   ch <- xl_chart("column", cs_series())
   for (opt in list(list(hide_zero = TRUE), list(right_to_left = TRUE),
-                   list(selection = "A1"), list(top_left = "A1")))
+                   list(selection = "A1"), list(top_left = "A1"),
+                   list(selected = TRUE)))
     expect_error(xl_chartsheet(ch, view = do.call(xl_sheet_view, opt)),
                  "which a chartsheet has no setter for", label = names(opt))
-  for (opt in list(list(active = TRUE), list(selected = TRUE),
-                   list(visible = FALSE), list(first_tab = TRUE)))
+  for (opt in list(list(active = TRUE), list(visible = FALSE),
+                   list(first_tab = TRUE)))
     expect_true(inherits(xl_chartsheet(ch, view = do.call(xl_sheet_view, opt)),
                          "xl_chartsheet"), info = names(opt))
 })
@@ -159,6 +160,41 @@ test_that("chartsheet arguments are validated", {
   expect_error(xl_chartsheet(ch, zoom = 5), "must be between 10 and 400")
   expect_error(xl_chartsheet(ch, tab_color = "not a colour"), "tab_color")
   expect_error(xl_chartsheet(ch, protect = list(nope = TRUE)), "protect")
+})
+
+test_that("a chartsheet takes the two protection options it has, not a sheet's", {
+  # the attribute asserts protection, so asking for no_* drops it: Excel
+  # writes content="1" for a protected chart and nothing for an editable one
+  plain <- cs_parts(xl_chart("column", cs_series()), protect = TRUE)
+  expect_match(plain$sheet, 'content="1"', fixed = TRUE)
+  expect_match(plain$sheet, 'objects="1"', fixed = TRUE)
+
+  r <- cs_parts(xl_chart("column", cs_series()),
+                protect = list(password = "s", no_content = TRUE,
+                               no_objects = TRUE))
+  expect_match(r$sheet, "sheetProtection", fixed = TRUE)
+  expect_false(grepl('content="1"', r$sheet, fixed = TRUE))
+  expect_false(grepl('objects="1"', r$sheet, fixed = TRUE))
+
+  # one at a time, so neither flag is standing in for the other
+  only_obj <- cs_parts(xl_chart("column", cs_series()),
+                       protect = list(no_objects = TRUE))
+  expect_match(only_obj$sheet, 'content="1"', fixed = TRUE)
+  expect_false(grepl('objects="1"', only_obj$sheet, fixed = TRUE))
+  only_con <- cs_parts(xl_chart("column", cs_series()),
+                       protect = list(no_content = TRUE))
+  expect_match(only_con$sheet, 'objects="1"', fixed = TRUE)
+  expect_false(grepl('content="1"', only_con$sheet, fixed = TRUE))
+})
+
+test_that("a worksheet's protection options are refused on a chartsheet, and vice versa", {
+  ch <- xl_chart("column", cs_series())
+  expect_error(xl_chartsheet(ch, protect = list(format_cells = TRUE)),
+               "a chartsheet has no cells")
+  expect_error(xl_chartsheet(ch, protect = list(format_cells = TRUE)),
+               "It accepts: no_content, no_objects", fixed = TRUE)
+  expect_error(xl_sheet(cs_sales, protect = list(no_content = TRUE)),
+               "belong to a chartsheet")
 })
 
 # ── Alongside the rest of the workbook ────────────────────────────────────────
@@ -199,4 +235,45 @@ test_that("a chartsheet may be given to xl_workbook() like any other sheet", {
                     properties = xl_properties(title = "T"))
   expect_s3_class(wb$sheets$Overview, "xl_chartsheet")
   expect_silent(write_xlsx(wb, tempfile(fileext = ".xlsx")))
+})
+
+test_that("a chartsheet takes the page and view options it supports", {
+  r <- cs_parts(xl_chart("column", cs_series()),
+                view = xl_sheet_view(active = TRUE, first_tab = TRUE),
+                page = xl_page_setup(orientation = "portrait",
+                                     margins = c(1, 1, 1.2, 1.2),
+                                     header = "&LLeft", footer = "&RRight",
+                                     header_margin = 0.6,
+                                     footer_margin = 0.7))
+  expect_match(r$sheet, 'orientation="portrait"', fixed = TRUE)
+  expect_match(r$sheet, 'left="1"', fixed = TRUE)
+  expect_match(r$sheet, 'header="0.6"', fixed = TRUE)
+  expect_match(r$sheet, 'footer="0.7"', fixed = TRUE)
+  expect_match(r$sheet, "&amp;LLeft", fixed = TRUE)
+  expect_match(r$sheet, "&amp;RRight", fixed = TRUE)
+  expect_match(r$workbook, "activeTab", fixed = TRUE)
+  expect_match(r$workbook, "firstSheet", fixed = TRUE)
+})
+
+test_that("`selected` is refused on a chartsheet rather than doing nothing", {
+  # chartsheet_select() sets a flag the sheetView writer never reads, so
+  # accepting it would be a silent no-op
+  expect_error(xl_chartsheet(xl_chart("column", cs_series()),
+                             view = xl_sheet_view(selected = TRUE)),
+               "no setter for")
+  expect_error(xl_chartsheet(xl_chart("column", cs_series()),
+                             view = xl_sheet_view(selected = TRUE)),
+               "A chartsheet takes: active, visible, first_tab", fixed = TRUE)
+})
+
+test_that("a hidden chartsheet is hidden in the workbook", {
+  r <- cs_parts(xl_chart("column", cs_series()),
+                view = xl_sheet_view(visible = FALSE), name = "Hidden")
+  expect_match(r$workbook, 'state="hidden"', fixed = TRUE)
+})
+
+test_that("a chart with no title has no unqualified range to complain about", {
+  # named() returns TRUE for an absent range, so a titleless chart passes
+  expect_s3_class(xl_chartsheet(xl_chart("column", cs_series())),
+                  "xl_chartsheet")
 })

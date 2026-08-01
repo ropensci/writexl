@@ -20,7 +20,10 @@ xl_chartsheet(
 
 \item{zoom}{The zoom level as a percentage, 10 to 400.}
 
-\item{protect}{Worksheet protection, as [xl_sheet()] takes it.}
+\item{protect}{`TRUE`, a password string, or a named list. A chartsheet
+has no cells, so of Excel's protection options it takes only
+`no_content` (let the chart be edited) and `no_objects` (let the shapes
+on it be edited); the worksheet options are refused by name.}
 
 \item{page}{An [xl_page_setup()] describing how it prints.}
 
@@ -41,7 +44,7 @@ is refused.
 A chartsheet supports only part of what a worksheet does, and the parts it
 does not are refused rather than dropped: of [xl_page_setup()] it takes the
 orientation, paper size, margins and the header and footer; of
-[xl_sheet_view()] it takes `active`, `selected`, `visible` and `first_tab`.
+[xl_sheet_view()] it takes `active`, `visible` and `first_tab`.
 }
 \examples{
 sales <- data.frame(quarter = c("Q1", "Q2"), revenue = c(10, 25))

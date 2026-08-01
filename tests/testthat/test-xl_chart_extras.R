@@ -247,3 +247,17 @@ test_that("every chart-level chart_*() function libxlsxwriter offers is called",
   for (f in fns)
     expect_true(grepl(paste0(f, "("), called, fixed = TRUE), info = f)
 })
+
+test_that("up-down bars accept the shapes they document, and refuse the rest", {
+  expect_null(.chart_up_down(NA, "up_down_bars"))
+  expect_null(.chart_up_down(FALSE, "up_down_bars"))
+  expect_equal(.chart_up_down(TRUE, "up_down_bars"), list(on = 1L))
+  # one side alone leaves the other at Excel's default
+  one <- .chart_up_down(list(up = xl_fill(background = "green")),
+                        "up_down_bars")
+  expect_equal(one$on, 1L)
+  expect_null(one$down_fill)
+  expect_error(.chart_up_down(list(sideways = TRUE), "up_down_bars"),
+               "must be TRUE, or list(up = , down = )", fixed = TRUE)
+  expect_error(.chart_up_down("yes", "up_down_bars"), "must be TRUE, or list")
+})

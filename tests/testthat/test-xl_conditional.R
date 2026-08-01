@@ -346,3 +346,84 @@ test_that("all four kinds coexist on one sheet", {
     expect_match(x, sprintf('type="%s"', ty), fixed = TRUE, label = ty)
   expect_equal(as.data.frame(readxl::read_xlsx(p)), df)
 })
+
+# ── The branches nothing else reached ────────────────────────────────────────
+
+test_that("a rule type is inferred from the criteria when none is given", {
+  expect_equal(.cond_infer_type(NULL, NULL), "cell")
+  expect_equal(.cond_infer_type(NULL, "contains"), "text")
+  expect_equal(.cond_infer_type(NULL, "yesterday"), "time_period")
+  expect_equal(.cond_infer_type(NULL, "above"), "average")
+  expect_equal(.cond_infer_type(NULL, ">"), "cell")
+  # an explicit type always wins
+  expect_equal(.cond_infer_type("duplicate", "contains"), "duplicate")
+  # a type with no criteria table of its own is left alone
+  expect_null(.check_conditional_criteria("duplicate", NULL))
+})
+
+test_that("a colour scale takes string thresholds as well as numbers", {
+  p <- write_tmp(list(D = xl_sheet(
+    data.frame(a = 1:5),
+    conditional = xl_cond_scale("A2:A6", colors = c("red", "green"),
+                                rule_types = c("formula", "formula"),
+                                values = c("=MIN($A$2:$A$6)",
+                                           "=MAX($A$2:$A$6)")))))
+  x <- xlsx_part(p, "xl/worksheets/sheet1.xml", raw = TRUE)
+  expect_match(x, "MIN($A$2:$A$6)", fixed = TRUE)
+  expect_match(x, "colorScale", fixed = TRUE)
+})
+
+test_that("an icon set defaults to three traffic lights", {
+  plain <- write_tmp(list(D = xl_sheet(data.frame(a = 1:5),
+                                       conditional = xl_cond_icons("A2:A6"))))
+  named <- write_tmp(list(D = xl_sheet(
+    data.frame(a = 1:5),
+    conditional = xl_cond_icons("A2:A6", style = "3_traffic_lights"))))
+  expect_equal(xlsx_part(plain, "xl/worksheets/sheet1.xml", raw = TRUE),
+               xlsx_part(named, "xl/worksheets/sheet1.xml", raw = TRUE))
+})
+
+test_that("conditional formatting names what was wrong", {
+  expect_error(xl_cond_icons(NULL), "must name the cells to format")
+  expect_error(write_tmp(list(D = xl_sheet(data.frame(a = 1:3),
+                                           conditional = list("nope")))),
+               "must be an xl_conditional object")
+})
+
+test_that("a rule type with no criteria of its own accepts none", {
+  # blanks, duplicates, errors and the rest take no criteria at all
+  for (ty in c("duplicate", "unique", "blanks", "no_blanks", "errors",
+               "no_errors"))
+    expect_null(.check_conditional_criteria(ty, NULL))
+  # and a type outside the table is left alone entirely
+  expect_null(.check_conditional_criteria("2_color_scale", "anything"))
+})
+
+test_that("an icon style of NA falls back to three traffic lights", {
+  a <- write_tmp(list(D = xl_sheet(data.frame(a = 1:5),
+                                   conditional = xl_cond_icons("A2:A6",
+                                                               style = NA))))
+  b <- write_tmp(list(D = xl_sheet(data.frame(a = 1:5),
+                                   conditional = xl_cond_icons("A2:A6"))))
+  expect_equal(xlsx_part(a, "xl/worksheets/sheet1.xml", raw = TRUE),
+               xlsx_part(b, "xl/worksheets/sheet1.xml", raw = TRUE))
+})
+
+test_that("every conditional constructor insists on a range", {
+  expect_error(xl_cond_cell(NULL, type = "duplicate"),
+               "must name the cells to format")
+  expect_error(xl_cond_scale(NULL), "must name the cells to format")
+  expect_error(xl_cond_bar(NULL), "must name the cells to format")
+})
+
+test_that("every data bar colour reaches the file", {
+  p <- write_tmp(list(D = xl_sheet(data.frame(a = c(-5, 3, 8)),
+    conditional = xl_cond_bar("A2:A4", color = "#0000FF",
+                              negative_color = "#FF0000",
+                              border_color = "#00FF00",
+                              negative_border_color = "#FFFF00",
+                              axis_color = "#FF00FF"))))
+  x <- xlsx_part(p, "xl/worksheets/sheet1.xml", raw = TRUE)
+  for (col in c("0000FF", "FF0000", "00FF00", "FFFF00", "FF00FF"))
+    expect_match(x, col, fixed = TRUE)
+})

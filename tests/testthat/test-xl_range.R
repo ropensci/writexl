@@ -157,3 +157,42 @@ test_that("freeze specs reuse the cell-reference parser but keep count semantics
   expect_equal(.parse_freeze(list(col = 3)), c(0L, 3L))
   expect_equal(.parse_freeze(NA_character_), c(-1L, -1L))
 })
+
+# ── Sheet-qualified ranges ───────────────────────────────────────────────────
+
+test_that("a quoted sheet name is split off, apostrophes and all", {
+  # Excel quotes a sheet name holding spaces or punctuation and doubles an
+  # apostrophe inside it
+  expect_equal(.split_sheet_ref("Data!A1:B5"),
+               list(sheet = "Data", rest = "A1:B5"))
+  expect_equal(.split_sheet_ref("'My Sheet'!A1:B5"),
+               list(sheet = "My Sheet", rest = "A1:B5"))
+  expect_equal(.split_sheet_ref("'It''s'!A1"),
+               list(sheet = "It's", rest = "A1"))
+  expect_equal(.split_sheet_ref("A1:B5"), list(sheet = NULL, rest = "A1:B5"))
+  # an opening quote with no closing one is not a sheet reference
+  expect_equal(.split_sheet_ref("'unterminated"),
+               list(sheet = NULL, rest = "'unterminated"))
+})
+
+test_that("a sheet name is refused where a range applies to one sheet only", {
+  df <- data.frame(a = 1:3, b = 4:6)
+  expect_error(.xl_resolve_range("Other!A1:B2", "range", df),
+               "may not name a sheet")
+  expect_error(.xl_resolve_range(list(sheet = "Other", cols = "a"), "range", df),
+               "may not name a sheet")
+  # and carried as an attribute where it is allowed
+  got <- .xl_resolve_range(list(sheet = "Other", cols = "a"), "range", df,
+                           allow_sheet = TRUE)
+  expect_equal(attr(got, "sheet"), "Other")
+  got <- .xl_resolve_range("'My Sheet'!A1:B2", "range", df, allow_sheet = TRUE)
+  expect_equal(attr(got, "sheet"), "My Sheet")
+})
+
+test_that("a sheet name in a spec must be a single string", {
+  df <- data.frame(a = 1:3)
+  for (bad in list(1, c("a", "b"), NA_character_))
+    expect_error(.xl_resolve_range(list(sheet = bad, cols = "a"), "range", df,
+                                   allow_sheet = TRUE),
+                 "must be a single sheet name")
+})

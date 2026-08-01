@@ -261,3 +261,18 @@ test_that("a split leaves the cells alone", {
   p <- write_tmp(list(D = xl_sheet(df, view = xl_sheet_view(split = "B3"))))
   expect_equal(as.data.frame(readxl::read_xlsx(p)), df)
 })
+
+test_that("the guards on an empty or malformed view hold", {
+  expect_null(.resolve_sheet_visibility(list()))
+  expect_null(.sheet_view_of(data.frame(a = 1)))
+  bad <- xl_sheet(data.frame(a = 1))
+  bad$view <- list(active = TRUE)
+  expect_error(.sheet_view_of(bad), "must be an xl_sheet_view object")
+  expect_error(write_tmp(list(D = bad)), "must be an xl_sheet_view object")
+})
+
+test_that("a raw split spec names its own unknown elements", {
+  expect_error(write_tmp(list(D = xl_sheet(data.frame(a = 1:3),
+    view = xl_sheet_view(split = list(vertical = 10, sideways = 2))))),
+    "unknown `split` element(s): sideways", fixed = TRUE)
+})

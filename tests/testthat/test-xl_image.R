@@ -1,21 +1,5 @@
 # Images: the constructor, its validation, and what reaches the file.
-
-# A minimal valid 1x1 PNG.  Hardcoded rather than shipped as a fixture or drawn
-# with png(), which needs a working graphics device that CRAN machines may not
-# have.
-PNG_1x1 <- as.raw(c(
-  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
-  0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-  0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00,
-  0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
-  0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
-  0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82))
-
-png_file <- function() {
-  p <- tempfile(fileext = ".png")
-  writeBin(PNG_1x1, p)
-  p
-}
+# PNG_1x1 and png_file() are in helper-xlsx.R -- other files need them too.
 
 # ── Format detection ──────────────────────────────────────────────────────────
 
@@ -386,4 +370,18 @@ test_that("only an embedded image costs row streaming", {
     "cannot be honoured")
   expect_equal(cm$on, 0L)
   expect_match(cm$reasons, "embedded image")
+})
+
+test_that("an embedded image takes a cell format", {
+  r <- img_parts(image = xl_image(png_file(), "B2", embed = TRUE,
+                                  format = xl_align(horizontal = "center")))
+  expect_match(r$sheet, "vm=", fixed = TRUE)
+  expect_true("xl/richData/rdrichvalue.xml" %in% r$files ||
+                any(grepl("richValue", r$files)))
+})
+
+test_that("an in-memory image needs R's PNG device", {
+  skip_if(isTRUE(capabilities("png")), "this build has a PNG device")
+  expect_error(xl_image(as.raster(matrix("red", 2, 2)), "A1"),
+               "unavailable here")
 })

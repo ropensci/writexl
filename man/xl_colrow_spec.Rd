@@ -12,7 +12,8 @@ xl_col_spec(
   hidden = NA,
   level = NA,
   format = NULL,
-  width_pixels = NA
+  width_pixels = NA,
+  collapsed = NA
 )
 
 xl_row_spec(
@@ -21,7 +22,8 @@ xl_row_spec(
   hidden = NA,
   level = NA,
   format = NULL,
-  height_pixels = NA
+  height_pixels = NA,
+  collapsed = NA
 )
 }
 \arguments{
@@ -42,6 +44,11 @@ default cell format.  Combine groups with `+` (e.g.
 Give one or the other, not both.  Excel stores character units and points,
 so the pixel value is converted on the way in --- read back, a width set
 as 100 pixels is 13.57 character units.}
+
+\item{collapsed}{Logical; draw this column/row as the collapsed summary of
+the group beside it.  Excel does not derive this --- the rows or columns
+of the group itself need `hidden = TRUE` as well, exactly as clicking the
+grouping symbol would leave them.}
 
 \item{rows}{Rows to target: a numeric vector of 1-based data-row indices
 (row 1 is the first data row, ignoring the header).}

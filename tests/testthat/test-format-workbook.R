@@ -353,3 +353,31 @@ test_that("an invalid constant_memory request is refused", {
                                         "yes"),
                "must be a single logical")
 })
+
+test_that("a pinned creation time makes two runs byte-identical", {
+  core <- function(p) {
+    tmp <- write_tmp(xl_workbook(data.frame(a = 1), properties = p))
+    list(core = xlsx_part(tmp, "docProps/core.xml", raw = TRUE),
+         bytes = readBin(tmp, "raw", file.size(tmp)))
+  }
+  when <- as.POSIXct("2020-06-15 12:34:56", tz = "UTC")
+  a <- core(xl_properties(created = when))
+  expect_match(a$core, "2020-06-15T12:34:56Z", fixed = TRUE)
+  # the whole file, not just the timestamp: that is the point of pinning it
+  expect_equal(core(xl_properties(created = when))$bytes, a$bytes)
+
+  # a Date is midnight UTC on that day
+  expect_match(core(xl_properties(created = as.Date("2020-06-15")))$core,
+               "2020-06-15T00:00:00Z", fixed = TRUE)
+  # and left unset libxlsxwriter stamps the moment of writing
+  expect_false(grepl("2020-06-15", core(xl_properties())$core, fixed = TRUE))
+})
+
+test_that("`created` must be a single date or datetime", {
+  bad <- function(x) write_tmp(xl_workbook(data.frame(a = 1),
+                                           properties = xl_properties(created = x)))
+  expect_error(bad("2020-06-15"), "must be a Date or POSIXct")
+  expect_error(bad(1592223296), "must be a Date or POSIXct")
+  expect_error(bad(as.Date(c("2020-06-15", "2020-06-16"))),
+               "must be a single date or datetime")
+})

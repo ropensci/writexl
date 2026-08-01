@@ -217,18 +217,22 @@ static void apply_columns(cell_write_ctx *ctx, SEXP opts, lxw_col_t cols){
   SEXP fi = list_get(opts, "col_format_id");
   SEXP hd = list_get(opts, "col_hidden");
   SEXP lv = list_get(opts, "col_level");
+  SEXP cp = list_get(opts, "col_collapsed");
   for(lxw_col_t i = 0; i < cols; i++){
     double width = (w  != R_NilValue && Rf_length(w)  > i) ? REAL(w)[i]     : NA_REAL;
     int    fid   = (fi != R_NilValue && Rf_length(fi) > i) ? INTEGER(fi)[i] : 0;
     int    hid   = (hd != R_NilValue && Rf_length(hd) > i) ? INTEGER(hd)[i] : NA_INTEGER;
     int    lev   = (lv != R_NilValue && Rf_length(lv) > i) ? INTEGER(lv)[i] : NA_INTEGER;
+    int    col   = (cp != R_NilValue && Rf_length(cp) > i) ? INTEGER(cp)[i] : NA_INTEGER;
     lxw_format *fmt = ctx_format(ctx, fid);
-    if(ISNA(width) && fmt == NULL && hid == NA_INTEGER && lev == NA_INTEGER)
+    if(ISNA(width) && fmt == NULL && hid == NA_INTEGER && lev == NA_INTEGER &&
+       col == NA_INTEGER)
       continue;
     note_protection(ctx, fid);
     lxw_row_col_options o = {0, 0, 0};
     if(hid != NA_INTEGER && hid > 0) o.hidden = 1;
     if(lev != NA_INTEGER && lev > 0) o.level = (uint8_t) lev;
+    if(col != NA_INTEGER && col > 0) o.collapsed = 1;
     double wv = ISNA(width) ? LXW_DEF_COL_WIDTH : width;
     assert_lxw(worksheet_set_column_opt(ctx->sheet, i, i, wv, fmt, &o));
   }
@@ -244,15 +248,18 @@ static void apply_row(cell_write_ctx *ctx, SEXP opts, lxw_row_t wrow){
   SEXP fi = list_get(opts, "row_format_id");
   SEXP hd = list_get(opts, "row_hidden");
   SEXP lv = list_get(opts, "row_level");
+  SEXP cp = list_get(opts, "row_collapsed");
   for(R_xlen_t k = 0; k < n; k++){
     if((lxw_row_t) INTEGER(rr)[k] != wrow) continue;
     double height = (hh != R_NilValue && !ISNA(REAL(hh)[k])) ? REAL(hh)[k] : LXW_DEF_ROW_HEIGHT;
     int    fid    = (fi != R_NilValue) ? INTEGER(fi)[k] : 0;
     int    hid    = (hd != R_NilValue) ? INTEGER(hd)[k] : NA_INTEGER;
     int    lev    = (lv != R_NilValue) ? INTEGER(lv)[k] : NA_INTEGER;
+    int    col    = (cp != R_NilValue) ? INTEGER(cp)[k] : NA_INTEGER;
     lxw_row_col_options o = {0, 0, 0};
     if(hid != NA_INTEGER && hid > 0) o.hidden = 1;
     if(lev != NA_INTEGER && lev > 0) o.level = (uint8_t) lev;
+    if(col != NA_INTEGER && col > 0) o.collapsed = 1;
     note_protection(ctx, fid);
     assert_lxw(worksheet_set_row_opt(ctx->sheet, wrow, height, ctx_format(ctx, fid), &o));
     return;
@@ -557,11 +564,13 @@ static lxw_chart_font chart_font_of(SEXP p, int *set){
   *set = 0;
   if(e == R_NilValue || !Rf_isVectorList(e)) return f;
   *set = 1;
+  f.name = payload_str(e, "name");
   if(payload_has(e, "size"))      f.size = payload_dbl(e, "size");
   if(payload_has(e, "color"))     f.color = (lxw_color_t) payload_int(e, "color");
   if(payload_has(e, "bold"))      f.bold = LXW_TRUE;
   if(payload_has(e, "italic"))    f.italic = LXW_TRUE;
   if(payload_has(e, "underline")) f.underline = LXW_TRUE;
+  if(payload_has(e, "rotation"))  f.rotation = payload_int(e, "rotation");
   return f;
 }
 
@@ -1095,6 +1104,9 @@ static void fill_protection(lxw_protection *prot, SEXP po){
   prot->pivot_tables      = (uint8_t) opt_scalar_int(po, "pivot_tables", 0);
   prot->scenarios         = (uint8_t) opt_scalar_int(po, "scenarios", 0);
   prot->objects           = (uint8_t) opt_scalar_int(po, "objects", 0);
+  /* chartsheets only; a worksheet payload never carries these */
+  prot->no_content        = (uint8_t) opt_scalar_int(po, "no_content", 0);
+  prot->no_objects        = (uint8_t) opt_scalar_int(po, "no_objects", 0);
 }
 
 /* Create and configure a chart from its payload.  Where it is then placed --
@@ -1212,7 +1224,6 @@ static void apply_chartsheet(lxw_workbook *workbook, const char *name,
   }
 
   if(payload_has(opts, "activate"))    chartsheet_activate(sheet);
-  if(payload_has(opts, "select"))      chartsheet_select(sheet);
   if(payload_has(opts, "hide"))        chartsheet_hide(sheet);
   if(payload_has(opts, "first_sheet")) chartsheet_set_first_sheet(sheet);
   if(payload_has(opts, "tab_color"))
@@ -1558,6 +1569,8 @@ static void apply_tables(cell_write_ctx *ctx, SEXP opts){
         entries[i].formula       = (char *) payload_str(c, "formula");
         entries[i].total_string  = (char *) payload_str(c, "total_string");
         entries[i].total_function = (uint8_t) payload_int(c, "total_function");
+        if(payload_has(c, "total_value"))
+          entries[i].total_value = payload_dbl(c, "total_value");
         if(payload_has(c, "format_id")){
           int fid = payload_int(c, "format_id");
           note_protection(ctx, fid);
@@ -2027,6 +2040,13 @@ static void apply_properties(lxw_workbook *wb, SEXP props){
   for(int i = 0; i < 10; i++){
     const char *v = payload_str(props, keys[i]);
     if(v){ *fields[i] = v; any_meta = 1; }
+  }
+  /* Seconds since the epoch, from R's own POSIXct.  Left at 0 libxlsxwriter
+     stamps the current time, so pinning it is what makes two runs over the
+     same data produce byte-identical files. */
+  if(payload_has(props, "created")){
+    dp.created = (time_t) payload_dbl(props, "created");
+    any_meta = 1;
   }
   if(any_meta)
     workbook_set_properties(wb, &dp);

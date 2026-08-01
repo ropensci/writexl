@@ -246,3 +246,48 @@ test_that("dropping a time zone preserves length and NA positions", {
   expect_equal(is.na(y), is.na(x))
   expect_length(.drop_tzone(as.POSIXct(character(0), tz = "UTC")), 0L)
 })
+
+# ── Column types normalised on the way in ────────────────────────────────────
+
+test_that("POSIXlt and integer-storage POSIXct become ordinary datetimes", {
+  lt <- as.POSIXlt("2024-03-01 12:00:00", tz = "UTC")
+  int <- as.POSIXct("2024-03-01 12:00:00", tz = "UTC")
+  storage.mode(int) <- "integer"
+  df <- data.frame(a = 1)
+  df$lt <- lt
+  df$int <- int
+  p <- write_tmp(df)
+  got <- as.data.frame(readxl::read_xlsx(p))
+  expect_s3_class(got$lt, "POSIXct")
+  expect_equal(format(got$lt, "%Y-%m-%d %H:%M", tz = "UTC"), "2024-03-01 12:00")
+  expect_equal(format(got$int, "%Y-%m-%d %H:%M", tz = "UTC"), "2024-03-01 12:00")
+})
+
+test_that("a datetime with no time zone falls back to the session's", {
+  # attr(x, "tzone") unset means "local", which is what the writer has to use
+  naive <- as.POSIXct("2024-03-01 12:00:00")
+  attr(naive, "tzone") <- NULL
+  df <- data.frame(a = 1)
+  df$t <- naive
+  p <- write_tmp(df)
+  got <- as.data.frame(readxl::read_xlsx(p))
+  expect_equal(format(got$t, "%Y-%m-%d %H:%M", tz = "UTC"), "2024-03-01 12:00")
+})
+
+test_that("a non-character column type is refused by name", {
+  expect_error(xl_formula(1:3), "must be a character vector")
+  expect_error(xl_hyperlink(1:3), "must be a character vector")
+})
+
+test_that("the row limit is refused before anything is written", {
+  # one column of doubles: big enough to cross the limit, small enough to build
+  big <- data.frame(a = numeric(1024L^2 + 1L))
+  expect_error(write_tmp(big), "does not support tables with 1M+ rows",
+               fixed = TRUE)
+})
+
+test_that("-Inf is written as text, like Inf", {
+  p <- write_tmp(data.frame(a = c(-Inf, Inf, 1)))
+  got <- as.data.frame(readxl::read_xlsx(p))
+  expect_equal(got$a, c("-Inf", "Inf", "1"))
+})
