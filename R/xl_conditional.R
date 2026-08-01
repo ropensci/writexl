@@ -392,7 +392,8 @@ xl_cond_bar <- function(range, color = NA, values = NULL, rule_types = NULL,
     bar_color                 = if (!.is_unset(color)) xl_color(color),
     bar_negative_color        = if (!.is_unset(negative_color)) xl_color(negative_color),
     bar_border_color          = if (!.is_unset(border_color)) xl_color(border_color),
-    bar_negative_border_color = if (!.is_unset(negative_border_color)) xl_color(negative_border_color),
+    bar_negative_border_color = if (!.is_unset(negative_border_color))
+                                  xl_color(negative_border_color),
     bar_axis_color            = if (!.is_unset(axis_color)) xl_color(axis_color)
   ))
   flags <- .drop_null(list(

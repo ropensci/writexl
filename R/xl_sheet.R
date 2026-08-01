@@ -514,7 +514,9 @@ print.xl_sheet <- function(x, ...) {
         row_row    <- c(row_row, (r - 1L) + header_offset)
         row_height <- c(row_height, if (!is.null(geo$height)) geo$height else NA_real_)
         row_fmt_id <- c(row_fmt_id, fid)
-        row_hidden <- c(row_hidden, if (!is.null(geo$hidden)) as.integer(isTRUE(geo$hidden)) else NA_integer_)
+        row_hidden <- c(row_hidden,
+          if (!is.null(geo$hidden)) as.integer(isTRUE(geo$hidden))
+          else NA_integer_)
         row_level  <- c(row_level, if (!is.null(geo$level)) as.integer(geo$level) else NA_integer_)
         row_collapsed <- c(row_collapsed,
           if (!is.null(geo$collapsed)) as.integer(isTRUE(geo$collapsed)) else NA_integer_)
@@ -532,7 +534,8 @@ print.xl_sheet <- function(x, ...) {
     gridlines <- if (is.na(el$gridlines)) -1L else if (isTRUE(el$gridlines)) 3L else 0L
     tab_color <- if (is.na(el$tab_color)) -1L else xl_color(el$tab_color)
     zoom <- if (is.na(el$zoom)) 0L else as.integer(el$zoom)
-    default_row_height <- if (is.na(el$default_row_height)) NA_real_ else as.numeric(el$default_row_height)
+    default_row_height <- if (is.na(el$default_row_height)) NA_real_
+                          else as.numeric(el$default_row_height)
     # libxlsxwriter requires the autofilter range before any column criteria,
     # so the filter payloads are appended after the autofilter one below
     fr <- .resolve_filters(el, df, header_offset)

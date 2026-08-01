@@ -89,7 +89,7 @@
 #' unlink(c('universities.xlsx', 'universities2.xlsx'))
 xl_formula <- function(x, format = NULL){
   x <- .as_character_arg(x, "x")
-  if(!all(grepl("^=",x) | is.na(x)))
+  if(!all(grepl("^=", x) | is.na(x)))
     stop("Formulas must start with '='")
   xl_cell_general(formula = x, format = format)
 }

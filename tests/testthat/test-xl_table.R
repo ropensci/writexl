@@ -36,7 +36,8 @@ test_that("each style type enforces its own number range", {
 test_that("a malformed style is rejected", {
   expect_error(.parse_table_style("rainbow 3"), 'must be "light", "medium" or "dark"')
   expect_error(.parse_table_style("medium"), 'a type and number like "medium 9"')
-  expect_error(.parse_table_style("medium 9 extra"), 'a type and number like')
+  expect_error(.parse_table_style("medium 9 extra"),
+               "a type and number like")
   expect_error(.parse_table_style("medium nine"), "numbered 1 to 28")
   expect_error(.parse_table_style(9), "must be a single string")
   expect_error(.parse_table_style(NA_character_), "must be a single string")
@@ -383,7 +384,7 @@ test_that("a header row that would land on data is refused", {
 test_that("a column outside the table's range is refused", {
   expect_error(write_tmp(list(D = xl_sheet(sdf, table = xl_table(
     range = "A1:A4", columns = xl_table_column("qty"))))),
-    'outside the table\'s range')
+    "outside the table's range")
 })
 
 # ── Conflicts ─────────────────────────────────────────────────────────────────

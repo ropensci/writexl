@@ -99,7 +99,7 @@ test_that("centring is applied on each axis independently", {
   expect_match(both, 'horizontalCentered="1"', fixed = TRUE)
   expect_match(both, 'verticalCentered="1"', fixed = TRUE)
   # FALSE is not TRUE: nothing is written
-  expect_false(grepl('horizontalCentered',
+  expect_false(grepl("horizontalCentered",
                      page_xml(xl_page_setup(center_horizontally = FALSE)),
                      fixed = TRUE))
 })
@@ -390,7 +390,8 @@ test_that("page breaks are written 0-based, one before the named row", {
 })
 
 test_that("vertical breaks accept numbers and column letters", {
-  expect_match(breaks_xml(xl_page_setup(v_breaks = 2)), '<colBreaks', fixed = TRUE)
+  expect_match(breaks_xml(xl_page_setup(v_breaks = 2)), "<colBreaks",
+               fixed = TRUE)
   expect_match(breaks_xml(xl_page_setup(v_breaks = 2)), '<brk id="1"', fixed = TRUE)
   # column "C" is the third column, so a break before it is 0-based 2
   expect_match(breaks_xml(xl_page_setup(v_breaks = "C")), '<brk id="2"',
