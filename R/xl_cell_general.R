@@ -401,7 +401,7 @@ as.data.frame.xl_cell_general <- function(x, row.names = NULL, optional = FALSE,
   structure(
     list(x),
     class     = "data.frame",
-    row.names = if (is.null(row.names)) seq_len(length(x)) else row.names
+    row.names = if (is.null(row.names)) seq_along(x) else row.names
   )
 }
 

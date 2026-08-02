@@ -140,7 +140,8 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
   tz <- attr(x, "tzone", exact = TRUE)
   if(is.null(tz) || !length(tz) || !nzchar(tz[1])){
     loc <- Sys.timezone()
-    if(is.na(loc)) "" else loc
+    # Sys.timezone() reports NA only where the OS has no zone configured
+    if(is.na(loc)) "" else loc  # nocov
   } else {
     tz[1]
   }
@@ -179,7 +180,7 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
   # a zero-length offset would recycle to nothing and silently empty the column.
   if(is.null(off) || length(off) != length(x) ||
      any(is.na(off) & !is.na(as.numeric(x))))
-    return(x)
+    return(x)  # nocov  (only on a platform whose POSIXlt has no gmtoff)
   off[is.na(off)] <- 0
   structure(as.numeric(x) + off, class = c("POSIXct", "POSIXt"), tzone = "UTC")
 }
@@ -308,13 +309,17 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
 .check_array_no_overlap <- function(q, anchor, df, header_offset, colname, k) {
   nrows <- nrow(df)
   ncols <- length(df)
-  if (nrows < 1L || ncols < 1L) return(invisible(NULL))
+  # unreachable from a written sheet: the check runs per cell, and a frame with
+  # no rows or no columns has no cells
+  if (nrows < 1L || ncols < 1L) return(invisible(NULL))  # nocov
   # the sheet's own data rectangle, 0-based
   first_row <- as.integer(header_offset)
   last_row  <- first_row + nrows - 1L
   r1 <- max(q[1L], first_row); r2 <- min(q[3L], last_row)
   c1 <- max(q[2L], 0L);        c2 <- min(q[4L], ncols - 1L)
-  if (r2 < r1 || c2 < c1) return(invisible(NULL))
+  # likewise: the range is required to start at the formula's own cell, which
+  # is inside the data, so the two rectangles always overlap
+  if (r2 < r1 || c2 < c1) return(invisible(NULL))  # nocov
   ncell <- (as.numeric(r2 - r1) + 1) * (as.numeric(c2 - c1) + 1)
   if (ncell == 1 && r1 == anchor[1L] && c1 == anchor[2L])
     return(invisible(NULL))

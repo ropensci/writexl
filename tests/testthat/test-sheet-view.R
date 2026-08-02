@@ -54,10 +54,12 @@ test_that("hiding every sheet is refused", {
 
 test_that("a hidden sheet cannot also be active or selected", {
   expect_error(write_tmp(list(A = xl_sheet(one()),
-                              B = xl_sheet(one(), view = xl_sheet_view(visible = FALSE, active = TRUE)))),
+                              B = xl_sheet(one(), view = xl_sheet_view(
+                                visible = FALSE, active = TRUE)))),
                "hidden but also marked active/selected")
   expect_error(write_tmp(list(A = xl_sheet(one()),
-                              B = xl_sheet(one(), view = xl_sheet_view(visible = FALSE, selected = TRUE)))),
+                              B = xl_sheet(one(), view = xl_sheet_view(
+                                visible = FALSE, selected = TRUE)))),
                "hidden but also marked active/selected")
 })
 
@@ -82,7 +84,8 @@ test_that("the first sheet cannot be hidden unless another is activated", {
 
 test_that("error messages name the offending sheet", {
   expect_error(write_tmp(list(Data = xl_sheet(one()),
-                              Notes = xl_sheet(one(), view = xl_sheet_view(visible = FALSE, active = TRUE)))),
+                              Notes = xl_sheet(one(), view = xl_sheet_view(
+                                visible = FALSE, active = TRUE)))),
                '"Notes"', fixed = TRUE)
   expect_error(write_tmp(list(First = xl_sheet(one(), view = xl_sheet_view(active = TRUE)),
                               Second = xl_sheet(one(), view = xl_sheet_view(active = TRUE)))),
@@ -101,7 +104,8 @@ test_that("plain data frames are treated as unset and never trip the rules", {
   # a bare data frame has no tab settings, so it must not be read as hidden
   expect_silent(write_tmp(list(A = one(), B = one())))
   # mixed with an xl_sheet
-  expect_silent(write_tmp(list(A = one(), B = xl_sheet(one(), view = xl_sheet_view(active = TRUE)))))
+  expect_silent(write_tmp(list(
+    A = one(), B = xl_sheet(one(), view = xl_sheet_view(active = TRUE)))))
   # a single plain data frame is not "every sheet hidden"
   expect_silent(write_tmp(one()))
 })
@@ -148,7 +152,8 @@ test_that("an inverted selection is rejected by the shared range parser", {
   # Excel would read the corner order as naming the active cell; writexl gives
   # that up in exchange for one strict range parser, and says so rather than
   # silently normalising
-  expect_error(write_tmp(list(D = xl_sheet(data.frame(x = 1:5), view = xl_sheet_view(selection = "C4:B2")))),
+  expect_error(write_tmp(list(D = xl_sheet(data.frame(x = 1:5),
+                 view = xl_sheet_view(selection = "C4:B2")))),
                "inverted")
 })
 
@@ -165,15 +170,20 @@ test_that("selection and top_left are independent", {
 
 test_that("the view scalars are validated", {
   expect_error(xl_sheet(data.frame(x = 1), view = xl_sheet_view(hide_zero = "yes")), "hide_zero")
-  expect_error(xl_sheet(data.frame(x = 1), view = xl_sheet_view(right_to_left = 1)), "right_to_left")
-  expect_error(write_tmp(list(D = xl_sheet(data.frame(x = 1), view = xl_sheet_view(selection = "not a range")))),
+  expect_error(xl_sheet(data.frame(x = 1),
+                        view = xl_sheet_view(right_to_left = 1)),
+               "right_to_left")
+  expect_error(write_tmp(list(D = xl_sheet(data.frame(x = 1),
+                 view = xl_sheet_view(selection = "not a range")))),
                "selection")
 })
 
 test_that("the view scalars leave the cells alone", {
   skip_if_not_installed("readxl")
   df <- data.frame(a = 1:5, stringsAsFactors = FALSE)
-  p <- write_tmp(list(D = xl_sheet(df, view = xl_sheet_view(hide_zero = TRUE, right_to_left = TRUE, selection = "A2", top_left = "A2"))))
+  p <- write_tmp(list(D = xl_sheet(df, view = xl_sheet_view(
+    hide_zero = TRUE, right_to_left = TRUE, selection = "A2",
+    top_left = "A2"))))
   expect_equal(as.data.frame(readxl::read_xlsx(p)), df)
 })
 
@@ -241,17 +251,21 @@ test_that("raw units can be given directly", {
 })
 
 test_that("raw split units are validated", {
-  expect_error(write_tmp(list(D = xl_sheet(data.frame(x = 1), view = xl_sheet_view(split = list(vertical = -1))))),
+  expect_error(write_tmp(list(D = xl_sheet(data.frame(x = 1),
+                 view = xl_sheet_view(split = list(vertical = -1))))),
                "non-negative")
-  expect_error(write_tmp(list(D = xl_sheet(data.frame(x = 1), view = xl_sheet_view(split = list(sideways = 1))))),
+  expect_error(write_tmp(list(D = xl_sheet(data.frame(x = 1),
+                 view = xl_sheet_view(split = list(sideways = 1))))),
                "unknown `split`")
 })
 
 test_that("split and freeze cannot both be set", {
-  expect_error(write_tmp(list(D = xl_sheet(data.frame(x = 1:5), freeze = "B2", view = xl_sheet_view(split = "B2")))),
+  expect_error(write_tmp(list(D = xl_sheet(data.frame(x = 1:5), freeze = "B2",
+                 view = xl_sheet_view(split = "B2")))),
                "cannot both be set")
   # either alone is fine
-  expect_silent(write_tmp(list(D = xl_sheet(data.frame(x = 1:5), view = xl_sheet_view(split = "B2")))))
+  expect_silent(write_tmp(list(D = xl_sheet(data.frame(x = 1:5),
+                  view = xl_sheet_view(split = "B2")))))
   expect_silent(write_tmp(list(D = xl_sheet(data.frame(x = 1:5), freeze = "B2"))))
 })
 
@@ -260,4 +274,19 @@ test_that("a split leaves the cells alone", {
   df <- data.frame(a = 1:5, stringsAsFactors = FALSE)
   p <- write_tmp(list(D = xl_sheet(df, view = xl_sheet_view(split = "B3"))))
   expect_equal(as.data.frame(readxl::read_xlsx(p)), df)
+})
+
+test_that("the guards on an empty or malformed view hold", {
+  expect_null(.resolve_sheet_visibility(list()))
+  expect_null(.sheet_view_of(data.frame(a = 1)))
+  bad <- xl_sheet(data.frame(a = 1))
+  bad$view <- list(active = TRUE)
+  expect_error(.sheet_view_of(bad), "must be an xl_sheet_view object")
+  expect_error(write_tmp(list(D = bad)), "must be an xl_sheet_view object")
+})
+
+test_that("a raw split spec names its own unknown elements", {
+  expect_error(write_tmp(list(D = xl_sheet(data.frame(a = 1:3),
+    view = xl_sheet_view(split = list(vertical = 10, sideways = 2))))),
+    "unknown `split` element(s): sideways", fixed = TRUE)
 })

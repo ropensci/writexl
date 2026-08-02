@@ -719,3 +719,74 @@ test_that("positional display text is unaffected by the rename", {
   y <- xl_hyperlink("https://a.com", "Site A", xl_font(bold = TRUE))
   expect_true(is_xl_format(y[[1L]][["format"]]))
 })
+
+# ── The guards nothing else reached ──────────────────────────────────────────
+
+test_that("a single array_range spec is one range, not a list of them", {
+  # list(rows = , cols = ) has to be wrapped, or its two elements would be
+  # taken as two cells' worth of ranges
+  cells <- xl_cell_general(formula = "=A1:B2", array = TRUE,
+                           array_range = list(rows = 1:2, cols = 1:2))
+  expect_length(cells, 1L)
+  expect_equal(cells[[1L]]$array_range, list(rows = 1:2, cols = 1:2))
+})
+
+test_that("a NULL hyperlink in a list is a cell with no hyperlink", {
+  cells <- xl_cell_general(value = c("a", "b"),
+                           hyperlink = list(NULL, "https://example.com"))
+  expect_true(is.na(cells[[1L]]$hyperlink) || is.null(cells[[1L]]$hyperlink))
+  expect_equal(cells[[2L]]$hyperlink, "https://example.com")
+})
+
+test_that("an unset array flag is FALSE for every cell", {
+  expect_equal(.cell_flag_vec(NULL, "array", 3L), rep(FALSE, 3L))
+  expect_error(.cell_flag_vec(NA, "array", 1L), "must be TRUE or FALSE")
+})
+
+test_that("an array range reaching past the sheet's data is accepted", {
+  # the overlap check only has something to say where the two rectangles meet;
+  # the range starts at its own cell (B2) and spills into empty columns
+  df <- data.frame(a = 1:2)
+  df$f <- xl_cell_general(formula = c("=TRANSPOSE(A2:A3)", NA), array = TRUE,
+                          array_range = list("B2:E2", NA))
+  expect_silent(write_tmp(df))
+})
+
+test_that("a frame with no rows has no data rectangle to overlap", {
+  empty <- data.frame(a = numeric(0))
+  empty$f <- xl_cell_general(formula = character(0), array = TRUE)
+  expect_silent(write_tmp(empty))
+})
+
+test_that("a dynamic formula carries its cached result, spilling or not", {
+  read_back <- function(cells) {
+    df <- data.frame(a = c(1, 2, 3))
+    df$f <- cells
+    p <- write_tmp(df)
+    list(sheet = xlsx_part(p, "xl/worksheets/sheet1.xml", raw = TRUE),
+         got = as.data.frame(readxl::read_xlsx(p)))
+  }
+  # single cell, with the value Excel would compute
+  r <- read_back(xl_cell_general(value = c(6, NA, NA),
+                                 formula = c("=SUM(A2:A4)", NA, NA),
+                                 dynamic = TRUE))
+  expect_equal(r$got$f[1L], 6)
+
+  # a declared range spills into columns the sheet does not write, again with
+  # a cached value for the anchor cell
+  r <- read_back(xl_cell_general(value = c(1, NA, NA),
+                                 formula = c("=TRANSPOSE(A2:A4)", NA, NA),
+                                 dynamic = TRUE,
+                                 array_range = list("B2:D2", NA, NA)))
+  expect_match(r$sheet, 'cm="1"', fixed = TRUE)
+  expect_equal(r$got$f[1L], 1)
+
+  # and without a cached value, on both paths
+  r <- read_back(xl_cell_general(formula = c("=SUM(A2:A4)", NA, NA),
+                                 dynamic = TRUE))
+  expect_match(r$sheet, "SUM(A2:A4)", fixed = TRUE)
+  r <- read_back(xl_cell_general(formula = c("=TRANSPOSE(A2:A4)", NA, NA),
+                                 dynamic = TRUE,
+                                 array_range = list("B2:D2", NA, NA)))
+  expect_match(r$sheet, "TRANSPOSE", fixed = TRUE)
+})

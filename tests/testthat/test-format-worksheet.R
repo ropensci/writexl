@@ -271,3 +271,14 @@ test_that("overlay payload lists are normalised", {
   expect_equal(.as_overlay_list(list(one, one)), list(one, one))
   expect_error(.as_overlay_list("x"), "overlay payload")
 })
+
+test_that("a filter hides a row that already carries a row spec", {
+  df <- data.frame(a = c("x", "y", "z"), stringsAsFactors = FALSE)
+  p <- write_tmp(list(D = xl_sheet(df,
+    rows = xl_row_spec(2, height = 30),
+    filter = xl_filter(col = "a", list = "x"))))
+  x <- xlsx_part(p, "xl/worksheets/sheet1.xml", raw = TRUE)
+  # the spec's own row keeps its height and gains the filter's hidden flag
+  expect_match(x, 'ht="30"', fixed = TRUE)
+  expect_match(x, 'hidden="1"', fixed = TRUE)
+})

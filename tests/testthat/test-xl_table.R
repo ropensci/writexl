@@ -36,7 +36,8 @@ test_that("each style type enforces its own number range", {
 test_that("a malformed style is rejected", {
   expect_error(.parse_table_style("rainbow 3"), 'must be "light", "medium" or "dark"')
   expect_error(.parse_table_style("medium"), 'a type and number like "medium 9"')
-  expect_error(.parse_table_style("medium 9 extra"), 'a type and number like')
+  expect_error(.parse_table_style("medium 9 extra"),
+               "a type and number like")
   expect_error(.parse_table_style("medium nine"), "numbered 1 to 28")
   expect_error(.parse_table_style(9), "must be a single string")
   expect_error(.parse_table_style(NA_character_), "must be a single string")
@@ -383,7 +384,7 @@ test_that("a header row that would land on data is refused", {
 test_that("a column outside the table's range is refused", {
   expect_error(write_tmp(list(D = xl_sheet(sdf, table = xl_table(
     range = "A1:A4", columns = xl_table_column("qty"))))),
-    'outside the table\'s range')
+    "outside the table's range")
 })
 
 # ── Conflicts ─────────────────────────────────────────────────────────────────
@@ -538,4 +539,55 @@ test_that("the print methods run", {
   expect_output(print(xl_table(total_row = TRUE)), "total row")
   expect_output(print(xl_table_column("qty", total = "sum")), "total=sum")
   expect_output(print(xl_table_column("qty", formula = "=1")), "formula")
+})
+
+test_that("a cached total is written for readers that do not evaluate formulas", {
+  df <- data.frame(fruit = c("apple", "pear"), qty = c(3, 4),
+                   stringsAsFactors = FALSE)
+  sheet <- xl_sheet(df, table = xl_table(total_row = TRUE, columns = list(
+    xl_table_column("fruit", total_label = "Total"),
+    xl_table_column("qty", total = "sum", total_value = 7))))
+  p <- write_tmp(list(D = sheet))
+  # readxl reads the cached value, so without one the total row reads blank
+  got <- as.data.frame(readxl::read_xlsx(p))
+  expect_equal(got$qty[3L], 7)
+  expect_equal(got$fruit[3L], "Total")
+  # the formula is still what Excel recalculates on open
+  expect_match(xlsx_part(p, "xl/tables/table1.xml", raw = TRUE),
+               'totalsRowFunction="sum"', fixed = TRUE)
+})
+
+test_that("a cached total needs the function it caches", {
+  expect_error(xl_table_column("qty", total_value = 7),
+               "caches the result of `total`", fixed = TRUE)
+  expect_error(xl_table_column("qty", total = "sum", total_value = "7"),
+               "must be a single non-NA number")
+  expect_error(xl_table_column("qty", total = "sum", total_value = c(1, 2)),
+               "must be a single non-NA number")
+  expect_error(xl_table_column("qty", total = "sum", total_value = NA_real_),
+               "must be a single non-NA number")
+  expect_equal(unclass(xl_table_column("q", total = "sum",
+                                       total_value = 7))$total_value, 7)
+})
+
+test_that("a generated table name is trimmed and made unique", {
+  # Excel caps a table name at 255 and compares them case-insensitively
+  long <- paste(rep("a", 300), collapse = "")
+  expect_equal(nchar(.sanitize_table_name(long)), 250L)
+  expect_equal(.unique_table_name("Sales", c("sales", "sales_2")), "Sales_3")
+  expect_equal(.unique_table_name("Sales", character(0)), "Sales")
+})
+
+test_that("a table needs a row that is neither header nor total", {
+  df <- data.frame(a = 1, b = 2)
+  expect_error(write_tmp(list(D = xl_sheet(df, table = xl_table(
+    range = "A1:B2", total_row = TRUE)))),
+    "at least one row that is not the header")
+})
+
+test_that("a sheet with no table has no column formats to collect", {
+  expect_equal(.table_column_formats(data.frame(a = 1), data.frame(a = 1)),
+               list(NULL))
+  expect_null(.check_table_conflicts(xl_sheet(data.frame(a = 1)),
+                                     data.frame(a = 1), 1L, list()))
 })

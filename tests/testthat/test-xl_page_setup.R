@@ -99,7 +99,7 @@ test_that("centring is applied on each axis independently", {
   expect_match(both, 'horizontalCentered="1"', fixed = TRUE)
   expect_match(both, 'verticalCentered="1"', fixed = TRUE)
   # FALSE is not TRUE: nothing is written
-  expect_false(grepl('horizontalCentered',
+  expect_false(grepl("horizontalCentered",
                      page_xml(xl_page_setup(center_horizontally = FALSE)),
                      fixed = TRUE))
 })
@@ -390,7 +390,8 @@ test_that("page breaks are written 0-based, one before the named row", {
 })
 
 test_that("vertical breaks accept numbers and column letters", {
-  expect_match(breaks_xml(xl_page_setup(v_breaks = 2)), '<colBreaks', fixed = TRUE)
+  expect_match(breaks_xml(xl_page_setup(v_breaks = 2)), "<colBreaks",
+               fixed = TRUE)
   expect_match(breaks_xml(xl_page_setup(v_breaks = 2)), '<brk id="1"', fixed = TRUE)
   # column "C" is the third column, so a break before it is 0-based 2
   expect_match(breaks_xml(xl_page_setup(v_breaks = "C")), '<brk id="2"',
@@ -436,4 +437,23 @@ test_that("print area and breaks together leave the cells alone", {
   p <- write_tmp(list(D = xl_sheet(df, page = xl_page_setup(
     print_area = "A1:A11", repeat_rows = 1, h_breaks = 6))))
   expect_equal(as.data.frame(readxl::read_xlsx(p)), df)
+})
+
+test_that("a header or footer image position may be given only once", {
+  logo <- png_file()
+  expect_error(xl_page_setup(header = "&L&G",
+                             header_image = list(left = logo, left = logo)),
+               "each position may be given only once")
+  expect_error(xl_page_setup(header = "&L&G",
+                             header_image = list(middle = logo)),
+               "unknown position")
+})
+
+test_that("a header image may be an in-memory picture", {
+  skip_if_not(isTRUE(capabilities("png")))
+  p <- write_tmp(list(D = xl_sheet(data.frame(a = 1:3), page = xl_page_setup(
+    header = "&L&G",
+    header_image = list(left = as.raster(matrix("red", 2, 2)))))))
+  d <- tempfile(); dir.create(d); utils::unzip(p, exdir = d)
+  expect_true(any(grepl("^xl/media/", list.files(d, recursive = TRUE))))
 })

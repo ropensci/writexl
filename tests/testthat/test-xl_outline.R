@@ -97,3 +97,36 @@ test_that("no outline or ignored errors means neither element is written", {
   expect_no_match(w, "<ignoredErrors>", fixed = TRUE)
   expect_no_match(w, "outlinePr", fixed = TRUE)
 })
+
+test_that("a collapsed group writes the summary row and column", {
+  # Excel does not derive `collapsed` from the group: the detail is hidden and
+  # the summary beside it carries the flag, which is the state clicking the
+  # grouping symbol leaves behind
+  w <- ws(cols = list(xl_col_spec("a", level = 1, hidden = TRUE),
+                      xl_col_spec("b", collapsed = TRUE)),
+          rows = list(xl_row_spec(1, level = 1, hidden = TRUE),
+                      xl_row_spec(2, collapsed = TRUE)))
+  expect_match(w, 'collapsed="1"', fixed = TRUE)
+  expect_equal(lengths(regmatches(w, gregexpr('collapsed="1"', w, fixed = TRUE))),
+               2L)
+  # and it is off unless asked for
+  expect_false(grepl("collapsed", ws(cols = xl_col_spec("a", level = 1)),
+                     fixed = TRUE))
+})
+
+test_that("collapsed alone is enough to reach the file", {
+  # no width, format, hidden or level beside it -- the column loop skips a
+  # column with nothing set, so `collapsed` has to count as something
+  expect_match(ws(cols = xl_col_spec("a", collapsed = TRUE)),
+               'collapsed="1"', fixed = TRUE)
+  expect_match(ws(rows = xl_row_spec(1, collapsed = TRUE)),
+               'collapsed="1"', fixed = TRUE)
+  expect_error(xl_col_spec("a", collapsed = "yes"), "`collapsed` must be")
+  expect_error(xl_row_spec(1, collapsed = "yes"), "`collapsed` must be")
+})
+
+test_that("ignore_errors takes a bare vector as well as a list", {
+  w <- ws(ignore_errors = c(number_stored_as_text = "A2:A4"))
+  expect_match(w, "ignoredError", fixed = TRUE)
+  expect_error(ws(ignore_errors = list("A2:A4")), "must be a named list")
+})

@@ -53,7 +53,9 @@
   if (startsWith(type, "bar") || startsWith(type, "column")) return("bar")
   if (startsWith(type, "line")) return("line")
   if (startsWith(type, "area")) return("area")
-  "other"
+  # every name in .LXW_CHART_TYPE matches one of the tests above, and every
+  # caller passes a type .val_enum() has already checked; a test pins that
+  "other"  # nocov
 }
 
 # feature -> the families that support it

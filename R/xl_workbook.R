@@ -24,6 +24,10 @@
 #'
 #' @param title,subject,author,manager,company,category,keywords,comments,status,hyperlink_base
 #'   Document metadata strings (Excel's "Properties" dialog).
+#' @param created The workbook's creation timestamp, a `Date` or `POSIXct`.
+#'   Left `NA` libxlsxwriter stamps the moment the file is written, which is
+#'   what makes two runs over the same data differ; pinning it makes them
+#'   byte-identical.
 #' @param custom A named list of custom document properties.  Values may be
 #'   character, integer, numeric, logical, `Date` or `POSIXct`.  A `Date` or
 #'   `POSIXct` is written as a real datetime property (not as text) and follows
@@ -65,7 +69,7 @@
 xl_properties <- function(title = NA, subject = NA, author = NA, manager = NA,
                           company = NA, category = NA, keywords = NA,
                           comments = NA, status = NA, hyperlink_base = NA,
-                          custom = NULL, read_only = FALSE, window_size = NULL,
+                          created = NA, custom = NULL, read_only = FALSE, window_size = NULL,
                           names = NULL,
                           default_format   = xl_format(),
                           header_format    = xl_font(bold = TRUE) +
@@ -102,7 +106,7 @@ xl_properties <- function(title = NA, subject = NA, author = NA, manager = NA,
     list(title = title, subject = subject, author = author, manager = manager,
          company = company, category = category, keywords = keywords,
          comments = comments, status = status, hyperlink_base = hyperlink_base,
-         custom = custom, read_only = read_only, window_size = window_size,
+         created = created, custom = custom, read_only = read_only, window_size = window_size,
          names = names,
          default_format = default_format, header_format = header_format,
          hyperlink_format = hyperlink_format, date_format = date_format,
@@ -311,6 +315,15 @@ print.xl_workbook <- function(x, ...) {
   for (k in meta_keys) {
     v <- props[[k]]
     if (!is.null(v) && !(length(v) == 1L && is.na(v))) out[[k]] <- as.character(v)
+  }
+  cr <- props$created
+  if (!is.null(cr) && !(length(cr) == 1L && is.na(cr))) {
+    if (!inherits(cr, "Date") && !inherits(cr, "POSIXct"))
+      stop("`created` must be a Date or POSIXct", call. = FALSE)
+    if (length(cr) != 1L)
+      stop("`created` must be a single date or datetime", call. = FALSE)
+    # time_t on the C side, and a Date is midnight UTC on that day
+    out$created <- as.numeric(as.POSIXct(cr, tz = "UTC"))
   }
   if (!is.null(props$custom) && length(props$custom)) {
     out$custom <- lapply(base::names(props$custom), function(nm) {

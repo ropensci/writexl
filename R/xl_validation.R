@@ -256,11 +256,11 @@ print.xl_validation <- function(x, ...) {
 # lxw_data_validation struct carries for each of value / minimum / maximum.
 .validation_limit <- function(x, prefix) {
   if (is.null(x)) return(base::list())
-  if (.is_formula_limit(x))
-    return(stats::setNames(base::list(x), paste0(prefix, "_formula")))
   if (.is_datetime_limit(x))
     return(stats::setNames(base::list(.datetime_fields(x)),
                            paste0(prefix, "_datetime")))
+  # a string is a formula whether or not it starts with "=" -- Excel stores the
+  # bound as a formula either way, and libxlsxwriter adds the "=" itself
   if (is.character(x))
     return(stats::setNames(base::list(x), paste0(prefix, "_formula")))
   stats::setNames(base::list(as.numeric(x)), paste0(prefix, "_number"))

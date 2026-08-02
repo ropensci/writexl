@@ -161,6 +161,41 @@ test_that("chartsheet arguments are validated", {
   expect_error(xl_chartsheet(ch, protect = list(nope = TRUE)), "protect")
 })
 
+test_that("a chartsheet takes the two protection options it has, not a sheet's", {
+  # the attribute asserts protection, so asking for no_* drops it: Excel
+  # writes content="1" for a protected chart and nothing for an editable one
+  plain <- cs_parts(xl_chart("column", cs_series()), protect = TRUE)
+  expect_match(plain$sheet, 'content="1"', fixed = TRUE)
+  expect_match(plain$sheet, 'objects="1"', fixed = TRUE)
+
+  r <- cs_parts(xl_chart("column", cs_series()),
+                protect = list(password = "s", no_content = TRUE,
+                               no_objects = TRUE))
+  expect_match(r$sheet, "sheetProtection", fixed = TRUE)
+  expect_false(grepl('content="1"', r$sheet, fixed = TRUE))
+  expect_false(grepl('objects="1"', r$sheet, fixed = TRUE))
+
+  # one at a time, so neither flag is standing in for the other
+  only_obj <- cs_parts(xl_chart("column", cs_series()),
+                       protect = list(no_objects = TRUE))
+  expect_match(only_obj$sheet, 'content="1"', fixed = TRUE)
+  expect_false(grepl('objects="1"', only_obj$sheet, fixed = TRUE))
+  only_con <- cs_parts(xl_chart("column", cs_series()),
+                       protect = list(no_content = TRUE))
+  expect_match(only_con$sheet, 'objects="1"', fixed = TRUE)
+  expect_false(grepl('content="1"', only_con$sheet, fixed = TRUE))
+})
+
+test_that("a worksheet's protection options are refused on a chartsheet, and vice versa", {
+  ch <- xl_chart("column", cs_series())
+  expect_error(xl_chartsheet(ch, protect = list(format_cells = TRUE)),
+               "a chartsheet has no cells")
+  expect_error(xl_chartsheet(ch, protect = list(format_cells = TRUE)),
+               "It accepts: no_content, no_objects", fixed = TRUE)
+  expect_error(xl_sheet(cs_sales, protect = list(no_content = TRUE)),
+               "belong to a chartsheet")
+})
+
 # ── Alongside the rest of the workbook ────────────────────────────────────────
 
 test_that("a chartsheet counts as a drawing in the ordering check", {
@@ -199,4 +234,73 @@ test_that("a chartsheet may be given to xl_workbook() like any other sheet", {
                     properties = xl_properties(title = "T"))
   expect_s3_class(wb$sheets$Overview, "xl_chartsheet")
   expect_silent(write_xlsx(wb, tempfile(fileext = ".xlsx")))
+})
+
+test_that("a chartsheet takes the page and view options it supports", {
+  r <- cs_parts(xl_chart("column", cs_series()),
+                view = xl_sheet_view(active = TRUE, first_tab = TRUE),
+                page = xl_page_setup(orientation = "portrait",
+                                     margins = c(1, 1, 1.2, 1.2),
+                                     header = "&LLeft", footer = "&RRight",
+                                     header_margin = 0.6,
+                                     footer_margin = 0.7))
+  expect_match(r$sheet, 'orientation="portrait"', fixed = TRUE)
+  expect_match(r$sheet, 'left="1"', fixed = TRUE)
+  expect_match(r$sheet, 'header="0.6"', fixed = TRUE)
+  expect_match(r$sheet, 'footer="0.7"', fixed = TRUE)
+  expect_match(r$sheet, "&amp;LLeft", fixed = TRUE)
+  expect_match(r$sheet, "&amp;RRight", fixed = TRUE)
+  expect_match(r$workbook, "activeTab", fixed = TRUE)
+  expect_match(r$workbook, "firstSheet", fixed = TRUE)
+})
+
+test_that("a chartsheet's tab is selected by the same argument a worksheet's is", {
+  # chartsheet_select() only sets a flag on the chartsheet, while <sheetView>
+  # is written from the worksheet it wraps -- so writexl sets that one too, and
+  # xl_sheet_view(selected =) means the same thing on either kind of sheet
+  view_of <- function(part) sub(".*(<sheetView [^>]*>).*", "\1", part)
+
+  cs <- cs_parts(xl_chart("column", cs_series()),
+                 view = xl_sheet_view(selected = TRUE))
+  expect_match(cs$sheet, 'tabSelected="1"', fixed = TRUE)
+
+  p <- write_tmp(list(A = cs_sales,
+                      B = xl_sheet(cs_sales,
+                                   view = xl_sheet_view(selected = TRUE))))
+  ws <- xlsx_part(p, "xl/worksheets/sheet2.xml", raw = TRUE)
+  expect_match(ws, 'tabSelected="1"', fixed = TRUE)
+  # the same element, byte for byte, on a chartsheet and on a worksheet
+  expect_equal(view_of(cs$sheet), view_of(ws))
+})
+
+test_that("the active sheet is selected too, on either kind of sheet", {
+  # Excel cannot show an active tab that is not also selected, and
+  # libxlsxwriter's *_activate() set both
+  cs <- cs_parts(xl_chart("column", cs_series()),
+                 view = xl_sheet_view(active = TRUE))
+  expect_match(cs$sheet, 'tabSelected="1"', fixed = TRUE)
+  expect_match(cs$workbook, "activeTab", fixed = TRUE)
+
+  p <- write_tmp(list(A = cs_sales,
+                      B = xl_sheet(cs_sales,
+                                   view = xl_sheet_view(active = TRUE))))
+  expect_match(xlsx_part(p, "xl/worksheets/sheet2.xml", raw = TRUE),
+               'tabSelected="1"', fixed = TRUE)
+})
+
+test_that("a sheet nobody selected carries no tabSelected", {
+  cs <- cs_parts(xl_chart("column", cs_series()))
+  expect_false(grepl("tabSelected", cs$sheet, fixed = TRUE))
+})
+
+test_that("a hidden chartsheet is hidden in the workbook", {
+  r <- cs_parts(xl_chart("column", cs_series()),
+                view = xl_sheet_view(visible = FALSE), name = "Hidden")
+  expect_match(r$workbook, 'state="hidden"', fixed = TRUE)
+})
+
+test_that("a chart with no title has no unqualified range to complain about", {
+  # named() returns TRUE for an absent range, so a titleless chart passes
+  expect_s3_class(xl_chartsheet(xl_chart("column", cs_series())),
+                  "xl_chartsheet")
 })

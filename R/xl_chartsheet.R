@@ -24,7 +24,9 @@
                       "header_margin", "footer_margin")
 
 # The xl_sheet_view() options it can express: chartsheet_activate(),
-# _select(), _hide() and _set_first_sheet().
+# _select(), _hide() and _set_first_sheet().  Selection is the same argument
+# here as on a worksheet -- see apply_chartsheet() in src/write_xlsx.c for the
+# one extra flag a chartsheet needs to make it reach the file.
 .CHARTSHEET_VIEW <- c("active", "selected", "visible", "first_tab")
 
 #' A sheet holding a single chart
@@ -41,12 +43,16 @@
 #' A chartsheet supports only part of what a worksheet does, and the parts it
 #' does not are refused rather than dropped: of [xl_page_setup()] it takes the
 #' orientation, paper size, margins and the header and footer; of
-#' [xl_sheet_view()] it takes `active`, `selected`, `visible` and `first_tab`.
+#' [xl_sheet_view()] it takes `active`, `selected`, `visible` and
+#'   `first_tab`.
 #'
 #' @param chart The [xl_chart()] to fill the sheet with.
 #' @param tab_color The colour of the sheet tab.
 #' @param zoom The zoom level as a percentage, 10 to 400.
-#' @param protect Worksheet protection, as [xl_sheet()] takes it.
+#' @param protect `TRUE`, a password string, or a named list. A chartsheet
+#'   has no cells, so of Excel's protection options it takes only
+#'   `no_content` (let the chart be edited) and `no_objects` (let the shapes
+#'   on it be edited); the worksheet options are refused by name.
 #' @param page An [xl_page_setup()] describing how it prints.
 #' @param view An [xl_sheet_view()] setting the tab state.
 #' @return An `xl_chartsheet` object.
@@ -64,7 +70,7 @@ xl_chartsheet <- function(chart, tab_color = NULL, zoom = NA, protect = NULL,
                           page = NULL, view = NULL) {
   if (missing(chart) || is.null(chart))
     stop("`chart` must be the xl_chart() to fill the sheet with", call. = FALSE)
-  .validate_protect(protect)
+  .validate_protect(protect, "chartsheet")
   ch <- .chart_list(chart)
   if (length(ch) != 1L)
     stop(sprintf(paste0("a chartsheet holds exactly one chart, not %d. Put ",
@@ -143,7 +149,7 @@ print.xl_chartsheet <- function(x, ...) {
   ent$tab_color <- p[["tab_color"]]
   ent$zoom <- p[["zoom"]]
   if (!is.null(p[["protect"]])) {
-    pr <- .resolve_protect(p[["protect"]])
+    pr <- .resolve_protect(p[["protect"]], "chartsheet")
     ent$protect <- pr$flag
     ent$protect_password <- pr$password
     ent$protect_options <- pr$options
@@ -155,8 +161,8 @@ print.xl_chartsheet <- function(x, ...) {
 # on the chartsheet itself for a bare list(cols = ) or an unqualified "B2:B10"
 # to resolve against.
 .check_chartsheet_ranges <- function(chart, own) {
+  # `r` is never NULL: the loop below skips a part that carries no range
   named <- function(r) {
-    if (is.null(r)) return(TRUE)
     if (!is.null(r[["sheet"]])) return(TRUE)
     is.character(r[["spec"]]) && !is.null(.split_sheet_ref(r[["spec"]])$sheet)
   }

@@ -35,3 +35,9 @@ src/libxlsxwriter/third_party/minizip/*
 *.tgz
 *.Rcheck/
 .Ruserdata
+
+# revdepcheck working tree: package library, checkouts and per-package logs
+revdep/
+
+# lintr scratch output
+lints.rds

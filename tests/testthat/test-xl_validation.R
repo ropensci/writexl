@@ -269,3 +269,33 @@ test_that("the print method runs", {
   expect_output(print(xl_validation("A2:A4", list = c("a", "b"))),
                 "xl_validation")
 })
+
+test_that("a validation with no type is the `any` kind", {
+  # no `type` and no `list` leaves the "any" kind, which validates nothing but
+  # still shows the input message
+  v <- unclass(xl_validation("A1:A5", input_message = "type something"))
+  expect_equal(v$kind, "any")
+  p <- write_tmp(list(D = xl_sheet(data.frame(a = 1:3), validation =
+    xl_validation("A2:A4", input_message = "type something"))))
+  expect_match(xlsx_part(p, "xl/worksheets/sheet1.xml", raw = TRUE),
+               "dataValidation", fixed = TRUE)
+})
+
+test_that("a character bound is passed through as a formula", {
+  p <- write_tmp(list(D = xl_sheet(data.frame(a = 1:3), validation =
+    xl_validation("A2:A4", type = "integer", criteria = "between",
+                  min = "=MIN($A$2:$A$4)", max = "=MAX($A$2:$A$4)"))))
+  x <- xlsx_part(p, "xl/worksheets/sheet1.xml", raw = TRUE)
+  expect_match(x, "MIN($A$2:$A$4)", fixed = TRUE)
+  expect_match(x, "MAX($A$2:$A$4)", fixed = TRUE)
+})
+
+test_that("a validation list must hold xl_validation objects", {
+  expect_error(write_tmp(list(D = xl_sheet(data.frame(a = 1:3),
+                                           validation = list("nope")))),
+               "must be an xl_validation object")
+})
+
+test_that("a type of NA is the `any` kind", {
+  expect_equal(unclass(xl_validation("A1:A5", type = NA))$kind, "any")
+})

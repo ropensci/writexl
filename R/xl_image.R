@@ -77,6 +77,7 @@
 .raster_to_png <- function(x, arg) {
   missing_ns <- !vapply(c("grDevices", "graphics"), requireNamespace,
                         logical(1), quietly = TRUE)
+  # nocov start  (needs a build with no PNG device; a test skips there instead)
   if (any(missing_ns) || !isTRUE(capabilities("png")))
     stop(sprintf(paste0("`%s` is an in-memory image, which writexl encodes ",
                         "with R's PNG device -- unavailable here (%s).\n",
@@ -92,6 +93,7 @@
                          paste(names(missing_ns)[missing_ns], collapse = ", "))
                  else "capabilities(\"png\") is FALSE"),
          call. = FALSE)
+  # nocov end
   d <- dim(x)
   if (length(d) < 2L || anyNA(d[1:2]) || any(d[1:2] < 1L))
     stop(sprintf("`%s` has no pixels to write", arg), call. = FALSE)
@@ -112,7 +114,9 @@
     })
   # dev.off() must run even if drawing fails, or the device is left open
   on.exit({
-    if (grDevices::dev.cur() > 1L) grDevices::dev.off()
+    # only fires when drawing threw: the happy path has closed the device by
+    # the time on.exit() runs
+    if (grDevices::dev.cur() > 1L) grDevices::dev.off()  # nocov
     unlink(path)
   }, add = TRUE)
   graphics::par(mar = c(0, 0, 0, 0), xaxs = "i", yaxs = "i")

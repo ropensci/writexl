@@ -135,8 +135,10 @@
 
 # Shared tail of every constructor.
 .new_conditional <- function(cluster, range, fields, stop_if_true, multi_range) {
-  if (missing(range) || is.null(range))
-    stop("`range` must name the cells to format", call. = FALSE)
+  # every constructor checks this first, so it can fail before its own
+  # validation runs; this is the backstop for one added later
+  if (missing(range) || is.null(range))                                # nocov
+    stop("`range` must name the cells to format", call. = FALSE)       # nocov
   structure(
     c(list(cluster = cluster, range = range),
       fields,
@@ -390,7 +392,8 @@ xl_cond_bar <- function(range, color = NA, values = NULL, rule_types = NULL,
     bar_color                 = if (!.is_unset(color)) xl_color(color),
     bar_negative_color        = if (!.is_unset(negative_color)) xl_color(negative_color),
     bar_border_color          = if (!.is_unset(border_color)) xl_color(border_color),
-    bar_negative_border_color = if (!.is_unset(negative_border_color)) xl_color(negative_border_color),
+    bar_negative_border_color = if (!.is_unset(negative_border_color))
+                                  xl_color(negative_border_color),
     bar_axis_color            = if (!.is_unset(axis_color)) xl_color(axis_color)
   ))
   flags <- .drop_null(list(

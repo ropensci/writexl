@@ -634,3 +634,112 @@ test_that("the default follows the sheet the values come from", {
     Data = crange_sales), sheet = "Chart")
   expect_equal(p[[1L]]$series[[1L]]$name_sheet, "Data")
 })
+
+# ── The options that had no test of their own ────────────────────────────────
+
+chart_file <- function(...) {
+  df <- data.frame(quarter = c("Q1", "Q2", "Q3"), revenue = c(10, 25, 18),
+                   stringsAsFactors = FALSE)
+  t <- tempfile(fileext = ".xlsx")
+  write_xlsx(list(Data = xl_sheet(df, chart = xl_chart(...))), t)
+  xlsx_part(t, "xl/charts/chart1.xml", raw = TRUE)
+}
+
+test_that("alt text and a smoothed, inverted series reach the file", {
+  s <- xl_chart_series(values = list(cols = "revenue"), smooth = TRUE,
+                       invert_if_negative = TRUE)
+  x <- chart_file("line", s, description = "Quarterly revenue",
+                  decorative = TRUE)
+  expect_match(x, "<c:smooth val=\"1\"/>", fixed = TRUE)
+  expect_match(x, "invertIfNegative", fixed = TRUE)
+})
+
+test_that("a chart's alt text reaches the drawing that holds it", {
+  drawing <- function(...) {
+    df <- data.frame(quarter = c("Q1", "Q2"), revenue = c(1, 2),
+                     stringsAsFactors = FALSE)
+    t <- tempfile(fileext = ".xlsx")
+    write_xlsx(list(Data = xl_sheet(df, chart = xl_chart("line",
+      xl_chart_series(values = list(cols = "revenue")), ...))), t)
+    # alt text belongs to the drawing anchor, not the chart part
+    xlsx_part(t, "xl/drawings/drawing1.xml", raw = TRUE)
+  }
+  expect_match(drawing(description = "Quarterly revenue"),
+               'descr="Quarterly revenue"', fixed = TRUE)
+  # marking a chart decorative replaces the description rather than joining it:
+  # Excel's model is that a decorative object has nothing to announce
+  d <- drawing(description = "Quarterly revenue", decorative = TRUE)
+  expect_match(d, "adec:decorative", fixed = TRUE)
+  expect_false(grepl("Quarterly revenue", d, fixed = TRUE))
+})
+
+test_that("a numeric axis crossing and styled gridlines reach the file", {
+  x <- chart_file("column", xl_chart_series(values = list(cols = "revenue")),
+                  y_axis = xl_chart_axis(
+                    crossing = 5, major_gridlines = TRUE,
+                    major_gridlines_format = xl_border(all = "dashed",
+                                                       color = "red")))
+  expect_match(x, "<c:crossesAt val=\"5\"/>", fixed = TRUE)
+  expect_match(x, "majorGridlines", fixed = TRUE)
+  expect_match(x, "FF0000", fixed = TRUE)
+  # and the two named crossings take the other branches
+  expect_match(chart_file("column", xl_chart_series(values = list(cols = "revenue")),
+                          y_axis = xl_chart_axis(crossing = "min")),
+               "<c:crosses val=\"min\"/>", fixed = TRUE)
+  expect_match(chart_file("column", xl_chart_series(values = list(cols = "revenue")),
+                          y_axis = xl_chart_axis(crossing = "max")),
+               "<c:crosses val=\"max\"/>", fixed = TRUE)
+})
+
+test_that("a chart area fill and a plot area fill are told apart", {
+  x <- chart_file("column", xl_chart_series(values = list(cols = "revenue")),
+                  chart_area_format = xl_fill(background = "yellow"),
+                  plot_area_format = xl_fill(background = "#C0C0C0"))
+  expect_match(x, "FFFF00", fixed = TRUE)
+  expect_match(x, "C0C0C0", fixed = TRUE)
+})
+
+test_that("chart arguments name what was wrong", {
+  s <- xl_chart_series(values = list(cols = "revenue"))
+  expect_error(xl_chart(NA, s), "must name a chart type")
+  expect_error(xl_chart("bubble", s), "`type` must be one of")
+  expect_error(xl_chart("column", s, at = "A1", scale = c(1, 2, 3)),
+               "must be one number or two")
+  expect_error(xl_chart("column", s, description = 1),
+               "must be a single non-NA string")
+  expect_error(xl_chart("column", list(s, "not a series")),
+               "must be an xl_chart_series")
+  expect_equal(.chart_list(NULL), list())
+  expect_error(.chart_list(list(xl_chart("column", s), "x")),
+               "must be an xl_chart object")
+})
+
+test_that("a series may not plot a sheet that has no data rows", {
+  empty <- data.frame(a = numeric(0))
+  plot_empty <- function(values)
+    write_tmp(list(Empty = empty,
+                   D = xl_sheet(data.frame(revenue = c(1, 2)),
+                                chart = xl_chart("column",
+                                  xl_chart_series(values = values)))))
+  # by column: the spec resolver has no rows to turn into a range
+  expect_error(plot_empty(list(sheet = "Empty", cols = "a")), "covers no rows")
+  # by A1 range: the range itself is fine, and the sheet is what is empty
+  expect_error(plot_empty("Empty!A1:A1"), "which has no data rows")
+  # and a range starting past the data says so instead
+  expect_error(plot_empty("Empty!A2:A3"), "selects no data")
+})
+
+test_that("every chart type has a family, so the fallback is unreachable", {
+  # the feature matrix is keyed by family, so a type falling through to
+  # "other" would silently be allowed everything and refused nothing
+  fams <- vapply(names(.LXW_CHART_TYPE), .CHART_FAMILY, character(1))
+  expect_setequal(unique(fams),
+                  c("pie", "bar", "line", "area", "scatter", "radar"))
+  expect_false("other" %in% fams)
+})
+
+test_that("a chart with no series to plot resolves to nothing", {
+  expect_equal(.chart_series_list(NULL), list())
+  expect_error(.chart_series_list("nope"),
+               "must be an xl_chart_series object or a list of them")
+})

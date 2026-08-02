@@ -379,3 +379,75 @@ test_that("the print method runs", {
   expect_output(print(xl_filter("q", ">", 100)), "xl_filter")
   expect_output(print(xl_filter("f", list = c("a", "b"))), "2 value")
 })
+
+# ── The branches nothing else reached ────────────────────────────────────────
+
+test_that("a hyperlink cell filters on the text Excel shows", {
+  df <- data.frame(site = c("a", "b"), stringsAsFactors = FALSE)
+  # a hyperlink with no value of its own displays its URL, so that is what a
+  # filter has to match
+  df$site <- c(xl_cell_general(hyperlink = "https://example.com"),
+               xl_cell_general(hyperlink = list(url = "https://r-project.org")))
+  keep <- xl_filter_keep(df, xl_filter(col = "site",
+                                       list = "https://example.com"))
+  expect_equal(keep, c(TRUE, FALSE))
+  keep <- xl_filter_keep(df, xl_filter(col = "site",
+                                       list = "https://r-project.org"))
+  expect_equal(keep, c(FALSE, TRUE))
+})
+
+test_that("a date column compares as a number, not as its text", {
+  df <- data.frame(when = as.Date(c("2024-01-01", "2024-06-01", "2024-12-01")))
+  expect_equal(xl_filter_keep(df, xl_filter(col = "when", criteria = ">",
+                                            value = as.Date("2024-05-01"))),
+               c(FALSE, TRUE, TRUE))
+  expect_true(.filter_numeric_value(as.Date("2024-01-01")))
+  expect_true(.filter_numeric_value(as.POSIXct("2024-01-01", tz = "UTC")))
+  expect_true(.filter_numeric_value("42"))
+  expect_false(.filter_numeric_value(NULL))
+  expect_false(.filter_numeric_value("a*"))
+  expect_false(.filter_numeric_value("apple"))
+})
+
+test_that("blanks and non-blanks are their own criteria", {
+  df <- data.frame(a = c("x", NA, ""), stringsAsFactors = FALSE)
+  expect_equal(xl_filter_keep(df, xl_filter(col = "a", criteria = "blanks")),
+               c(FALSE, TRUE, TRUE))
+  expect_equal(xl_filter_keep(df, xl_filter(col = "a", criteria = "non-blanks")),
+               c(TRUE, FALSE, FALSE))
+})
+
+test_that("a second criteria needs its own value", {
+  expect_error(xl_filter(col = "a", criteria = ">", value = 1,
+                         criteria2 = "<"),
+               "needs a `value2`")
+})
+
+test_that("blanks reaches the custom rule when it is the second criteria", {
+  # a lone "blanks" is a standard filter; paired with a comparison under "and"
+  # it becomes a custom rule, which is a different evaluator
+  df <- data.frame(a = c("x", NA, "y"), stringsAsFactors = FALSE)
+  expect_equal(xl_filter_keep(df, xl_filter(col = "a", criteria = "!=",
+                                            value = "x", criteria2 = "blanks",
+                                            and_or = "or")),
+               c(FALSE, TRUE, TRUE))
+  # "blanks" AND "non-blanks" is the empty set, and each half is evaluated
+  expect_equal(xl_filter_keep(df, xl_filter(col = "a", criteria = "blanks",
+                                            criteria2 = "non-blanks",
+                                            and_or = "and")),
+               c(FALSE, FALSE, FALSE))
+})
+
+test_that("a date inside a mixed cell column compares as a number", {
+  df <- data.frame(a = 1:3)
+  df$when <- xl_cell_general(value = list(as.Date("2024-01-01"),
+                                          as.Date("2024-06-01"),
+                                          as.Date("2024-12-01")))
+  expect_equal(xl_filter_keep(df, xl_filter(col = "when", criteria = ">",
+                                            value = as.Date("2024-05-01"))),
+               c(FALSE, TRUE, TRUE))
+  # and a value list against a date column is refused, not guessed
+  expect_error(xl_filter_keep(df, xl_filter(col = "when",
+                                            list = "2024-01-01")),
+               "date")
+})

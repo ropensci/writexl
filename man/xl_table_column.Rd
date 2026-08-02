@@ -10,6 +10,7 @@ xl_table_column(
   formula = NULL,
   total = NULL,
   total_label = NULL,
+  total_value = NULL,
   format = NULL,
   header_format = NULL
 )
@@ -31,6 +32,11 @@ name the table, see the `name` argument of [xl_table()].}
 
 \item{total_label}{A string for the total-row cell instead of a function ---
 typically `"Total"` under the first column.}
+
+\item{total_value}{The number the total-row cell already holds. Excel
+recalculates `total` on open and ignores this, but a reader that does not
+evaluate formulas --- [readxl::read_xlsx()] among them --- shows what is
+cached, which without this is nothing.}
 
 \item{format}{An [xl_format] applied to the column's data cells.}
 

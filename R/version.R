@@ -12,5 +12,6 @@ lxw_version <- function(){
 
 #' @useDynLib writexl C_set_tempdir
 .onLoad <- function(lib, pkg){
-  .Call(C_set_tempdir, tempdir())
+  # runs before any test does, so covr never records it
+  .Call(C_set_tempdir, tempdir())  # nocov
 }
