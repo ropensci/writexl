@@ -141,12 +141,11 @@ test_that("the page options a chartsheet has no setter for are refused", {
 test_that("the view options a chartsheet has no setter for are refused", {
   ch <- xl_chart("column", cs_series())
   for (opt in list(list(hide_zero = TRUE), list(right_to_left = TRUE),
-                   list(selection = "A1"), list(top_left = "A1"),
-                   list(selected = TRUE)))
+                   list(selection = "A1"), list(top_left = "A1")))
     expect_error(xl_chartsheet(ch, view = do.call(xl_sheet_view, opt)),
                  "which a chartsheet has no setter for", label = names(opt))
-  for (opt in list(list(active = TRUE), list(visible = FALSE),
-                   list(first_tab = TRUE)))
+  for (opt in list(list(active = TRUE), list(selected = TRUE),
+                   list(visible = FALSE), list(first_tab = TRUE)))
     expect_true(inherits(xl_chartsheet(ch, view = do.call(xl_sheet_view, opt)),
                          "xl_chartsheet"), info = names(opt))
 })
@@ -255,15 +254,43 @@ test_that("a chartsheet takes the page and view options it supports", {
   expect_match(r$workbook, "firstSheet", fixed = TRUE)
 })
 
-test_that("`selected` is refused on a chartsheet rather than doing nothing", {
-  # chartsheet_select() sets a flag the sheetView writer never reads, so
-  # accepting it would be a silent no-op
-  expect_error(xl_chartsheet(xl_chart("column", cs_series()),
-                             view = xl_sheet_view(selected = TRUE)),
-               "no setter for")
-  expect_error(xl_chartsheet(xl_chart("column", cs_series()),
-                             view = xl_sheet_view(selected = TRUE)),
-               "A chartsheet takes: active, visible, first_tab", fixed = TRUE)
+test_that("a chartsheet's tab is selected by the same argument a worksheet's is", {
+  # chartsheet_select() only sets a flag on the chartsheet, while <sheetView>
+  # is written from the worksheet it wraps -- so writexl sets that one too, and
+  # xl_sheet_view(selected =) means the same thing on either kind of sheet
+  view_of <- function(part) sub(".*(<sheetView [^>]*>).*", "\1", part)
+
+  cs <- cs_parts(xl_chart("column", cs_series()),
+                 view = xl_sheet_view(selected = TRUE))
+  expect_match(cs$sheet, 'tabSelected="1"', fixed = TRUE)
+
+  p <- write_tmp(list(A = cs_sales,
+                      B = xl_sheet(cs_sales,
+                                   view = xl_sheet_view(selected = TRUE))))
+  ws <- xlsx_part(p, "xl/worksheets/sheet2.xml", raw = TRUE)
+  expect_match(ws, 'tabSelected="1"', fixed = TRUE)
+  # the same element, byte for byte, on a chartsheet and on a worksheet
+  expect_equal(view_of(cs$sheet), view_of(ws))
+})
+
+test_that("the active sheet is selected too, on either kind of sheet", {
+  # Excel cannot show an active tab that is not also selected, and
+  # libxlsxwriter's *_activate() set both
+  cs <- cs_parts(xl_chart("column", cs_series()),
+                 view = xl_sheet_view(active = TRUE))
+  expect_match(cs$sheet, 'tabSelected="1"', fixed = TRUE)
+  expect_match(cs$workbook, "activeTab", fixed = TRUE)
+
+  p <- write_tmp(list(A = cs_sales,
+                      B = xl_sheet(cs_sales,
+                                   view = xl_sheet_view(active = TRUE))))
+  expect_match(xlsx_part(p, "xl/worksheets/sheet2.xml", raw = TRUE),
+               'tabSelected="1"', fixed = TRUE)
+})
+
+test_that("a sheet nobody selected carries no tabSelected", {
+  cs <- cs_parts(xl_chart("column", cs_series()))
+  expect_false(grepl("tabSelected", cs$sheet, fixed = TRUE))
 })
 
 test_that("a hidden chartsheet is hidden in the workbook", {

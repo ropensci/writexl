@@ -23,12 +23,11 @@
 .CHARTSHEET_PAGE <- c("orientation", "paper", "margins", "header", "footer",
                       "header_margin", "footer_margin")
 
-# The xl_sheet_view() options it can express: chartsheet_activate(), _hide()
-# and _set_first_sheet().  `selected` is not among them: chartsheet_select()
-# sets a flag on the chartsheet, while the sheetView element is written from
-# the worksheet it wraps, so nothing reaches the file.  Measured against
-# libxlsxwriter 1.2.4 -- `active` writes activeTab, `selected` writes nothing.
-.CHARTSHEET_VIEW <- c("active", "visible", "first_tab")
+# The xl_sheet_view() options it can express: chartsheet_activate(),
+# _select(), _hide() and _set_first_sheet().  Selection is the same argument
+# here as on a worksheet -- see apply_chartsheet() in src/write_xlsx.c for the
+# one extra flag a chartsheet needs to make it reach the file.
+.CHARTSHEET_VIEW <- c("active", "selected", "visible", "first_tab")
 
 #' A sheet holding a single chart
 #'
@@ -44,7 +43,8 @@
 #' A chartsheet supports only part of what a worksheet does, and the parts it
 #' does not are refused rather than dropped: of [xl_page_setup()] it takes the
 #' orientation, paper size, margins and the header and footer; of
-#' [xl_sheet_view()] it takes `active`, `visible` and `first_tab`.
+#' [xl_sheet_view()] it takes `active`, `selected`, `visible` and
+#'   `first_tab`.
 #'
 #' @param chart The [xl_chart()] to fill the sheet with.
 #' @param tab_color The colour of the sheet tab.
@@ -131,6 +131,7 @@ print.xl_chartsheet <- function(x, ...) {
   vw <- p[["view"]]
   if (!is.null(vw)) {
     if (isTRUE(vw$active))       ent$activate <- 1L
+    if (isTRUE(vw$selected))     ent$select <- 1L
     if (identical(vw$visible, FALSE)) ent$hide <- 1L
     if (isTRUE(vw$first_tab))    ent$first_sheet <- 1L
   }

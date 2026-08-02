@@ -91,6 +91,19 @@ test_that("what a cell shows is always called `value`", {
   expect_equal(names(Filter(function(a) "text" %in% a, api)), character(0))
 })
 
+test_that("sheet selection has exactly one spelling", {
+  # Which tab is selected is an xl_sheet_view() setting, and only that: a
+  # worksheet and a chartsheet take the same argument and write the same
+  # element.  A second route -- xl_sheet(selected =), say -- would have to be
+  # kept in step with the visibility rules in sheet_visibility.R, which read
+  # the view and nothing else.
+  api <- api_arg_positions()
+  expect_equal(names(Filter(function(a) "selected" %in% a, api)),
+               "xl_sheet_view")
+  expect_equal(names(Filter(function(a) "active" %in% a, api)),
+               "xl_sheet_view")
+})
+
 test_that("data comes first in the functions that take data", {
   api <- api_arg_positions()
   expect_equal(api$write_xlsx[1L], "x")

@@ -1224,6 +1224,15 @@ static void apply_chartsheet(lxw_workbook *workbook, const char *name,
   }
 
   if(payload_has(opts, "activate"))    chartsheet_activate(sheet);
+  if(payload_has(opts, "select")){
+    chartsheet_select(sheet);
+    /* chartsheet_select() sets a flag on the chartsheet, but <sheetView> is
+       written from the worksheet it wraps -- lxw_worksheet_write_sheet_views(
+       self->worksheet) -- so tabSelected needs the flag set there too.  This
+       is the field chartsheet_activate() writes for its own case, one line
+       above where it sets ->active. */
+    sheet->worksheet->selected = LXW_TRUE;
+  }
   if(payload_has(opts, "hide"))        chartsheet_hide(sheet);
   if(payload_has(opts, "first_sheet")) chartsheet_set_first_sheet(sheet);
   if(payload_has(opts, "tab_color"))

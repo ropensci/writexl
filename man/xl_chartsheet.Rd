@@ -44,7 +44,8 @@ is refused.
 A chartsheet supports only part of what a worksheet does, and the parts it
 does not are refused rather than dropped: of [xl_page_setup()] it takes the
 orientation, paper size, margins and the header and footer; of
-[xl_sheet_view()] it takes `active`, `visible` and `first_tab`.
+[xl_sheet_view()] it takes `active`, `selected`, `visible` and
+  `first_tab`.
 }
 \examples{
 sales <- data.frame(quarter = c("Q1", "Q2"), revenue = c(10, 25))
