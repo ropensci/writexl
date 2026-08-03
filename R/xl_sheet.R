@@ -42,6 +42,10 @@
 #'   as 100 pixels is 13.57 character units.
 #' @param hidden Logical; hide the column/row.
 #' @param level Integer outline (grouping) level, 0--7.
+#' @param na What to write in this column where a value has none, overriding
+#'   the workbook's [xl_properties()]`(na = )`. `NA` (the default) inherits it.
+#'   Columns are where this usually belongs: a substitute that suits a numeric
+#'   column rarely suits a date one.
 #' @param collapsed Logical; draw this column/row as the collapsed summary of
 #'   the group beside it.  Excel does not derive this --- the rows or columns
 #'   of the group itself need `hidden = TRUE` as well, exactly as clicking the
@@ -87,7 +91,8 @@ NULL
 #' @rdname xl_colrow_spec
 #' @export
 xl_col_spec <- function(cols, width = NA, hidden = NA, level = NA,
-                        format = NULL, width_pixels = NA, collapsed = NA) {
+                        format = NULL, width_pixels = NA, collapsed = NA,
+                        na = NA) {
   if (missing(cols) || length(cols) < 1L)
     stop("`cols` must name or index at least one column", call. = FALSE)
   if (!is.character(cols) && !is.numeric(cols))
@@ -98,7 +103,8 @@ xl_col_spec <- function(cols, width = NA, hidden = NA, level = NA,
                            .pixels_to_width),
     hidden = .val_flag(hidden, "hidden"),
     level  = .val_int(level, "level", min = 0, max = 7),
-    collapsed = .val_flag(collapsed, "collapsed")
+    collapsed = .val_flag(collapsed, "collapsed"),
+    na = .val_na(na)
   ))
   .new_colrow_spec("col", list(kind = "col", index = cols), geometry, format)
 }
@@ -465,6 +471,8 @@ print.xl_sheet <- function(x, ...) {
   col_hidden <- rep(NA_integer_, ncols)
   col_level  <- rep(NA_integer_, ncols)
   col_collapsed <- rep(NA_integer_, ncols)
+  # a list, not a vector: each column's `na` keeps its own type
+  col_na <- vector("list", ncols)
   explicit_width <- rep(FALSE, ncols)   # columns whose width the user set
   for (i in seq_len(ncols)) {
     base <- props$default_format
@@ -504,6 +512,7 @@ print.xl_sheet <- function(x, ...) {
         if (!is.null(geo$level))  col_level[i]  <- as.integer(geo$level)
         if (!is.null(geo$collapsed))
           col_collapsed[i] <- as.integer(isTRUE(geo$collapsed))
+        if (!is.null(geo$na)) col_na[[i]] <- geo$na
       }
     }
     # row specs
@@ -624,6 +633,7 @@ print.xl_sheet <- function(x, ...) {
     col_width = col_width, col_format_id = col_format_id,
     col_hidden = col_hidden, col_level = col_level,
     col_collapsed = col_collapsed,
+    col_na = if (any(lengths(col_na))) col_na else NULL,
     row_row = row_row, row_height = row_height, row_format_id = row_fmt_id,
     row_hidden = row_hidden, row_level = row_level,
     row_collapsed = row_collapsed,

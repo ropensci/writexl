@@ -16,6 +16,7 @@ xl_properties(
   status = NA,
   hyperlink_base = NA,
   created = NA,
+  na = NA,
   custom = NULL,
   read_only = FALSE,
   window_size = NULL,
@@ -37,6 +38,15 @@ xl_properties(
 Left `NA` libxlsxwriter stamps the moment the file is written, which is
 what makes two runs over the same data differ; pinning it makes them
 byte-identical.}
+
+\item{na}{What to write where a value has none --- an `NA` or `NaN` in the
+data, or a cell with nothing in it at all. `NA` (the default) leaves the
+cell blank, which is what writexl has always done. Anything else is
+written in its place, keeping its own type: `na = "Not available"` writes
+a string, `na = 0` a number. A column or an individual cell can override
+it --- see [xl_col_spec()] and [xl_cell_general()]. Note that a non-blank
+`na` in a numeric column makes that column mixed, so a reader such as
+[readxl::read_xlsx()] returns the whole column as character.}
 
 \item{custom}{A named list of custom document properties.  Values may be
 character, integer, numeric, logical, `Date` or `POSIXct`.  A `Date` or

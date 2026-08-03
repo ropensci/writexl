@@ -13,7 +13,9 @@
 #' data frame column of a different length (just like [xl_formula()]).
 #'
 #' @param value An atomic vector or a list of scalars, one per cell. Use `NA`
-#'   to write an explicit empty cell. A list enables mixed types across cells
+#'   for a cell that is empty unless `na` says otherwise (see `na` below, and
+#'   note that a workbook-wide `na` reaches these values too). A list enables
+#'   mixed types across cells
 #'   in the same column (e.g., `list(1.5, "text", TRUE)`). Date and POSIXct
 #'   scalars are supported and formatted as in [write_xlsx()].  When
 #'   `hyperlink` is also set for the same cell, a **character** `value` is
@@ -55,6 +57,13 @@
 #'   an array formula.  On a cell that has no `formula` the flags are inert, so a
 #'   single `array = TRUE` can be recycled across a column that mixes formula
 #'   and value cells.
+#' @param na What to write in a cell that has no value, one per cell and
+#'   recycled.  `NA` (the default) inherits the column's
+#'   [xl_col_spec()]`(na = )`, and failing that the workbook's
+#'   [xl_properties()]`(na = )`; a cell that sets its own overrides both.  This
+#'   is also how a cell asks for a blank where the column or workbook would
+#'   otherwise substitute something --- give it the value you want, `""` for an
+#'   empty string.
 #' @param array_range The range a legacy array formula covers, for the rare case
 #'   where it must be declared: an Excel range string (`"C2:C11"`) or a
 #'   `list(rows = , cols = )` spec, one per cell (`NA` for none). It must start
@@ -102,13 +111,14 @@
 #' df$cell_col    <- xl_cell_general(value = 99L)  # all rows get 99
 xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
                             format = NULL, comment = NULL, array = FALSE,
-                            dynamic = FALSE, array_range = NULL) {
+                            dynamic = FALSE, array_range = NULL, na = NA) {
 
   # Require at least one content argument -------------------------------------
   if (is.null(value) && is.null(formula) && is.null(hyperlink) &&
       is.null(comment))
     stop("At least one of 'value', 'formula', 'hyperlink', or 'comment' must ",
-         "be provided. Use value = NA for an explicit empty cell.", call. = FALSE)
+         "be provided. Use value = NA for a cell with nothing in it.",
+         call. = FALSE)
 
   # Reject values writexl cannot write ----------------------------------------
   # Uses the same predicate as the column-level check in normalize_df(), so an
@@ -249,6 +259,15 @@ xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
                     formula_given = !is.null(formula))
   .check_rich_value(value_list, formula_vec, hyperlink_list)
 
+  # Normalise `na` to one entry per cell -------------------------------------
+  # NULL where the cell inherits, so C can tell "this cell says blank is fine"
+  # from "this cell has nothing to say".
+  na_src <- if (is.list(na)) na else as.list(na)
+  if (length(na_src) != 1L && length(na_src) != n)
+    stop(sprintf("`na` must be length 1 or %d (one per cell), not %d", n,
+                 length(na_src)), call. = FALSE)
+  na_list <- rep_len(lapply(na_src, .val_na, arg = "na"), n)
+
   # Build the per-cell records ------------------------------------------------
   cells <- lapply(seq_len(n), function(i) {
     list(
@@ -259,7 +278,8 @@ xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
       comment     = comment_list[[i]],
       array       = array_vec[[i]],
       dynamic     = dynamic_vec[[i]],
-      array_range = range_list[[i]]
+      array_range = range_list[[i]],
+      na          = na_list[[i]]
     )
   })
 

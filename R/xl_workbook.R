@@ -28,6 +28,14 @@
 #'   Left `NA` libxlsxwriter stamps the moment the file is written, which is
 #'   what makes two runs over the same data differ; pinning it makes them
 #'   byte-identical.
+#' @param na What to write where a value has none --- an `NA` or `NaN` in the
+#'   data, or a cell with nothing in it at all. `NA` (the default) leaves the
+#'   cell blank, which is what writexl has always done. Anything else is
+#'   written in its place, keeping its own type: `na = "Not available"` writes
+#'   a string, `na = 0` a number. A column or an individual cell can override
+#'   it --- see [xl_col_spec()] and [xl_cell_general()]. Note that a non-blank
+#'   `na` in a numeric column makes that column mixed, so a reader such as
+#'   [readxl::read_xlsx()] returns the whole column as character.
 #' @param custom A named list of custom document properties.  Values may be
 #'   character, integer, numeric, logical, `Date` or `POSIXct`.  A `Date` or
 #'   `POSIXct` is written as a real datetime property (not as text) and follows
@@ -69,7 +77,8 @@
 xl_properties <- function(title = NA, subject = NA, author = NA, manager = NA,
                           company = NA, category = NA, keywords = NA,
                           comments = NA, status = NA, hyperlink_base = NA,
-                          created = NA, custom = NULL, read_only = FALSE, window_size = NULL,
+                          created = NA, na = NA, custom = NULL,
+                          read_only = FALSE, window_size = NULL,
                           names = NULL,
                           default_format   = xl_format(),
                           header_format    = xl_font(bold = TRUE) +
@@ -106,7 +115,8 @@ xl_properties <- function(title = NA, subject = NA, author = NA, manager = NA,
     list(title = title, subject = subject, author = author, manager = manager,
          company = company, category = category, keywords = keywords,
          comments = comments, status = status, hyperlink_base = hyperlink_base,
-         created = created, custom = custom, read_only = read_only, window_size = window_size,
+         created = created, na = .val_na(na), custom = custom,
+         read_only = read_only, window_size = window_size,
          names = names,
          default_format = default_format, header_format = header_format,
          hyperlink_format = hyperlink_format, date_format = date_format,
@@ -316,6 +326,7 @@ print.xl_workbook <- function(x, ...) {
     v <- props[[k]]
     if (!is.null(v) && !(length(v) == 1L && is.na(v))) out[[k]] <- as.character(v)
   }
+  if (!is.null(props$na)) out$na <- props$na
   cr <- props$created
   if (!is.null(cr) && !(length(cr) == 1L && is.na(cr))) {
     if (!inherits(cr, "Date") && !inherits(cr, "POSIXct"))

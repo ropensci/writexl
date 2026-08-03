@@ -13,14 +13,17 @@ xl_cell_general(
   comment = NULL,
   array = FALSE,
   dynamic = FALSE,
-  array_range = NULL
+  array_range = NULL,
+  na = NA
 )
 
 \method{as.character}{xl_cell_general}(x, ...)
 }
 \arguments{
 \item{value}{An atomic vector or a list of scalars, one per cell. Use `NA`
-to write an explicit empty cell. A list enables mixed types across cells
+for a cell that is empty unless `na` says otherwise (see `na` below, and
+note that a workbook-wide `na` reaches these values too). A list enables
+mixed types across cells
 in the same column (e.g., `list(1.5, "text", TRUE)`). Date and POSIXct
 scalars are supported and formatted as in [write_xlsx()].  When
 `hyperlink` is also set for the same cell, a **character** `value` is
@@ -79,6 +82,14 @@ and value cells.}
   is the right spelling for a `SUMPRODUCT`-style aggregate. Supplying it
   forces the workbook out of the memory-efficient row-streaming mode, since
   libxlsxwriter cannot pad an array range while streaming.}
+
+\item{na}{What to write in a cell that has no value, one per cell and
+recycled.  `NA` (the default) inherits the column's
+[xl_col_spec()]`(na = )`, and failing that the workbook's
+[xl_properties()]`(na = )`; a cell that sets its own overrides both.  This
+is also how a cell asks for a blank where the column or workbook would
+otherwise substitute something --- give it the value you want, `""` for an
+empty string.}
 
 \item{x}{An `xl_cell_general`.}
 

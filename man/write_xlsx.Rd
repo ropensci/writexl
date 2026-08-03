@@ -10,6 +10,7 @@ write_xlsx(
   path = tempfile(fileext = ".xlsx"),
   col_names = TRUE,
   format_headers = TRUE,
+  na = NA,
   use_zip64 = FALSE,
   constant_memory = NA,
   constant_memory_threshold = 128 * 1024^2
@@ -26,6 +27,13 @@ data frames / `xl_sheet`s that become the sheets in the xlsx}
 \item{format_headers}{apply the workbook's header format to that header row?
 The default header format is bold and centered; change it with
 \code{\link{xl_properties}(header_format = )}.}
+
+\item{na}{what to write where a value has none. `NA` (the default) leaves
+the cell blank, as writexl has always done; anything else is written in
+its place, keeping its own type. Shorthand for
+\code{\link{xl_properties}(na = )}, so give it there instead when `x` is
+already an [xl_workbook]. A column or a single cell can override it: see
+[xl_col_spec()] and [xl_cell_general()].}
 
 \item{use_zip64}{use \href{https://en.wikipedia.org/wiki/Zip_(file_format)#ZIP64}{zip64}
 to enable support for 4GB+ xlsx files. Not all platforms can read this.}
