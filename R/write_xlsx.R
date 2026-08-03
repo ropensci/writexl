@@ -365,7 +365,12 @@ normalize_df <- function(df){
     df[[i]] <- as.character(df[[i]])
   }
   for(i in which(vapply(df, function(x){is.integer(x) && inherits(x, "POSIXct")}, logical(1)))){
-    df[[i]] <- as.POSIXct(as.double(df[[i]]))
+    # as.double() drops the class, so this dispatches to as.POSIXct.numeric(),
+    # whose `origin` had no default before R 4.3 -- there it is an error,
+    # "'origin' must be supplied".  1970-01-01 is what the later default uses,
+    # so naming it gives the same instant on every version rather than a
+    # value that depends on which R is running.
+    df[[i]] <- as.POSIXct(as.double(df[[i]]), origin = "1970-01-01")
   }
   for(i in which(vapply(df, inherits, logical(1), "POSIXlt"))){
     df[[i]] <- as.POSIXct(df[[i]])
