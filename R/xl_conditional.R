@@ -349,8 +349,7 @@ xl_cond_scale <- function(range, colors = c("red", "yellow", "green"),
   fields <- list(type = "2_color_scale")
   if (n == 3L) fields$type <- "3_color_scale"
   for (i in seq_len(n))
-    fields <- c(fields, .cond_point(values[[i]] %||% NULL,
-                                    rule_types[[i]] %||% NULL,
+    fields <- c(fields, .cond_point(values[[i]], rule_types[[i]],
                                     colors[[i]], prefixes[i], prefixes[i]))
   .new_conditional("scale", range, fields, stop_if_true, multi_range)
 }
@@ -385,8 +384,8 @@ xl_cond_bar <- function(range, color = NA, values = NULL, rule_types = NULL,
   fields <- list(type = "data_bar")
   for (i in 1:2) {
     pre <- c("min", "max")[i]
-    fields <- c(fields, .cond_point(values[[i]] %||% NULL,
-                                    rule_types[[i]] %||% NULL, NA, pre, pre))
+    fields <- c(fields, .cond_point(values[[i]], rule_types[[i]],
+                                    NA, pre, pre))
   }
   cols <- .drop_null(list(
     bar_color                 = if (!.is_unset(color)) xl_color(color),

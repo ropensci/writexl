@@ -42,7 +42,13 @@ linters <- linters_with_defaults(
   # The R sources aim at 80 and mostly hold it; 100 is the ceiling the whole
   # package -- sources, tests and vignettes -- currently meets, so a report
   # here means a line that has genuinely got away.
-  line_length_linter = line_length_linter(100L)
+  line_length_linter = line_length_linter(100L),
+
+  # writexl supports the R versions its CI checks, the oldest being 4.1, and a
+  # function that does not exist there is invisible on a modern machine until
+  # CI says so.  `%||%` is excepted because the package defines its own in
+  # xl_format.R rather than relying on base's, which arrived in 4.4.
+  backport_linter = backport_linter("4.1.0", except = "%||%")
 )
 
 exclusions <- list(
