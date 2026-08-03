@@ -121,7 +121,7 @@ p <- tempfile(fileext = ".xlsx"); openxlsx2::write_xlsx(flights, p); file.size(p
 ## 29297097   (27.9 MB)
 ```
 
-Measured on R 4.6.1, writexl 1.5.4.9000, openxlsx2 1.28.
+Measured on R 4.6.1, writexl 2.0.0, openxlsx2 1.28.
 
 ### Memory
 

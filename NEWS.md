@@ -1,4 +1,36 @@
-# writexl 1.5.4.9000
+# writexl 2.0.0
+
+writexl is now maintained by Bill Denney; Jeroen Ooms remains an author.
+
+## Breaking changes
+
+The version number is 2.0.0 for these, each of which can change what an
+existing script writes.  Everything else in this release is additive.
+
+* `POSIXct` columns are no longer silently converted to UTC. When every
+  datetime in the workbook shares one time zone, the zone is dropped and local
+  wall-clock time is written; when they differ, all are converted to UTC with a
+  warning. Code that relied on always getting the UTC instant will see shifted
+  values.
+
+* `Date` values before 1900-03-01 were written one day too late, and now agree
+  with `POSIXct`. Files written earlier that contain such dates disagree with
+  files written now.
+
+* Columns of a type writexl cannot represent (`complex`, `raw`, a bare list
+  column) are an error naming the column, where before they warned and wrote
+  empty cells. A script that ignored the warning now stops.
+
+* Sheet names are repaired differently: truncated to a genuine 31 characters
+  rather than 29, with characters Excel forbids replaced and the resulting
+  duplicates resolved. A workbook with long or awkward sheet names may end up
+  with different tab names than before -- and, in the `"2024/Q1"` case, one
+  Excel will actually open.
+
+* `xl_hyperlink(name = )` is deprecated in favour of `value`, which now
+  occupies the position `name` used to, so positional calls are unaffected.
+  Supplying `name` warns; supplying both is an error.
+
 
 ## New features
 
@@ -99,10 +131,6 @@ carry the detail.
   `xl_rich_string()` mean a cell built for a sheet can be reused anywhere a
   plain string is wanted.
 
-* Columns of a type writexl cannot represent (`complex`, `raw`, a bare list
-  column) now raise an error naming the column, rather than warning and leaving
-  the cells empty.
-
 * `write_xlsx()` now errors informatively when a data frame exceeds the xlsx
   column limit (16384) or row limit (1048576).
 
@@ -120,22 +148,6 @@ carry the detail.
 
 * Fix a `strcpy()` buffer overflow in the internal `C_set_tempdir()`; a tempdir
   path of 2048 bytes or more now errors informatively.
-
-* `POSIXct` columns are no longer silently converted to UTC. When every datetime
-  in the workbook shares one time zone, the zone is dropped and local
-  wall-clock time is written; when they differ, all are converted to UTC with a
-  warning. Code that relied on always getting the UTC instant will see shifted
-  values. See the "Getting started with writexl" vignette.
-
-* `Date` values before 1900-03-01 were written one day too late, because the
-  `Date` writer did not compensate for Excel's phantom 1900-02-29. `Date` and
-  `POSIXct` now write identical serial numbers.
-
-* Sheet names are repaired properly: they are truncated to a genuine 31
-  characters (previously 29, despite the warning saying 31), characters Excel
-  forbids (`[ ] : * ? / \`) are replaced, edge apostrophes are stripped, and
-  duplicates created by either repair are resolved. A sheet named `"2024/Q1"`
-  previously produced a file Excel refused to open.
 
 # writexl 1.5.4
 
