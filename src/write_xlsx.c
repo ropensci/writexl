@@ -179,7 +179,23 @@ typedef struct {
   int            sheet_protected;  /* is this worksheet protected?            */
   int           *warn_unlocked;    /* set when protection formatting is used  */
                                    /* on an unprotected sheet                 */
+  SEXP           wb_na;   /* workbook-wide stand-in for a missing value      */
+  SEXP           col_na;  /* VECSXP, one per column; element NULL = inherit  */
 } cell_write_ctx;
+
+/* What to write where a value has none: the cell's own `na`, else the
+   column's, else the workbook's.  Each level is absent when it was NA on the
+   R side, so an unset level falls through and an unset workbook yields
+   R_NilValue -- which write_na() declines, leaving the blank writexl has
+   always written. */
+static SEXP resolve_na(cell_write_ctx *ctx, lxw_col_t col, SEXP cell_na){
+  if(cell_na != R_NilValue && Rf_length(cell_na)) return cell_na;
+  if(ctx->col_na != R_NilValue && Rf_xlength(ctx->col_na) > (R_xlen_t) col){
+    SEXP v = VECTOR_ELT(ctx->col_na, col);
+    if(v != R_NilValue && Rf_length(v)) return v;
+  }
+  return ctx->wb_na;
+}
 
 /* Resolve a 1-based format id to a format pointer (0 or out-of-range -> NULL) */
 static lxw_format *ctx_format(cell_write_ctx *ctx, int id){
@@ -1787,6 +1803,17 @@ static int write_atomic_value(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
   }
 }
 
+/* Write the stand-in for a value that had none, and report whether it wrote a
+   cell.  An unset `na` is R_NilValue and writes nothing, which is what keeps
+   the default identical to the blank writexl has always written.  It goes
+   through the same dispatcher as an ordinary value, so `na` works for every
+   type a column can hold without a second type table. */
+static int write_na(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
+                     SEXP na, lxw_format *fmt){
+  if(na == R_NilValue || Rf_length(na) == 0) return 0;
+  return write_atomic_value(ctx, row, col, na, get_type(na), 0, fmt);
+}
+
 /* --- xl_cell_general field accessors ------------------------------------- */
 
 /* A per-cell logical field, absent or NA reading as FALSE. */
@@ -2019,8 +2046,11 @@ static void write_cell_general(cell_write_ctx *ctx,
      cell.  Plain (non-xl_cell_general) columns are deliberately left alone:
      their NAs are covered by the column format Excel already applies. */
   if(value == R_NilValue || Rf_isNull(value) || Rf_length(value) == 0 ||
-     !write_atomic_value(ctx, row, col_idx, value, get_type(value), 0, fmt))
-    assert_lxw(worksheet_write_blank(ctx->sheet, row, col_idx, fmt));
+     !write_atomic_value(ctx, row, col_idx, value, get_type(value), 0, fmt)){
+    if(!write_na(ctx, row, col_idx,
+                 resolve_na(ctx, col_idx, list_get(cell, "na")), fmt))
+      assert_lxw(worksheet_write_blank(ctx->sheet, row, col_idx, fmt));
+  }
 }
 
 /* --- Top-level cell dispatcher ------------------------------------------- */
@@ -2029,8 +2059,8 @@ static void write_cell(cell_write_ctx *ctx, lxw_row_t row, lxw_col_t col,
                         SEXP col_data, R_COL_TYPE type, lxw_row_t i){
   if(type == COL_CELL_GENERAL)
     write_cell_general(ctx, row, col, col_data, i);
-  else
-    write_atomic_value(ctx, row, col, col_data, type, i, NULL);
+  else if(!write_atomic_value(ctx, row, col, col_data, type, i, NULL))
+    write_na(ctx, row, col, resolve_na(ctx, col, R_NilValue), NULL);
 }
 
 /* --- Workbook document properties ---------------------------------------- */
@@ -2239,7 +2269,8 @@ SEXP C_write_data_frame_list(SEXP df_list, SEXP file, SEXP col_names,
     int sheet_protected = opt_scalar_int(opts, "protect", 0);
     int warn_unlocked = 0;
     cell_write_ctx ctx = {workbook, sheet, fmts, nfmts, fmt_prot,
-                          sheet_protected, &warn_unlocked};
+                          sheet_protected, &warn_unlocked,
+                          list_get(properties, "na"), list_get(opts, "col_na")};
 
     // Apply column geometry/formats and sheet-level options (freeze, etc.),
     // then the range-scoped overlays.  All of this must precede the row loop

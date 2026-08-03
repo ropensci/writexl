@@ -74,6 +74,23 @@
   x
 }
 
+# What to write where a value has none.  Any single atomic value is kept with
+# its own type, so `na = 0` stays a number and `na = "-"` a string -- the cell
+# writer that handles ordinary values handles this one, which is why no type
+# table is needed here.  NA returns NULL, meaning "nothing set at this level":
+# a workbook then leaves the cell blank, and a column or a cell falls through
+# to the level above it.
+.val_na <- function(x, arg = "na") {
+  if (is.null(x)) return(NULL)
+  if (is.factor(x)) x <- as.character(x)
+  if (!is.atomic(x) || length(x) != 1L)
+    stop(sprintf(paste0("`%s` must be a single value of any type, or NA to ",
+                        "leave the cell blank"), arg), call. = FALSE)
+  # NaN is as unrepresentable as NA, so it cannot stand in for one either
+  if (is.na(x)) return(NULL)
+  x
+}
+
 .val_int <- function(x, arg, min = NA, max = NA) {
   if (.is_unset(x)) return(NULL)
   if (!is.numeric(x) || length(x) != 1L)

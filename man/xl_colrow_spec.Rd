@@ -13,7 +13,8 @@ xl_col_spec(
   level = NA,
   format = NULL,
   width_pixels = NA,
-  collapsed = NA
+  collapsed = NA,
+  na = NA
 )
 
 xl_row_spec(
@@ -49,6 +50,11 @@ as 100 pixels is 13.57 character units.}
 the group beside it.  Excel does not derive this --- the rows or columns
 of the group itself need `hidden = TRUE` as well, exactly as clicking the
 grouping symbol would leave them.}
+
+\item{na}{What to write in this column where a value has none, overriding
+the workbook's [xl_properties()]`(na = )`. `NA` (the default) inherits it.
+Columns are where this usually belongs: a substitute that suits a numeric
+column rarely suits a date one.}
 
 \item{rows}{Rows to target: a numeric vector of 1-based data-row indices
 (row 1 is the first data row, ignoring the header).}

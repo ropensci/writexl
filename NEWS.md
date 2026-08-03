@@ -84,6 +84,14 @@ carry the detail.
   out of the bundled `chart.h`, so a function added upstream surfaces as a
   failure rather than as a gap.
 
+* **A stand-in for missing values** via `na`, which writexl has always written
+  as an empty cell (#76). `write_xlsx(df, na = "not measured")` sets it for a
+  whole workbook, `xl_properties(na = )` does the same on a workbook object,
+  and `xl_col_spec(na = )` and `xl_cell_general(na = )` narrow it to one column
+  or one cell --- the innermost setting wins. It covers `NaN` as well as `NA`,
+  and keeps its own type, so `na = 0` writes a number and leaves a numeric
+  column numeric. The default, `na = NA`, is the empty cell as before.
+
 * Argument names are consistent across the new functions. Whatever a cell,
   label or box will show is `value`, whatever its type; a size in pixels says
   so (`width_pixels`); and a caption is `title`, with `title_format` and

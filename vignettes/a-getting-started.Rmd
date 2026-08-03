@@ -56,6 +56,18 @@ Column types map to Excel's own:
 --- `complex`, `raw`, a plain list column --- is an error rather than a silent
 approximation.
 
+`na` writes something else in place of an empty cell, for `NaN` as well as
+`NA`. It keeps its own type, so a number stays a number:
+
+```{r}
+tmp <- write_xlsx(data.frame(x = c(1.5, NA)), na = "not measured")
+```
+
+Set it for the whole workbook with `xl_properties(na = )`, for one column with
+`xl_col_spec(na = )`, or for one cell with `xl_cell_general(na = )`; the
+innermost one that is set wins. Substituting a string into a numeric column
+makes that column mixed, so reading it back gives character.
+
 Excel has no concept of a time zone, so `POSIXct` needs a decision. writexl
 makes it once for the whole workbook: if every value shares one zone the local
 wall-clock reading is written, and if they differ everything is converted to

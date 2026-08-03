@@ -28,6 +28,12 @@
 #'   \code{\link{xl_properties}(header_format = )}.
 #' @param use_zip64 use \href{https://en.wikipedia.org/wiki/Zip_(file_format)#ZIP64}{zip64}
 #' to enable support for 4GB+ xlsx files. Not all platforms can read this.
+#' @param na what to write where a value has none. `NA` (the default) leaves
+#'   the cell blank, as writexl has always done; anything else is written in
+#'   its place, keeping its own type. Shorthand for
+#'   \code{\link{xl_properties}(na = )}, so give it there instead when `x` is
+#'   already an [xl_workbook]. A column or a single cell can override it: see
+#'   [xl_col_spec()] and [xl_cell_general()].
 #' @param constant_memory stream rows to disk instead of building the whole
 #'   workbook in memory. `NA` (the default) decides per workbook: on for large
 #'   data, off for small, and always off when a feature needs it off. `TRUE`
@@ -48,18 +54,23 @@
 #' tmp <- write_xlsx(list(mysheet = iris))
 #' readxl::read_xlsx(tmp)
 write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
-                       format_headers = TRUE, use_zip64 = FALSE,
+                       format_headers = TRUE, na = NA, use_zip64 = FALSE,
                        constant_memory = NA,
                        constant_memory_threshold = 128 * 1024^2){
   # Resolve the input to an xl_workbook.  A bare data frame / xl_sheet / list
   # is wrapped in a workbook with default properties; an explicit xl_workbook
   # overrides col_names/format_headers.
   if(inherits(x, "xl_workbook")){
+    # a workbook carries its own properties, so the shorthand has nowhere to go
+    # rather than somewhere surprising
+    if(!is.null(.val_na(na)))
+      stop("`na` is a shorthand for xl_properties(na = ); `x` is already an ",
+           "xl_workbook, so set it there", call. = FALSE)
     wb <- x
     col_names <- wb$col_names
     format_headers <- wb$format_headers
   } else {
-    wb <- xl_workbook(x, properties = xl_properties(),
+    wb <- xl_workbook(x, properties = xl_properties(na = na),
                       col_names = col_names, format_headers = format_headers)
   }
   props <- wb$properties
