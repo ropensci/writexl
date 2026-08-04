@@ -110,8 +110,14 @@ that combine multiple features (e.g., a formula with a pre-calculated
 result, or a URL with separate display text and tooltip).
 
 An `xl_cell_general` behaves like a vector: it has a `length()`, supports
-`[`, `c()`, and `rep()`, and recycles automatically when assigned to a
-data frame column of a different length (just like [xl_formula()]).
+`[`, `[[`, `c()` and `rep()`, and recycles automatically when assigned to a
+data frame column of a different length (just like [xl_formula()]).  It is
+deliberately not a list, so that `df[, j] <- cells` assigns one column
+rather than being read as a list of them.
+
+`df[i, j] <- x` sets that cell's `value`, whatever `x`'s type; a formula
+needs [xl_formula()], since a cell column carries no column-wide notion of
+"these are all formulas".
 
 `as.character()` returns what each cell displays, so a cell built for a sheet
 can be reused wherever a plain string is wanted --- [xl_merge()]'s or

@@ -382,7 +382,7 @@ print.xl_sheet <- function(x, ...) {
 # Per-cell display width for a column (0 for blank/NA cells).
 .content_nchar <- function(col) {
   if (inherits(col, "xl_cell_general")) {
-    vapply(unclass(col), function(rec) {
+    vapply(.cell_records(col), function(rec) {
       s <- .cell_display_string(rec)
       if (is.na(s)) 0L else nchar(s, type = "width")
     }, integer(1))

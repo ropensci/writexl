@@ -172,7 +172,7 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
       if(inherits(col, "POSIXct")){
         out <- c(out, .tzone_of(col))
       } else if(inherits(col, "xl_cell_general")){
-        for(rec in unclass(col))
+        for(rec in .cell_records(col))
           if(inherits(rec$value, "POSIXct"))
             out <- c(out, .tzone_of(rec$value))
       }
@@ -203,7 +203,7 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
     if(inherits(col, "POSIXct")){
       df[[j]] <- .drop_tzone(col)
     } else if(inherits(col, "xl_cell_general")){
-      recs <- unclass(col)
+      recs <- .cell_records(col)
       touched <- FALSE
       for(k in seq_along(recs)){
         if(inherits(recs[[k]]$value, "POSIXct")){
@@ -212,7 +212,7 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
         }
       }
       if(touched)
-        df[[j]] <- structure(recs, class = class(col))
+        df[[j]] <- .new_cell_vector(recs)
     }
   }
   df
@@ -255,7 +255,7 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
   for (j in seq_along(df)) {
     col <- df[[j]]
     if (!inherits(col, "xl_cell_general")) next
-    recs <- unclass(col)
+    recs <- .cell_records(col)
     ids <- vapply(recs, .resolve_cell_format_id, integer(1), reg = reg, props = props)
     for (k in seq_along(recs)) {
       rec <- recs[[k]]
@@ -284,7 +284,7 @@ write_xlsx <- function(x, path = tempfile(fileext = ".xlsx"), col_names = TRUE,
       rec$array_range <- NULL
       recs[[k]] <- rec
     }
-    col <- structure(recs, class = class(col))
+    col <- .new_cell_vector(recs)
     attr(col, "writexl_format_ids") <- ids
     df[[j]] <- col
   }
