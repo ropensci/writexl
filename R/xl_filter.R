@@ -83,7 +83,7 @@
 }
 
 .filter_cells_general <- function(x, nm) {
-  recs <- unclass(x)
+  recs <- .cell_records(x)
   n <- length(recs)
   num <- rep(NA_real_, n)
   txt <- rep(NA_character_, n)

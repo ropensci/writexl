@@ -3,18 +3,18 @@
 
 test_that("xl_cell_general accepts a single format, a list, or NULL", {
   x <- xl_cell_general(value = 1:3, format = xl_font(bold = TRUE))
-  expect_true(is_xl_format(unclass(x)[[1]]$format))
-  expect_true(is_xl_format(unclass(x)[[3]]$format))
+  expect_true(is_xl_format(x[[1]]$format))
+  expect_true(is_xl_format(x[[3]]$format))
 
   # per-cell list, recycled
   y <- xl_cell_general(value = 1:2,
                        format = list(xl_font(bold = TRUE), xl_font(italic = TRUE)))
-  expect_true(unclass(unclass(y)[[1]]$format)$font$bold)
-  expect_true(unclass(unclass(y)[[2]]$format)$font$italic)
+  expect_true(unclass(y[[1]]$format)$font$bold)
+  expect_true(unclass(y[[2]]$format)$font$italic)
 
   # NULL -> no format
   z <- xl_cell_general(value = 1:2)
-  expect_null(unclass(z)[[1]]$format)
+  expect_null(z[[1]]$format)
 
   expect_error(xl_cell_general(value = 1, format = list("bad")),
                "must be an xl_format")

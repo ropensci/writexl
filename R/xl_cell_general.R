@@ -9,8 +9,14 @@
 #' result, or a URL with separate display text and tooltip).
 #'
 #' An `xl_cell_general` behaves like a vector: it has a `length()`, supports
-#' `[`, `c()`, and `rep()`, and recycles automatically when assigned to a
-#' data frame column of a different length (just like [xl_formula()]).
+#' `[`, `[[`, `c()` and `rep()`, and recycles automatically when assigned to a
+#' data frame column of a different length (just like [xl_formula()]).  It is
+#' deliberately not a list, so that `df[, j] <- cells` assigns one column
+#' rather than being read as a list of them.
+#'
+#' `df[i, j] <- x` sets that cell's `value`, whatever `x`'s type; a formula
+#' needs [xl_formula()], since a cell column carries no column-wide notion of
+#' "these are all formulas".
 #'
 #' @param value An atomic vector or a list of scalars, one per cell. Use `NA`
 #'   for a cell that is empty unless `na` says otherwise (see `na` below, and
@@ -283,7 +289,43 @@ xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
     )
   })
 
-  structure(cells, class = c("xl_cell_general", "xl_cell"))
+  .new_cell_vector(cells)
+}
+
+# --- The object ---------------------------------------------------------------
+#
+# An xl_cell_general is an integer vector carrying its per-cell records in an
+# attribute, the shape factor uses.  The integers are bookkeeping: they are
+# always seq_along(records), and nothing reads them.  What matters is that the
+# object is *not* a list, because `[<-.data.frame` treats a list value as a
+# list of columns -- so `df[, j] <- cells` assigned one cell record per column
+# and lost the class, which is what broke a reverse dependency on 2.0.0.
+#
+# The carrier is an integer rather than the displayed text on purpose.  If the
+# class is ever stripped -- recycling into a longer frame does it, in base R
+# and in writexl 1.5.4 alike -- an integer leaves an obviously wrong 1, 2, 3
+# rather than plausible-looking text that would write as silently wrong cells.
+
+# The carrier is the authority on length, not the records.  R extends a data
+# frame's rows through xpdrows.data.frame(), which does `class(y) <- NULL;
+# length(y) <- n; attributes(y) <- saved` -- it strips the class, pads the
+# carrier, and puts the old attributes back verbatim, so no method of ours is
+# consulted and the records come back short.  Padding them here on the way out
+# makes the object heal itself: the new cells read as empty, which is what
+# extending a data frame means.
+.cell_records <- function(x) {
+  r <- attr(x, "records", exact = TRUE)
+  n <- length(unclass(x))
+  if (length(r) != n) {
+    length(r) <- n
+    r <- .fill_empty_cells(r)
+  }
+  r
+}
+
+.new_cell_vector <- function(records) {
+  structure(seq_along(records), records = records,
+            class = c("xl_cell_general", "xl_cell"))
 }
 
 #' @description
@@ -296,7 +338,7 @@ xl_cell_general <- function(value = NULL, formula = NULL, hyperlink = NULL,
 #' @rdname xl_cell_general
 #' @export
 as.character.xl_cell_general <- function(x, ...) {
-  vapply(x, function(el) {
+  vapply(.cell_records(x), function(el) {
     v <- el[["value"]]
     if (is_xl_rich_string(v)) as.character(v)
     else if (is.null(v) || length(v) != 1L) NA_character_
@@ -399,17 +441,69 @@ length.xl_cell_general <- function(x) length(unclass(x))
 
 #' @export
 `[.xl_cell_general` <- function(x, i, ...) {
-  structure(unclass(x)[i], class = class(x))
+  .new_cell_vector(.cell_records(x)[i])
+}
+
+# `x[[i]]` is one cell's record, the named list of its fields -- the carrier is
+# bookkeeping and never the answer to a question about a cell.
+#' @export
+`[[.xl_cell_general` <- function(x, i, ...) .cell_records(x)[[i]]
+
+#' @export
+`[[<-.xl_cell_general` <- function(x, i, value) {
+  recs <- .cell_records(x)
+  recs[[i]] <- value
+  .new_cell_vector(recs)
+}
+
+# Assigning into a cell column has to reach the records.  Without this method
+# `df[i, j] <- value` writes into the integer carrier instead -- silently, and
+# leaving the records one short -- because that is where `[<-.data.frame`
+# sends it.  A bare value becomes the cell's `value`; an xl_cell_general on
+# the right replaces those cells outright.
+#' @export
+`[<-.xl_cell_general` <- function(x, i, value) {
+  recs <- .cell_records(x)
+  repl <- if (inherits(value, "xl_cell_general")) .cell_records(value)
+          else .cell_records(xl_cell_general(value = value))
+  # `i` may point past the end -- `d[3, 2] <-` on a one-row frame does exactly
+  # that -- so index the list directly and let it grow.  seq_along(recs)[i]
+  # would give NA there and drop the assignment on the floor.
+  k <- if (is.logical(i)) sum(i, na.rm = TRUE) else length(i)
+  recs[i] <- rep_len(repl, k)
+  .new_cell_vector(.fill_empty_cells(recs))
+}
+
+# Extending a data frame pads its other columns, and `[<-.data.frame` does that
+# through `length<-`.  Without this method the cell column stays short and the
+# frame is refused with "replacement has N rows, data has N+1".
+#' @export
+`length<-.xl_cell_general` <- function(x, value) {
+  recs <- .cell_records(x)
+  length(recs) <- value
+  .new_cell_vector(.fill_empty_cells(recs))
+}
+
+# `[<-` and `length<-` can both leave NULL holes past the old end.  A hole is a
+# cell with nothing in it, which is what an unwritten cell already means.
+.fill_empty_cells <- function(recs) {
+  holes <- vapply(recs, is.null, logical(1))
+  if (any(holes))
+    recs[holes] <- list(.cell_records(xl_cell_general(value = NA))[[1L]])
+  recs
 }
 
 #' @export
 c.xl_cell_general <- function(x, ...) {
-  structure(c(unclass(x), ...), class = class(x))
+  parts <- lapply(list(x, ...), function(el)
+    if (inherits(el, "xl_cell_general")) .cell_records(el)
+    else .cell_records(xl_cell_general(value = el)))
+  .new_cell_vector(do.call(c, parts))
 }
 
 #' @export
 rep.xl_cell_general <- function(x, ...) {
-  structure(rep(unclass(x), ...), class = class(x))
+  .new_cell_vector(rep(.cell_records(x), ...))
 }
 
 #' @export
@@ -431,7 +525,7 @@ print.xl_cell_general <- function(x, max = 10L, ...) {
   cat(sprintf("[xl_cell_general: %d cell%s]\n", n, if (n == 1L) "" else "s"))
   show <- seq_len(min(n, max))
   for (i in show) {
-    cell  <- unclass(x)[[i]]
+    cell  <- .cell_records(x)[[i]]
     parts <- character(0L)
 
     val <- cell[["value"]]

@@ -33,7 +33,8 @@
 
 .cell_holds_rich_string <- function(x) {
   inherits(x, "xl_cell_general") &&
-    any(vapply(x, function(el) is_xl_rich_string(el[["value"]]), logical(1)))
+    any(vapply(.cell_records(x), function(el) is_xl_rich_string(el[["value"]]),
+               logical(1)))
 }
 
 #' Excel Types
