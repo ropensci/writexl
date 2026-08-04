@@ -92,17 +92,6 @@ carry the detail.
   and keeps its own type, so `na = 0` writes a number and leaves a numeric
   column numeric. The default, `na = NA`, is the empty cell as before.
 
-* `xl_cell_general()` is a vector rather than a list, so a cell column can be
-  assigned with `df[, j] <- cells` and not only with `df[[j]] <- cells`.
-  `[<-.data.frame` reads a list value as a list of *columns*, which scattered
-  one cell record per column and dropped the class; the records now ride in an
-  attribute behind an integer index, the shape `factor` uses. `[`, `[[`, `c()`,
-  `rep()` and `length()` are unchanged from a caller's point of view.
-
-  `df[i, j] <- x` sets that cell's value. A formula needs `xl_formula()`: a
-  cell column has no column-wide "these are all formulas", which is what
-  writexl 1.5.4 carried on the column's class.
-
 * Argument names are consistent across the new functions. Whatever a cell,
   label or box will show is `value`, whatever its type; a size in pixels says
   so (`width_pixels`); and a caption is `title`, with `title_format` and
