@@ -212,7 +212,11 @@ test_that("as.data.frame.xl_cell_general: data.frame() uses the argument name", 
   expect_null(names(as.data.frame(x)))
   df <- data.frame(a = 1:3, my_col = x)
   expect_equal(names(df), c("a", "my_col"))
-  expect_true(is.list(df$my_col))
+  # not a list, and that is the point: `[<-.data.frame` reads a list value as a
+  # list of columns, so a list-backed cell vector could not be assigned with
+  # `df[, j] <-` at all
+  expect_s3_class(df$my_col, "xl_cell_general")
+  expect_false(is.list(df$my_col))
 })
 
 test_that("rep.xl_cell_general with length.out", {

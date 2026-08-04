@@ -1901,7 +1901,11 @@ static void write_rich_string_cell(cell_write_ctx *ctx, lxw_row_t row,
 static void write_cell_general(cell_write_ctx *ctx,
                                 lxw_row_t row, lxw_col_t col_idx,
                                 SEXP col, lxw_row_t i){
-  SEXP cell      = VECTOR_ELT(col, (R_xlen_t) i);
+  /* the column is an integer carrier; the per-cell records ride along in an
+     attribute, so that `df[, j] <- cells` reaches [<-.data.frame as one column
+     rather than as a list of them */
+  SEXP recs      = Rf_getAttrib(col, Rf_install("records"));
+  SEXP cell      = VECTOR_ELT(recs, (R_xlen_t) i);
   SEXP value     = list_get(cell, "value");
   SEXP formula   = list_get(cell, "formula");
   SEXP hyperlink = list_get(cell, "hyperlink");
