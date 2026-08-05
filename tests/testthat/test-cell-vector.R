@@ -52,7 +52,9 @@ test_that("the pattern that broke a reverse dependency works", {
   expect_s3_class(NOTES[[2]], "xl_cell_general")
 
   NOTES[1, 1] <- "Title"
-  NOTES[3, 2] <- "=LEFT(A1,1)"
+  # writing a formula string as a value is what this pattern does; the warning
+  # is the subject of its own test below
+  expect_warning(NOTES[3, 2] <- "=LEFT(A1,1)", "not a formula")
   expect_s3_class(NOTES[[2]], "xl_cell_general")
   # the carrier and the records stay in step: a stale record list is how this
   # corrupts silently rather than loudly
@@ -123,7 +125,7 @@ test_that("assigning a bare string writes a string, not a formula", {
   # column-level kind here, and `d[i, j] <- "=A1"` writes the six characters.
   d <- data.frame(a = 1:2)
   d[, 2] <- xl_formula(c("=A1", "=A2"))
-  d[2, 2] <- "=SUM(A1:A2)"
+  expect_warning(d[2, 2] <- "=SUM(A1:A2)", "not a formula")
   expect_equal(.cell_records(d[[2]])[[2L]]$value, "=SUM(A1:A2)")
   expect_true(is.na(.cell_records(d[[2]])[[2L]]$formula))
   # the formula spelling is explicit, and still available
@@ -163,4 +165,24 @@ test_that("`length<-` grows and shrinks a cell vector", {
   length(x) <- 2L
   expect_length(x, 2L)
   expect_equal(x[[2L]]$value, 2)
+})
+
+test_that("writing a formula string as a value says so", {
+  # a cell column has no column-wide "these are all formulas", so this writes
+  # the characters.  That is the rule, but it is a quiet way to lose every
+  # formula on a sheet, so it warns -- and points at the spelling that works.
+  d <- data.frame(a = 1:2)
+  d[, 2] <- xl_cell_general(value = c(1, 2))
+  expect_warning(d[2, 2] <- "=SUM(A1)", "Use xl_formula")
+  expect_warning(d[2, 2] <- "=SUM(A1)", "df[[j]] <- xl_formula", fixed = TRUE)
+
+  # and stays quiet everywhere the intent is already clear
+  expect_silent(d[2, 2] <- "plain text")
+  expect_silent(d[2, 2] <- 99)
+  expect_silent(d[2, 2] <- NA)
+  expect_silent(d[2, 2] <- xl_formula("=SUM(A1)"))
+  expect_silent(d[2, 2] <- xl_cell_general(formula = "=SUM(A1)"))
+  # constructing a text cell that looks like a formula is deliberate and
+  # documented, so it is not the assignment's business to second-guess it
+  expect_silent(xl_cell_general(value = "=SUM(A1)"))
 })

@@ -464,6 +464,7 @@ length.xl_cell_general <- function(x) length(unclass(x))
 #' @export
 `[<-.xl_cell_general` <- function(x, i, value) {
   recs <- .cell_records(x)
+  .warn_formula_as_text(value)
   repl <- if (inherits(value, "xl_cell_general")) .cell_records(value)
           else .cell_records(xl_cell_general(value = value))
   # `i` may point past the end -- `d[3, 2] <-` on a one-row frame does exactly
@@ -472,6 +473,26 @@ length.xl_cell_general <- function(x) length(unclass(x))
   k <- if (is.logical(i)) sum(i, na.rm = TRUE) else length(i)
   recs[i] <- rep_len(repl, k)
   .new_cell_vector(.fill_empty_cells(recs))
+}
+
+# A string beginning with "=" assigned into a cell column is written as those
+# characters, not as a formula: a cell column has no column-wide "these are all
+# formulas".  That is the documented rule, but it is a quiet way to lose every
+# formula on a sheet -- a reverse dependency shipped a workbook with twenty
+# inert HYPERLINK strings and nothing said a word -- so say something.
+#
+# Only on assignment, where the ambiguity is.  xl_cell_general(value = "=x")
+# writing text is deliberate and stays silent.
+.warn_formula_as_text <- function(value) {
+  if (inherits(value, "xl_cell_general") || !is.character(value)) return(invisible(NULL))
+  v <- value[!is.na(value)]
+  if (!length(v) || !any(startsWith(v, "="))) return(invisible(NULL))
+  warning("assigning a string beginning with \"=\" into a cell column writes ",
+          "those characters, not a formula. Use xl_formula() for a formula, ",
+          "either per cell or over the finished column:
+",
+          "  df[[j]] <- xl_formula(df[[j]])", call. = FALSE)
+  invisible(NULL)
 }
 
 # Extending a data frame pads its other columns, and `[<-.data.frame` does that
