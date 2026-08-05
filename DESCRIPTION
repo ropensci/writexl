@@ -1,7 +1,7 @@
 Package: writexl
 Type: Package
 Title: Export Data Frames to Excel 'xlsx' Format
-Version: 1.5.4.9000
+Version: 2.0.0
 Authors@R: c(
     person("Jeroen", "Ooms", role = "aut", comment = c(ORCID = "0000-0002-4035-0289")),
     person("Bill", "Denney", ,"wdenney@humanpredictions.com", role = c("aut", "cre"),

@@ -39,5 +39,6 @@ src/libxlsxwriter/third_party/minizip/*
 # revdepcheck working tree: package library, checkouts and per-package logs
 revdep/
 
-# lintr scratch output
+# scratch output from lintr and revdep helper scripts
 lints.rds
+revdep_*.rds
