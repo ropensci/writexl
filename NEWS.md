@@ -28,11 +28,11 @@ existing script writes.  Everything else in this release is additive.
   Excel will actually open.
 
 * A cell column has no column-wide notion of "these are all formulas", so
-  `df[i, j] <- "=SUM(A1:A2)"` writes the eight characters rather than a
-  formula. `xl_formula()` returned a classed character vector in 1.5.4 and the
-  class survived a row assignment, which is what made the older spelling work;
-  it now returns a cell object, where a formula is a property of each cell.
-  Build the column and mark it once:
+  `df[i, j] <- "=SUM(A1:A2)"` writes the eleven characters rather than a
+  formula, and warns that it has. `xl_formula()` returned a classed character
+  vector in 1.5.4 and the class survived a row assignment, which is what made
+  the older spelling work; it now returns a cell object, where a formula is a
+  property of each cell. Build the column and mark it once:
 
   ```r
   NOTES[[2]] <- xl_formula(NOTES[[2]])   # after the rows are filled in
