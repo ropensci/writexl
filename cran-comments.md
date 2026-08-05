@@ -34,8 +34,8 @@ cells, all hyperlinks present, no warnings.
 
 The maintainer changes with this release, from Jeroen Ooms
 (jeroenooms@gmail.com) to Bill Denney (wdenney@humanpredictions.com). Jeroen
-Ooms remains an author. Confirmation from the outgoing maintainer is being sent
-to CRAN separately.
+Ooms remains an author. He confirmed the change to CRAN by email during the
+previous submission, and CRAN acknowledged it.
 
 ## Why the major version
 
