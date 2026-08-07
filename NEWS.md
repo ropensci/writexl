@@ -1,3 +1,14 @@
+# writexl 2.0.1
+
+A compiled-code cleanup requested by CRAN; nothing changes at the R level.
+
+* The bundled libxlsxwriter assigned the result of `strstr()`/`strpbrk()` on a
+  `const` string to a non-`const` pointer in four places. With GCC 16 and
+  glibc 2.43, where the C23 `<string.h>` search functions preserve `const`,
+  those assignments drew "discards 'const' qualifier" warnings, and the CRAN
+  checks on the r-devel Fedora flavors flag them as significant. The pointers
+  were only ever read, and are now `const` (or gone).
+
 # writexl 2.0.0
 
 writexl is now maintained by Bill Denney; Jeroen Ooms remains an author.
